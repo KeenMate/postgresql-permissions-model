@@ -566,12 +566,13 @@ create table auth.provider
 
 create table tenant
 (
-    tenant_id     int generated always as identity not null primary key,
-    uuid          uuid                             not null default ext.uuid_generate_v4(), -- if you need this kind of identifier, it's ready for you
-    title         text                             not null,
-    code          text                             not null,
-    is_removable  bool                             not null default true,
-    is_assignable bool                             not null default true
+    tenant_id        int generated always as identity not null primary key,
+    uuid             uuid                             not null default ext.uuid_generate_v4(), -- if you need this kind of identifier, it's ready for you
+    title            text                             not null,
+    code             text                             not null,
+    is_removable     bool                             not null default true,
+    is_assignable    bool                             not null default true,
+    access_type_code bool                                                                      -- invitation_only, registration, all
 ) inherits (_template_timestamps);
 
 create table user_info
@@ -1315,7 +1316,7 @@ begin
 end;
 $$;
 
-create function  auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
+create function auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
                                      _throw_err bool default true)
     returns bool
     language plpgsql
@@ -1334,8 +1335,9 @@ begin
 
     select permissions, expiration_date
     from auth.user_permission_cache upc
-    where upc.tenant_id = _tenant_id or upc.tenant_id = 1 -- primary/master tenant
-      and user_id = _target_user_id
+    where upc.tenant_id = _tenant_id
+       or upc.tenant_id = 1 -- primary/master tenant
+        and user_id = _target_user_id
     into __perms, __expiration_date;
 
     if __expiration_date is null or __expiration_date <= now() then
@@ -1709,7 +1711,7 @@ begin
     --     perform auth.has_permission(null, _user_id, 'system.authentication.create_auth_event');
 
     if
-            _user_id is not null and (__requester_username is null or __requester_username = '') then
+        _user_id is not null and (__requester_username is null or __requester_username = '') then
         select username
         from user_info ui
         where ui.user_id = _user_id
@@ -5188,20 +5190,6 @@ end
 
 
 $$;
-
-
-/***
- *    ██████╗ ██████╗     ██████╗ ███████╗██████╗ ███╗   ███╗██╗███████╗███████╗██╗ ██████╗ ███╗   ██╗███████╗
- *    ██╔══██╗██╔══██╗    ██╔══██╗██╔════╝██╔══██╗████╗ ████║██║██╔════╝██╔════╝██║██╔═══██╗████╗  ██║██╔════╝
- *    ██║  ██║██████╔╝    ██████╔╝█████╗  ██████╔╝██╔████╔██║██║███████╗███████╗██║██║   ██║██╔██╗ ██║███████╗
- *    ██║  ██║██╔══██╗    ██╔═══╝ ██╔══╝  ██╔══██╗██║╚██╔╝██║██║╚════██║╚════██║██║██║   ██║██║╚██╗██║╚════██║
- *    ██████╔╝██████╔╝    ██║     ███████╗██║  ██║██║ ╚═╝ ██║██║███████║███████║██║╚██████╔╝██║ ╚████║███████║
- *    ╚═════╝ ╚═════╝     ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
- *
- */
-
-grant usage on schema
-    const, unsecure, error, ext, auth, helpers to pluto_dev;
 
 /***
  *    ██████╗--██████╗-███████╗████████╗-----██████╗██████╗-███████╗-█████╗-████████╗███████╗
