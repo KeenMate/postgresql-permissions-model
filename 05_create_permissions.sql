@@ -4568,7 +4568,14 @@ begin
     select aug.user_group_id
     from active_user_groups aug
     where aug.tenant_id = _tenant_id
-      and aug.is_default;
+      and aug.is_default
+      and user_group_id not in (select group_id
+                                from user_group_member ugm
+                                         inner join user_group ug on ug.user_group_id = ugm.group_id
+                                where ugm.user_id = _user_id
+                                  and ug.tenant_id = _tenant_id
+                                  and ug.is_default);
+
 
     FOR group_data IN
         SELECT dg.*
