@@ -81,6 +81,7 @@ $$;
 create function helpers.get_code(_text text, _separator text default '_')
     returns text
     stable returns null on null input
+    parallel safe
     language sql
 as
 $$
