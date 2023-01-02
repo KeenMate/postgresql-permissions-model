@@ -535,6 +535,11 @@ create table const.sys_param
 
 create unique index uq_sys_params on const.sys_param (group_code, code);
 
+create table const.tenant_access_type
+(
+    code text not null primary key
+);
+
 create table const.token_type
 (
     code                          text not null primary key,
@@ -567,12 +572,12 @@ create table auth.provider
 create table tenant
 (
     tenant_id        int generated always as identity not null primary key,
-    uuid             uuid                             not null default ext.uuid_generate_v4(), -- if you need this kind of identifier, it's ready for you
+    uuid             uuid                             not null                                            default ext.uuid_generate_v4(), -- if you need this kind of identifier, it's ready for you
     title            text                             not null,
     code             text                             not null,
-    is_removable     bool                             not null default true,
-    is_assignable    bool                             not null default true,
-    access_type_code bool                                                                      -- invitation_only, registration, all
+    is_removable     bool                             not null                                            default true,
+    is_assignable    bool                             not null                                            default true,
+    access_type_code bool                             not null references const.tenant_access_type (code) default ''                      -- any, invitation_only, authenticated
 ) inherits (_template_timestamps);
 
 create table user_info
@@ -2869,7 +2874,7 @@ $$;
  */
 
 
-create function public.create_tenant(_created_by text, _user_id bigint, _title text, _code text default null,
+create function auth.create_tenant(_created_by text, _user_id bigint, _title text, _code text default null,
                                      _is_removable bool default true, _is_assignable bool default true,
                                      _tenant_owner_id bigint default null)
     returns setof tenant
@@ -2934,6 +2939,8 @@ create function auth.get_tenants(_user_id bigint)
             (
                 __created       timestamptz,
                 __created_by    text,
+                __modified      timestamptz,
+                __modified_by   text,
                 __tenant_id     int,
                 __uuid          text,
                 __title         text,
@@ -2959,7 +2966,8 @@ begin
                code,
                is_removable,
                is_assignable
-        from tenant t;
+        from tenant t
+        order by t.title;
 end;
 $$;
 
