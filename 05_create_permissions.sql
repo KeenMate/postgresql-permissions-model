@@ -577,7 +577,7 @@ create table auth.tenant
     code             text                             not null,
     is_removable     bool                             not null                                            default true,
     is_assignable    bool                             not null                                            default true,
-    access_type_code text                             not null references const.tenant_access_type (code) default 'authenticated'         -- invitation_only, authenticated
+    access_type_code text                             not null references const.tenant_access_type (code) default 'authenticated'         -- members_only, authenticated
 ) inherits (_template_timestamps);
 
 create table auth.user_info
@@ -5045,7 +5045,7 @@ begin
     -- COMMMON WITH ALL DATABASES
 
     insert into const.tenant_access_type(code)
-    values ('invitation_only');
+    values ('members_only');
     insert into const.tenant_access_type(code)
     values ('authenticated');
 
