@@ -461,7 +461,6 @@ $$;
 create function auth.get_user_random_code()
     returns text
     language sql
-    immutable
     volatile
     cost 1
 as
@@ -5075,6 +5074,10 @@ begin
     perform unsecure.create_permission_by_path_as_system('Authentication', 'system', false);
     perform unsecure.create_permission_by_path_as_system('Get data', 'system.authentication');
     perform unsecure.create_permission_by_path_as_system('Create auth event', 'system.authentication');
+
+    perform unsecure.create_permission_by_path_as_system('Journal', _is_assignable := true);
+    perform unsecure.create_permission_by_path_as_system('Read journal', 'system.journal', _is_assignable := true);
+    perform unsecure.create_permission_by_path_as_system('Get payload', 'system.journal', _is_assignable := true);
 
     perform unsecure.create_permission_by_path_as_system('Areas', 'system', false);
     perform unsecure.create_permission_by_path_as_system('Public', 'system.areas');
