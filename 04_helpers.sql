@@ -69,8 +69,7 @@ $$
 select not helpers.is_empty_string(_text);
 $$;
 
-create function helpers.random_string(len integer default 36) returns text
-    stable
+create or replace function helpers.random_string(len integer default 36) returns text
     cost 1
     volatile
     language sql
