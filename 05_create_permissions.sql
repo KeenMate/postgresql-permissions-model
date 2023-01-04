@@ -462,6 +462,7 @@ create function auth.get_user_random_code()
     returns text
     language sql
     volatile
+	parallel safe
     cost 1
 as
 $$
