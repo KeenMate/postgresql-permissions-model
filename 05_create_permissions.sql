@@ -584,8 +584,8 @@ create table auth.tenant
 create table auth.user_info
 (
     user_id                 bigint generated always as identity not null primary key,
-    code                    text                                not null default auth.get_user_random_code() unique , -- if you need this kind of identifier, it's ready for you
-    uuid                    uuid                                not null default ext.uuid_generate_v4() unique ,      -- if you need this kind of identifier, it's ready for you
+    code                    text                                not null default auth.get_user_random_code() unique, -- if you need this kind of identifier, it's ready for you
+    uuid                    uuid                                not null default ext.uuid_generate_v4() unique,      -- if you need this kind of identifier, it's ready for you
     can_login               bool                                not null default true,
     username                text                                not null check (length(username) <= 255 ),
     email                   text check (length(email) <= 255 ),
@@ -593,7 +593,8 @@ create table auth.user_info
     is_system               bool                                not null default false,
     is_active               bool                                not null default true,
     is_locked               bool                                not null default false,
-    last_used_provider_code text                                references auth.provider (code) on update set null
+    last_used_provider_code text                                references auth.provider (code) on delete set null,
+    original_username       text                                not null
 ) inherits (_template_timestamps);
 
 create unique index uq_user_info on user_info (email);
@@ -1447,8 +1448,8 @@ create function unsecure.create_system_user()
     rows 1
 as
 $$
-insert into auth.user_info(created_by, modified_by, can_login, email, display_name, username, is_system)
-values ('initial_script', 'initial_script', false, 'system', 'System', 'system', true)
+insert into auth.user_info(created_by, modified_by, can_login, email, display_name, username, original_username, is_system)
+values ('initial_script', 'initial_script', false, 'system', 'System', 'system', 'system', true)
 returning *;
 
 $$;
@@ -4371,8 +4372,8 @@ begin
 
     if
         __last_id is null then
-        insert into user_info (created_by, modified_by, username, email, display_name, last_used_provider_code)
-        values (_created_by, _created_by, __normalized_username, __normalized_email, _display_name, _last_provider_code)
+        insert into auth.user_info (created_by, modified_by, username, original_username, email, display_name, last_used_provider_code)
+        values (_created_by, _created_by, __normalized_username, trim(_username), __normalized_email, _display_name, _last_provider_code)
         returning user_id into __last_id;
     end if;
 
