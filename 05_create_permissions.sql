@@ -462,6 +462,7 @@ create function auth.get_user_random_code()
     returns text
     language sql
     immutable
+    volatile
     cost 1
 as
 $$
@@ -583,8 +584,8 @@ create table auth.tenant
 create table auth.user_info
 (
     user_id                 bigint generated always as identity not null primary key,
-    code                    text                                not null default auth.get_user_random_code(), -- if you need this kind of identifier, it's ready for you
-    uuid                    uuid                                not null default ext.uuid_generate_v4(),      -- if you need this kind of identifier, it's ready for you
+    code                    text                                not null default auth.get_user_random_code() unique , -- if you need this kind of identifier, it's ready for you
+    uuid                    uuid                                not null default ext.uuid_generate_v4() unique ,      -- if you need this kind of identifier, it's ready for you
     can_login               bool                                not null default true,
     username                text                                not null check (length(username) <= 255 ),
     email                   text check (length(email) <= 255 ),
@@ -1446,8 +1447,8 @@ create function unsecure.create_system_user()
     rows 1
 as
 $$
-insert into auth.user_info(created_by, modified_by, can_login, email, display_name, username)
-values ('initial_script', 'initial_script', false, 'system', 'System', 'system')
+insert into auth.user_info(created_by, modified_by, can_login, email, display_name, username, is_system)
+values ('initial_script', 'initial_script', false, 'system', 'System', 'system', true)
 returning *;
 
 $$;

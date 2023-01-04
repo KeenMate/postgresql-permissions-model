@@ -72,6 +72,7 @@ $$;
 create function helpers.random_string(len integer default 36) returns text
     stable
     cost 1
+    volatile
     language sql
 as
 $$
