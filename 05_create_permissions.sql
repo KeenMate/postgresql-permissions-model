@@ -600,15 +600,15 @@ create unique index uq_user_info on user_info (email);
 create table auth.tenant_user
 (
     tenant_user_id bigint generated always as identity not null primary key,
-    tenant_id      int                                 not null references tenant (tenant_id) on delete cascade,
-    user_id        int                                 not null references user_info (user_id) on delete cascade
+    tenant_id      int                                 not null references auth.tenant (tenant_id) on delete cascade,
+    user_id        int                                 not null references auth.user_info (user_id) on delete cascade
 ) inherits (_template_created);
 
 create table auth.user_permission_cache
 (
     upc_id          bigint generated always as identity not null primary key,
-    user_id         bigint                              not null references user_info (user_id),
-    tenant_id       int                                 not null references tenant (tenant_id),
+    user_id         bigint                              not null references auth.user_info (user_id),
+    tenant_id       int                                 not null references auth.tenant (tenant_id),
     groups          text[]                              not null default '{}',
     permissions     text[]                              not null default '{}',
     expiration_date timestamptz                         not null
@@ -619,7 +619,7 @@ create table auth.user_permission_cache
 create table auth.user_data
 (
     user_data_id bigint generated always as identity not null primary key,
-    user_id      bigint                              not null references user_info (user_id) on delete cascade,
+    user_id      bigint                              not null references auth.user_info (user_id) on delete cascade,
     first_name   text,
     middle_name  text,
     last_name    text
@@ -631,7 +631,7 @@ create table auth.user_identity
     user_identity_id bigint generated always as identity not null primary key,
     provider_code    text                                not null references auth.provider (code) on update cascade on delete cascade,
     uid              text,
-    user_id          bigint references user_info (user_id) on delete cascade,
+    user_id          bigint references auth.user_info (user_id) on delete cascade,
     provider_groups  text[],
     provider_roles   text[],
     user_data        jsonb,
@@ -660,7 +660,7 @@ create index ix_permission_node_path on auth.permission using GIST (node_path);
 create table auth.perm_set
 (
     perm_set_id   int generated always as identity not null primary key,
-    tenant_id     int references tenant (tenant_id) on delete cascade,
+    tenant_id     int references auth.tenant (tenant_id) on delete cascade,
     title         text                             not null,
     code          text                             not null unique, -- set with trigger
     is_system     bool                             not null default false,
@@ -683,7 +683,7 @@ create table auth.perm_set_perm
 create table auth.user_group
 (
     user_group_id             int generated always as identity not null primary key,
-    tenant_id                 int references tenant (tenant_id),
+    tenant_id                 int references auth.tenant (tenant_id),
     title                     text                             not null,
     code                      text                             not null, -- set with trigger
     is_system                 bool                             not null default false,
@@ -720,7 +720,7 @@ create table auth.user_group_member
     member_id         bigint generated always as identity not null primary key,
     group_id          int                                 not null references auth.user_group (user_group_id) on delete cascade,
     user_id           bigint                              not null references auth.user_info (user_id) on delete cascade,
-    mapping_id        int references user_group_mapping (ug_mapping_id) on delete cascade,
+    mapping_id        int references auth.user_group_mapping (ug_mapping_id) on delete cascade,
     manual_assignment bool                                not null default false
 ) inherits (_template_created);
 
@@ -788,13 +788,14 @@ create table journal
     tenant_id      int references auth.tenant (tenant_id),
     data_group     text,
     data_object_id bigint,
+    data_code      text,
     event_id       int,
     user_id        bigint                              references auth.user_info (user_id) on delete set null,
     message        text                                not null,
     data_payload   jsonb
 ) inherits (_template_created);
 
-create index ix_journal on journal (tenant_id, data_group, data_object_id);
+create index ix_journal on journal (tenant_id, data_group, coalesce(data_object_id, 0), coalesce(data_code, 'n/a'));
 
 /***
  *    ██╗   ██╗██╗███████╗██╗    ██╗███████╗
@@ -1322,7 +1323,7 @@ end;
 $$;
 
 create or replace function auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
-                                     _throw_err bool default true)
+                                                _throw_err bool default true)
     returns bool
     language plpgsql
     stable
@@ -1428,7 +1429,7 @@ $$;
 
 
 create function unsecure.create_primary_tenant()
-    returns setof tenant
+    returns setof auth.tenant
     language sql
     rows 1
 as
@@ -1440,7 +1441,7 @@ $$;
 
 
 create function unsecure.create_system_user()
-    returns setof user_info
+    returns setof auth.user_info
     language sql
     rows 1
 as
@@ -1452,7 +1453,7 @@ returning *;
 $$;
 
 create function unsecure.delete_user_by_username_as_system(_username text)
-    returns user_info
+    returns auth.user_info
     language sql as
 $$
 delete
@@ -2082,7 +2083,7 @@ declare
 begin
 
     insert into auth.user_group (created_by, modified_by, tenant_id, title, is_default, is_system, is_assignable,
-                            is_active, is_external)
+                                 is_active, is_external)
     values (_created_by, _created_by, _tenant_id, _title, _is_default, _is_system, _is_assignable, _is_active,
             _is_external)
     returning user_group_id
@@ -2630,8 +2631,8 @@ begin
     end if;
 
     return query insert into auth.user_group_mapping (created_by, group_id, provider_code, mapped_object_id,
-                                                 mapped_object_name,
-                                                 mapped_role)
+                                                      mapped_object_name,
+                                                      mapped_role)
         values (_created_by, _user_group_id, _provider_code, lower(_mapped_object_id), _mapped_object_name,
                 lower(_mapped_role))
         returning ug_mapping_id;
@@ -2884,7 +2885,7 @@ $$;
 create function auth.create_tenant(_created_by text, _user_id bigint, _title text, _code text default null,
                                    _is_removable bool default true, _is_assignable bool default true,
                                    _tenant_owner_id bigint default null)
-    returns setof tenant
+    returns setof auth.tenant
     language plpgsql
     rows 1
 as
@@ -4349,7 +4350,7 @@ $$;
 
 create function unsecure.create_user_info(_created_by text, _user_id bigint, _username text, _email text,
                                           _display_name text, _last_provider_code text)
-    returns setof user_info
+    returns setof auth.user_info
     language plpgsql
     rows 1
 as
@@ -4411,7 +4412,7 @@ $$
 begin
 
     return query insert into auth.user_identity (created_by, modified_by, provider_code, uid, user_id,
-                                            user_data, password_hash, password_salt, is_active)
+                                                 user_data, password_hash, password_salt, is_active)
         values (_created_by, _created_by, _provider_code, _provider_uid, _target_user_id,
                 _user_data::jsonb, _password_hash, _password_salt, _is_active)
         returning user_id, provider_code, uid;
