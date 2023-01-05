@@ -1741,7 +1741,7 @@ $$;
  */
 
 create function unsecure.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-                                           _target_user_id bigint, _ip_address text, _user_agent text, _origin text)
+                                           _target_user_id bigint, _ip_address text, _user_agent text, _origin text, _event_data jsonb default null)
     returns table
             (
                 __auth_event_id bigint
@@ -1779,7 +1779,8 @@ begin
                                               target_username,
                                               ip_address,
                                               user_agent,
-                                              origin)
+                                              origin,
+                                              event_data)
         values (_created_by,
                 _event_type_code,
                 _user_id,
@@ -1788,14 +1789,15 @@ begin
                 __target_username,
                 _ip_address,
                 _user_agent,
-                _origin)
+                _origin,
+                _event_data)
         returning auth_event_id;
 end;
 $$;
 
 
 create function auth.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-                                       _target_user_id bigint, _ip_address text, _user_agent text, _origin text)
+                                       _target_user_id bigint, _ip_address text, _user_agent text, _origin text, _event_data jsonb)
     returns table
             (
                 ___auth_event_id bigint
@@ -1807,7 +1809,7 @@ begin
     return query
         select __auth_event_id
         from unsecure.create_auth_event(_created_by, _user_id, _event_type_code, _target_user_id, _ip_address,
-                                        _user_agent, _origin);
+                                        _user_agent, _origin, _event_data);
 end;
 $$;
 
@@ -5204,17 +5206,46 @@ begin
         auth.create_provider('initial', 1, 'aad', 'Azure authentication', false);
 
     insert into const.auth_event_type(code)
-    values ('add_user_identity');
+    values ('create_user_info');
     insert into const.auth_event_type(code)
-    values ('remove_user_identity');
+    values ('update_user_info');
+    insert into const.auth_event_type(code)
+    values ('delete_user_info');
+
+    insert into const.auth_event_type(code)
+    values ('create_user_identity');
+    insert into const.auth_event_type(code)
+    values ('update_user_identity');
+    insert into const.auth_event_type(code)
+    values ('delete_user_identity');
+
+    insert into const.auth_event_type(code)
+    values ('user_logged_in');
+    insert into const.auth_event_type(code)
+    values ('user_logged_out');
+
+    insert into const.auth_event_type(code)
+    values ('user_invited');
+    insert into const.auth_event_type(code)
+    values ('user_invitation_accepted');
+    insert into const.auth_event_type(code)
+    values ('user_invitation_rejected');
+
     insert into const.auth_event_type(code)
     values ('email_verification');
     insert into const.auth_event_type(code)
     values ('phone_verification');
     insert into const.auth_event_type(code)
-    values ('request_password_reset');
+    values ('password_reset_requested');
     insert into const.auth_event_type(code)
-    values ('change_password');
+    values ('password_change');
+    insert into const.auth_event_type(code)
+    values ('password_changed');
+
+    insert into const.auth_event_type(code)
+    values ('external_data_update'); -- when data are about to be changed directly at identity provider or elsewhere
+    insert into const.auth_event_type(code)
+    values ('external_data_updated'); -- when data are changed directly at identity provider or elsewhere
 
     insert into const.token_type(code, default_expiration_in_seconds)
     values ('email_verification', 1 * 60 * 60);
