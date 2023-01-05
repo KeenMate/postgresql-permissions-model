@@ -597,7 +597,7 @@ create table auth.user_info
     original_username       text                                not null
 ) inherits (_template_timestamps);
 
-create unique index uq_user_info on user_info (email);
+create unique index uq_user_info on auth.user_info (email);
 
 create table auth.tenant_user
 (
@@ -1333,16 +1333,6 @@ begin
 end;
 $$;
 
-create or replace function auth.has_permissions(_target_user_id bigint, _perm_codes text[],
-                                                _throw_err bool default true)
-    returns bool
-    language sql
-    stable
-as
-$$
-select *
-from auth.has_permissions(1, _target_user_id, _perm_codes, _throw_err);
-$$;
 
 create or replace function auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
                                                 _throw_err bool default true)
@@ -1436,6 +1426,18 @@ begin
     return false;
 end ;
 $$;
+
+create or replace function auth.has_permissions(_target_user_id bigint, _perm_codes text[],
+                                                _throw_err bool default true)
+    returns bool
+    language sql
+    stable
+as
+$$
+select *
+from auth.has_permissions(1, _target_user_id, _perm_codes, _throw_err);
+$$;
+
 
 create function auth.has_permission(_target_user_id bigint, _perm_code text,
                                     _throw_err bool default true)
@@ -1741,73 +1743,81 @@ $$;
  */
 
 create function unsecure.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-                                           _target_user_id bigint, _ip_address text, _user_agent text, _origin text)
-    returns table
-            (
-                __auth_event_id bigint
-            )
-    language plpgsql
+																					 _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
+																					 _event_data jsonb default null,
+																					 _target_user_oid text default null, _target_username text default null)
+	returns table
+					(
+						__auth_event_id bigint
+					)
+	language plpgsql
 as
 $$
 declare
-    __requester_username text;
-    __target_username    text;
+	__requester_username text;
 begin
-    --     perform auth.has_permission(null, _user_id, 'system.authentication.create_auth_event');
+	--     perform auth.has_permission(null, _user_id, 'system.authentication.create_auth_event');
 
-    if
-        _user_id is not null and (__requester_username is null or __requester_username = '') then
-        select username
-        from auth.user_info ui
-        where ui.user_id = _user_id
-        into __requester_username;
-    end if;
+	if
+		_user_id is not null and (__requester_username is null or __requester_username = '') then
+		select username
+		from auth.user_info ui
+		where ui.user_id = _user_id
+		into __requester_username;
+	end if;
 
-    if
-        _target_user_id is not null then
-        select username
-        from auth.user_info ui
-        where ui.user_id = _target_user_id
-        into __target_username;
-    end if;
+	if
+		_target_user_id is not null and _target_username is null then
+		select username
+		from auth.user_info ui
+		where ui.user_id = _target_user_id
+		into _target_username;
+	end if;
 
-    return query insert into auth.auth_event (created_by,
-                                              event_type_code,
-                                              requester_user_id,
-                                              requester_username,
-                                              target_user_id,
-                                              target_username,
-                                              ip_address,
-                                              user_agent,
-                                              origin)
-        values (_created_by,
-                _event_type_code,
-                _user_id,
-                __requester_username,
-                _target_user_id,
-                __target_username,
-                _ip_address,
-                _user_agent,
-                _origin)
-        returning auth_event_id;
+	return query insert into auth.auth_event (created_by,
+																						event_type_code,
+																						requester_user_id,
+																						requester_username,
+																						target_user_id,
+																						target_user_oid,
+																						target_username,
+																						ip_address,
+																						user_agent,
+																						origin,
+																						event_data)
+		values (_created_by,
+						_event_type_code,
+						_user_id,
+						__requester_username,
+						_target_user_id,
+						_target_user_oid,
+						_target_username,
+						_ip_address,
+						_user_agent,
+						_origin,
+						_event_data)
+		returning auth_event_id;
 end;
 $$;
 
 
 create function auth.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-                                       _target_user_id bigint, _ip_address text, _user_agent text, _origin text)
-    returns table
-            (
-                ___auth_event_id bigint
-            )
-    language plpgsql
+																			 _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
+																			 _event_data jsonb default null,
+																			 _target_user_oid text default null, _target_username text default null)
+	returns table
+					(
+						___auth_event_id bigint
+					)
+	language plpgsql
 as
 $$
 begin
-    return query
-        select __auth_event_id
-        from unsecure.create_auth_event(_created_by, _user_id, _event_type_code, _target_user_id, _ip_address,
-                                        _user_agent, _origin);
+	return query
+		select __auth_event_id
+		from unsecure.create_auth_event(_created_by, _user_id, _event_type_code,
+																		_target_user_id, _ip_address,
+																		_user_agent, _origin, _event_data, _target_user_oid, _target_username);
 end;
 $$;
 
@@ -2145,14 +2155,14 @@ $$;
 
 create function unsecure.create_user_group_as_system(_tenant_id int, _title text
 , _is_system bool default false, _is_assignable bool default true)
-    returns setof user_group
+    returns setof auth.user_group
     language sql
     rows 1
 as
 $$
 select ug.*
 from unsecure.create_user_group('system', 1, _title, _tenant_id, _is_assignable, true, false, _is_system) g
-         inner join user_group ug on ug.user_group_id = g.__group_id;
+         inner join auth.user_group ug on ug.user_group_id = g.__group_id;
 
 $$;
 
@@ -2585,7 +2595,7 @@ begin
              , ugma.mapped_object_name
              , ugma.provider_code
         from auth.user_group_member ugm
-                 left join user_group_mapping ugma on ugma.ug_mapping_id = ugm.mapping_id
+                 left join auth.user_group_mapping ugma on ugma.ug_mapping_id = ugm.mapping_id
                  inner join auth.user_info ui on ui.user_id = ugm.user_id
         where ugm.group_id = _user_group_id;
 
@@ -4616,12 +4626,12 @@ begin
     create
         temporary table tmp_default_groups as
     select aug.user_group_id
-    from active_user_groups aug
+    from auth.active_user_groups aug
     where aug.tenant_id = _tenant_id
       and aug.is_default
       and user_group_id not in (select group_id
                                 from auth.user_group_member ugm
-                                         inner join user_group ug on ug.user_group_id = ugm.group_id
+                                         inner join auth.user_group ug on ug.user_group_id = ugm.group_id
                                 where ugm.user_id = _user_id
                                   and ug.tenant_id = _tenant_id
                                   and ug.is_default);
