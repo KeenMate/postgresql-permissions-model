@@ -462,7 +462,7 @@ create function auth.get_user_random_code()
     returns text
     language sql
     volatile
-	parallel safe
+    parallel safe
     cost 1
 as
 $$
@@ -762,10 +762,14 @@ create table auth.auth_event
     requester_username text,
     target_user_id     bigint                              references auth.user_info (user_id) on delete set null,
     target_username    text,
+    target_user_oid    text,
     ip_address         text,
     user_agent         text,
-    origin             text
+    origin             text,
+    event_data         jsonb
 ) inherits (_template_created);
+
+create index ix_auth_event_data on auth.auth_event using gin (event_data jsonb_path_ops);
 
 create table auth.token
 (
@@ -781,8 +785,13 @@ create table auth.token
     used_at            timestamptz,
     ip_address         text,
     user_agent         text,
-    origin             text
+    origin             text,
+    token_data         jsonb
 ) inherits (_template_timestamps);
+
+create index ix_token_token on auth.token using hash (token);
+create index ix_token_expires_at on auth.token using btree (expires_at);
+create index ix_token_token_data on auth.token using gin (token_data jsonb_path_ops);
 
 create table journal
 (
@@ -1065,7 +1074,7 @@ begin
                                          from unnest(__provider_groups) g
                                                   inner join auth.user_group_mapping ugm
                                                              on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
-                                                  inner join user_group u
+                                                  inner join auth.user_group u
                                                              on u.user_group_id = ugm.group_id
                                          union
                                          select distinct ugm.group_id
@@ -1115,7 +1124,7 @@ begin
     return query
         select array_agg(distinct ug.code)
         from auth.user_group_member ugm
-                 inner join user_group ug on ug.user_group_id = ugm.group_id
+                 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
         where user_id = _target_user_id;
 end;
 $$;
@@ -1324,6 +1333,17 @@ begin
 end;
 $$;
 
+create or replace function auth.has_permissions(_target_user_id bigint, _perm_codes text[],
+                                                _throw_err bool default true)
+    returns bool
+    language sql
+    stable
+as
+$$
+select *
+from auth.has_permissions(1, _target_user_id, _perm_codes, _throw_err);
+$$;
+
 create or replace function auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
                                                 _throw_err bool default true)
     returns bool
@@ -1414,6 +1434,18 @@ begin
     end if;
 
     return false;
+end ;
+$$;
+
+create function auth.has_permission(_target_user_id bigint, _perm_code text,
+                                    _throw_err bool default true)
+    returns bool
+    language plpgsql
+    stable
+as
+$$
+begin
+    return auth.has_permissions(1, _target_user_id, array [_perm_code], _throw_err);
 end ;
 $$;
 
@@ -1809,7 +1841,8 @@ create function auth.create_token(_created_by text, _user_id bigint,
                                   _token_type_code text,
                                   _token_channel_code text,
                                   _token text,
-                                  _expires_at timestamptz default null)
+                                  _expires_at timestamptz default null,
+                                  _token_data text default null)
     returns table
             (
                 ___token_id   bigint,
@@ -1863,14 +1896,15 @@ begin
 
     insert into auth.token (created_by,
                             user_id, auth_event_id, token_type_code, token_channel_code,
-                            token, expires_at)
+                            token, expires_at, token_data)
     values (_created_by,
             _target_user_id,
             _auth_event_id,
             _token_type_code,
             _token_channel_code,
             _token,
-            _expires_at)
+            _expires_at,
+            _token_data::jsonb)
     returning token_id, uid, expires_at
         into __last_id, __token_uid, __token_expires_at;
 
