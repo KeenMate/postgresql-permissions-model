@@ -146,7 +146,7 @@ $$;
 
 -- User has no correct permission in tenant
 
-create function error.raise_52109(_user_id bigint, _tenant_id int, _perm_codes text[]) returns void
+create function error.raise_52109(_tenant_id int, _user_id bigint, _perm_codes text[]) returns void
     language plpgsql as
 $$
 begin
@@ -557,7 +557,7 @@ create table const.token_state
     code text not null primary key
 );
 
-create table const.auth_event_type
+create table const.user_event_type
 (
     code text not null primary key
 );
@@ -754,10 +754,10 @@ create unique index uq_permission_assignment ON auth.permission_assignment (grou
                                                                             coalesce(perm_set_id, 0),
                                                                             coalesce(permission_id, 0));
 
-create table auth.auth_event
+create table auth.user_event
 (
-    auth_event_id      bigint generated always as identity not null primary key,
-    event_type_code    text                                not null references const.auth_event_type (code),
+    user_event_id      bigint generated always as identity not null primary key,
+    event_type_code    text                                not null references const.user_event_type (code),
     requester_user_id  bigint                              references auth.user_info (user_id) on delete set null,
     requester_username text,
     target_user_id     bigint                              references auth.user_info (user_id) on delete set null,
@@ -769,14 +769,14 @@ create table auth.auth_event
     event_data         jsonb
 ) inherits (_template_created);
 
-create index ix_auth_event_data on auth.auth_event using gin (event_data jsonb_path_ops);
+create index ix_user_event_data on auth.user_event using gin (event_data jsonb_path_ops);
 
 create table auth.token
 (
     token_id           bigint generated always as identity not null primary key,
     user_id            bigint references auth.user_info (user_id),
     uid                text                                not null default helpers.random_string(12) unique, -- token uid
-    auth_event_id      int references auth.auth_event (auth_event_id) on delete cascade,                      -- related authentication event
+    user_event_id      int references auth.user_event (user_event_id) on delete cascade,                      -- related authentication event
     token_state_code   text                                not null default 'valid' references const.token_state (code),
     token_type_code    text                                not null references const.token_type (code),
     token_channel_code text                                not null references const.token_channel (code),
@@ -1014,7 +1014,18 @@ as
 $$
 begin
     perform
-        error.raise_52109(_user_id, _tenant_id, _perm_codes);
+        error.raise_52109(_tenant_id, _user_id, _perm_codes);
+end;
+$$;
+
+create function auth.throw_no_permission(_user_id bigint, _perm_codes text[])
+    returns void
+    language plpgsql
+as
+$$
+begin
+    perform
+        error.raise_52109(1, _user_id, _perm_codes);
 end;
 $$;
 
@@ -1026,6 +1037,17 @@ $$
 begin
     perform
         auth.throw_no_permission(_tenant_id, _user_id, array [_perm_code]);
+end;
+$$;
+
+create function auth.throw_no_permission(_user_id bigint, _perm_code text)
+    returns void
+    language plpgsql
+as
+$$
+begin
+    perform
+        auth.throw_no_permission(1, _user_id, array [_perm_code]);
 end;
 $$;
 
@@ -1742,13 +1764,13 @@ $$;
  *
  */
 
-create function unsecure.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-																					 _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
-																					 _event_data jsonb default null,
-																					 _target_user_oid text default null, _target_username text default null)
+create function unsecure.create_user_event(_created_by text, _user_id bigint, _event_type_code text,
+                                           _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
+                                           _event_data jsonb default null,
+                                           _target_user_oid text default null, _target_username text default null)
     returns table
             (
-                __auth_event_id bigint
+                __user_event_id bigint
             )
     language plpgsql
 as
@@ -1756,7 +1778,7 @@ $$
 declare
     __requester_username text;
 begin
-    --     perform auth.has_permission(null, _user_id, 'system.authentication.create_auth_event');
+    --     perform auth.has_permission(null, _user_id, 'system.authentication.create_user_event');
 
     if
         _user_id is not null and (__requester_username is null or __requester_username = '') then
@@ -1767,19 +1789,19 @@ begin
     end if;
 
     if
-		_target_user_id is not null and _target_username is null then
+        _target_user_id is not null and _target_username is null then
         select username
         from auth.user_info ui
         where ui.user_id = _target_user_id
-		into _target_username;
+        into _target_username;
     end if;
 
-    return query insert into auth.auth_event (created_by,
+    return query insert into auth.user_event (created_by,
                                               event_type_code,
                                               requester_user_id,
                                               requester_username,
                                               target_user_id,
-																						target_user_oid,
+                                              target_user_oid,
                                               target_username,
                                               ip_address,
                                               user_agent,
@@ -1790,34 +1812,34 @@ begin
                 _user_id,
                 __requester_username,
                 _target_user_id,
-						_target_user_oid,
-						_target_username,
+                _target_user_oid,
+                _target_username,
                 _ip_address,
                 _user_agent,
                 _origin,
                 _event_data)
-        returning auth_event_id;
+        returning user_event_id;
 end;
 $$;
 
 
-create function auth.create_auth_event(_created_by text, _user_id bigint, _event_type_code text,
-																			 _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
-																			 _event_data jsonb default null,
-																			 _target_user_oid text default null, _target_username text default null)
+create function auth.create_user_event(_created_by text, _user_id bigint, _event_type_code text,
+                                       _target_user_id bigint, _ip_address text, _user_agent text, _origin text,
+                                       _event_data jsonb default null,
+                                       _target_user_oid text default null, _target_username text default null)
     returns table
             (
-                ___auth_event_id bigint
+                ___user_event_id bigint
             )
     language plpgsql
 as
 $$
 begin
     return query
-        select __auth_event_id
-		from unsecure.create_auth_event(_created_by, _user_id, _event_type_code,
-																		_target_user_id, _ip_address,
-																		_user_agent, _origin, _event_data, _target_user_oid, _target_username);
+        select __user_event_id
+        from unsecure.create_user_event(_created_by, _user_id, _event_type_code,
+                                        _target_user_id, _ip_address,
+                                        _user_agent, _origin, _event_data, _target_user_oid, _target_username);
 end;
 $$;
 
@@ -1847,7 +1869,7 @@ $$;
 
 create function auth.create_token(_created_by text, _user_id bigint,
                                   _target_user_id bigint,
-                                  _auth_event_id int,
+                                  _user_event_id int,
                                   _token_type_code text,
                                   _token_channel_code text,
                                   _token text,
@@ -1905,11 +1927,11 @@ begin
 
 
     insert into auth.token (created_by,
-                            user_id, auth_event_id, token_type_code, token_channel_code,
+                            user_id, user_event_id, token_type_code, token_channel_code,
                             token, expires_at, token_data)
     values (_created_by,
             _target_user_id,
-            _auth_event_id,
+            _user_event_id,
             _token_type_code,
             _token_channel_code,
             _token,
@@ -4528,7 +4550,7 @@ begin
         perform auth.has_permission(null, _user_id, 'system.manage_users.change_password');
     end if;
 
-    perform unsecure.create_auth_event(_modified_by, _user_id, 'change_password',
+    perform unsecure.create_user_event(_modified_by, _user_id, 'change_password',
                                        _target_user_id, _ip_address, _user_agent, _origin);
 
     return query
@@ -5151,6 +5173,7 @@ begin
     perform unsecure.create_permission_by_path_as_system('Enable user identity', 'system.manage_users');
     perform unsecure.create_permission_by_path_as_system('Disable user identity', 'system.manage_users');
     perform unsecure.create_permission_by_path_as_system('Change password', 'system.manage_users');
+    perform unsecure.create_permission_by_path_as_system('Read user events', 'system.manage_users');
 
     perform unsecure.create_permission_by_path_as_system('Manage tenants', 'system');
     perform unsecure.create_permission_by_path_as_system('Create tenant', 'system.manage_tenants');
@@ -5213,46 +5236,46 @@ begin
     perform
         auth.create_provider('initial', 1, 'aad', 'Azure authentication', false);
 
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('create_user_info');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('update_user_info');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('delete_user_info');
 
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('create_user_identity');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('update_user_identity');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('delete_user_identity');
 
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('user_logged_in');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('user_logged_out');
 
-    insert into const.auth_event_type(code)
-    values ('user_invited');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
+    values ('user_invitation_sent');
+    insert into const.user_event_type(code)
     values ('user_invitation_accepted');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('user_invitation_rejected');
 
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('email_verification');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('phone_verification');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('password_reset_requested');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('password_change');
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('password_changed');
 
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('external_data_update'); -- when data are about to be changed directly at identity provider or elsewhere
-    insert into const.auth_event_type(code)
+    insert into const.user_event_type(code)
     values ('external_data_updated'); -- when data are changed directly at identity provider or elsewhere
 
     insert into const.token_type(code, default_expiration_in_seconds)
