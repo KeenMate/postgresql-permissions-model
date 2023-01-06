@@ -1,5 +1,6 @@
 # Database event codes
 
+
 ## Common
 
 | Event code  | Description |
