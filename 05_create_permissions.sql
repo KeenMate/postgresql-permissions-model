@@ -1855,7 +1855,7 @@ create function auth.create_token(_created_by text, _user_id bigint,
                                   _token_channel_code text,
                                   _token text,
                                   _expires_at timestamptz default null,
-                                  _token_data text default null)
+                                  _token_data jsonb default null)
   returns table
           (
             ___token_id   bigint,
@@ -1910,7 +1910,7 @@ begin
   insert into auth.token ( created_by, user_id, user_event_id, token_type_code, token_channel_code, token, expires_at
                          , token_data)
   values ( _created_by, _target_user_id, _user_event_id, _token_type_code, _token_channel_code, _token, _expires_at
-         , _token_data::jsonb)
+         , _token_data)
   returning token_id, uid, expires_at
     into __last_id, __token_uid, __token_expires_at;
 
@@ -1934,10 +1934,12 @@ $$;
 create function auth.validate_token(_modified_by text, _user_id bigint,
                                     _target_user_id bigint,
                                     _token text,
+                                    _token_type text,
                                     _ip_address text,
                                     _user_agent text,
                                     _origin text,
-                                    _set_as_used bool default false)
+                                    _set_as_used bool default false,
+                                    _token_uid text default null)
   returns table
           (
             ___token_id         bigint,
@@ -1960,8 +1962,10 @@ begin
 
   select token_id, uid, token_state_code, user_id
   from auth.token
-  where token = _token
-    and ((_target_user_id is not null and token.user_id = _target_user_id) or true)
+  where ((_target_user_id is not null and token.user_id = _target_user_id) or true)
+    and token_type_code = _token_type
+    and (_token_uid is null or _token_uid = uid)
+    and token = _token
   into __token_id, __token_uid, __token_state_code, __token_user_id;
 
   if
@@ -2060,6 +2064,7 @@ end;
 $$;
 
 create or replace function auth.set_token_as_used(_modified_by text, _user_id bigint, _token text,
+                                             _token_type text,
                                              _ip_address text,
                                              _user_agent text,
                                              _origin text)
@@ -2078,7 +2083,7 @@ begin
   return query
     with token_id as (select token_id
                       from auth.token
-                      where token = _token)
+                      where token_type_code = _token_type and token = _token)
     select *
     from auth.set_token_as_used(_modified_by, _user_id, token_id,
                                 _ip_address,
