@@ -929,14 +929,14 @@ $$;
 create or replace function get_journal_msgs(_tenant_id int, _user_id int, _from timestamptz, _to timestamptz)
     returns table
             (
-                __journal_id     bigint,
-                __created        timestamptz,
-                __created_by     text,
-                __data_group     text,
-                __data_object_id bigint,
+                __journal_id       bigint,
+                __created          timestamptz,
+                __created_by       text,
+                __data_group       text,
+                __data_object_id   bigint,
                 __data_object_code text,
-                __user_id        bigint,
-                __msg            text
+                __user_id          bigint,
+                __msg              text
             )
     language plpgsql
     stable
@@ -4584,7 +4584,7 @@ as
 $$
 declare
     __normalized_email text;
-    __new_user         user_info;
+    __new_user         auth.user_info;
 begin
 
     perform
