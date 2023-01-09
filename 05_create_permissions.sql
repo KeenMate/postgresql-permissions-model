@@ -1874,7 +1874,7 @@ create function auth.create_token(_created_by text, _user_id bigint,
                                   _token_channel_code text,
                                   _token text,
                                   _expires_at timestamptz default null,
-                                  _token_data text default null)
+                                  _token_data jsonb default null)
     returns table
             (
                 ___token_id   bigint,
@@ -1936,7 +1936,7 @@ begin
             _token_channel_code,
             _token,
             _expires_at,
-            _token_data::jsonb)
+            _token_data)
     returning token_id, uid, expires_at
         into __last_id, __token_uid, __token_expires_at;
 
