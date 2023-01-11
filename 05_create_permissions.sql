@@ -1457,19 +1457,6 @@ select *
 from auth.has_permissions(1, _target_user_id, _perm_codes, _throw_err);
 $$;
 
-
-create function auth.has_permission(_target_user_id bigint, _perm_code text,
-                                    _throw_err bool default true)
-    returns bool
-    language plpgsql
-    stable
-as
-$$
-begin
-    return auth.has_permissions(1, _target_user_id, array [_perm_code], _throw_err);
-end ;
-$$;
-
 create function auth.has_permission(_tenant_id int, _target_user_id bigint, _perm_code text,
                                     _throw_err bool default true)
     returns bool
@@ -1482,6 +1469,17 @@ begin
 end ;
 $$;
 
+create function auth.has_permission(_target_user_id bigint, _perm_code text,
+                                    _throw_err bool default true)
+    returns bool
+    language plpgsql
+    stable
+as
+$$
+begin
+    return auth.has_permissions(1, _target_user_id, array [_perm_code], _throw_err);
+end ;
+$$;
 
 create function unsecure.create_primary_tenant()
     returns setof auth.tenant
@@ -1843,270 +1841,306 @@ $$;
  */
 
 create function unsecure.expire_tokens(_created_by text)
-    returns void
-    language sql as
+	returns void
+	language sql as
 $$
 update auth.token
-set modified         = now()
-  , modified_by      = _created_by
-  , token_state_code = 'expired'
+set modified         = now(),
+		modified_by      = _created_by,
+		token_state_code = 'expired'
 where token_state_code = 'valid'
-  and expires_at
-    < now();
+	and expires_at
+	< now();
 $$;
 
-
-create function auth.create_token(_created_by text, _user_id bigint,
-                                  _target_user_id bigint,
-                                  _user_event_id int,
-                                  _token_type_code text,
-                                  _token_channel_code text,
-                                  _token text,
-                                  _expires_at timestamptz default null,
-                                  _token_data jsonb default null)
-    returns table
-            (
-                ___token_id   bigint,
-                ___token_uid  text,
-                ___expires_at timestamptz
-            )
-    language plpgsql
+create or replace function auth.create_token(_created_by text, _user_id bigint,
+																						 _target_user_id bigint,
+																						 _target_user_oid text,
+																						 _user_event_id int,
+																						 _token_type_code text,
+																						 _token_channel_code text,
+																						 _token text,
+																						 _expires_at timestamptz default null,
+																						 _token_data jsonb default null)
+	returns table
+					(
+						___token_id   bigint,
+						___token_uid  text,
+						___expires_at timestamptz
+					)
+	language plpgsql
 as
 $$
 declare
-    __default_expiration_in_seconds int;
-    __last_id                       bigint;
-    __token_uid                     text;
-    __token_expires_at              timestamptz;
+	__default_expiration_in_seconds int;
+	__last_id                       bigint;
+	__token_uid                     text;
+	__token_expires_at              timestamptz;
 begin
-    perform
-        auth.has_permission(null, _user_id, 'system.tokens.create_token');
+	perform
+		auth.has_permission( _user_id, 'system.tokens.create_token');
 
-    if
-        _expires_at is null then
+	if
+		_expires_at is null then
 
-        select default_expiration_in_seconds
-        from const.token_type
-        where code = _token_type_code
-        into __default_expiration_in_seconds;
+		select default_expiration_in_seconds
+		from const.token_type
+		where code = _token_type_code
+		into __default_expiration_in_seconds;
 
-        _expires_at := now() + '1 second'::interval * __default_expiration_in_seconds;
-    end if;
+		_expires_at := now() + '1 second'::interval * __default_expiration_in_seconds;
+	end if;
 
-    if
-        _target_user_id is not null then
-        -- invalidate all previous tokens of the same type for the same user that are still valid
-        update auth.token
-        set modified         = now()
-          , modified_by      = _created_by
-          , token_state_code = 'invalid'
-        where user_id = _target_user_id
-          and token_type_code = _token_type_code
-          and token_state_code = 'valid';
-    end if;
+	if
+		_target_user_id is not null then
+		-- invalidate all previous tokens of the same type for the same user that are still valid
+		update auth.token
+		set modified         = now(),
+				modified_by      = _created_by,
+				token_state_code = 'invalid'
+		where user_id = _target_user_id
+			and token_type_code = _token_type_code
+			and token_state_code = 'valid';
+	end if;
 
-    if
-        exists(select
-               from auth.token
-               where token = _token
-                 and token_state_code = 'valid'
-                 and token_type_code = _token_type_code) then
-        perform error.raise_52276();
-    end if;
+	if
+		exists(select
+					 from auth.token
+					 where token = _token
+						 and token_state_code = 'valid'
+						 and token_type_code = _token_type_code) then
+		perform error.raise_52276();
+	end if;
 
 
-    insert into auth.token (created_by,
-                            user_id, user_event_id, token_type_code, token_channel_code,
-                            token, expires_at, token_data)
-    values (_created_by,
-            _target_user_id,
-            _user_event_id,
-            _token_type_code,
-            _token_channel_code,
-            _token,
-            _expires_at,
-            _token_data::jsonb)
-    returning token_id, uid, expires_at
-        into __last_id, __token_uid, __token_expires_at;
+	insert into auth.token (created_by,
+													user_id, user_oid, user_event_id, token_type_code, token_channel_code,
+													token, expires_at, token_data)
+	values ( _created_by
+				 , _target_user_id
+				 , _target_user_oid
+				 , _user_event_id
+				 , _token_type_code
+				 , _token_channel_code
+				 , _token
+				 , _expires_at
+				 , _token_data)
+	returning token_id, uid, expires_at
+		into __last_id, __token_uid, __token_expires_at;
 
-    perform
-        add_journal_msg(_created_by, null, _user_id
-            , format('User: %s created a new token for user: %s'
-                            , _created_by, _target_user_id)
-            , case when _target_user_id is not null then 'user' else 'token' end
-            , case when _target_user_id is not null then _target_user_id else __last_id end
-            ,
-                        array ['token_type_code', _token_type_code, 'token_channel_code', _token_channel_code, 'token_expires_at', _expires_at::text]
-            , 50401);
+	perform
+		add_journal_msg(_created_by, 1, _user_id
+			, format('User: %s created a new token for user: %s'
+											, _created_by, _target_user_id)
+			, 'token'
+			, __last_id
+			, null
+			, 50401);
 
-    return query
-        select __last_id, __token_uid, __token_expires_at;
+	return query
+		select __last_id, __token_uid, __token_expires_at;
 
-    perform unsecure.expire_tokens(_created_by);
+	perform unsecure.expire_tokens(_created_by);
 end;
 $$;
 
-create function auth.validate_token(_modified_by text, _user_id bigint,
-                                    _target_user_id bigint,
-                                    _token text,
-                                    _token_type text,
-                                    _ip_address text,
-                                    _user_agent text,
-                                    _origin text,
-                                    _set_as_used bool default false,
-                                    _token_uid text default null)
-    returns table
-            (
-                ___token_id         bigint,
-                ___token_uid        text,
-                ___token_state_code text,
-                ___used_at          timestamptz,
-                ___user_id          bigint
-            )
-    language plpgsql
+create or replace function auth.validate_token(_modified_by text, _user_id bigint,
+																							 _target_user_id bigint,
+																							 _token_uid text,
+																							 _token text,
+																							 _token_type text,
+																							 _ip_address text,
+																							 _user_agent text,
+																							 _origin text,
+																							 _set_as_used bool default false)
+	returns table
+					(
+						___token_id         bigint,
+						___token_uid        text,
+						___token_state_code text,
+						___used_at          timestamptz,
+						___user_id          bigint,
+						___user_oid         text
+					)
+	language plpgsql
 as
 $$
 declare
-    __token_id         bigint;
-    __token_uid        text;
-    __token_state_code text;
-    __token_user_id    bigint;
+	__token_id         bigint;
+	__token_uid        text;
+	__token_state_code text;
+	__token_user_id    bigint;
 begin
-    perform
-        auth.has_permission(null, _user_id, 'system.tokens.validate_token');
+	perform
+		auth.has_permission( _user_id, 'system.tokens.validate_token');
 
-    select token_id, uid, token_state_code, user_id
-    from auth.token
-    where ((_target_user_id is not null and token.user_id = _target_user_id) or true)
-      and token_type_code = _token_type
-      and (_token_uid is null or _token_uid = uid)
-      and token = _token
-    into __token_id, __token_uid, __token_state_code, __token_user_id;
+	select token_id, uid, token_state_code, user_id
+	from auth.token
+	where ((_target_user_id is not null and token.user_id = _target_user_id) or true)
+		and token_type_code = _token_type
+		and (helpers.is_not_empty_string(_token_uid) or helpers.is_not_empty_string(_token))
+		and (helpers.is_empty_string(_token_uid) or uid = _token_uid)
+		and (helpers.is_empty_string(_token) or token = _token)
+	into __token_id, __token_uid, __token_state_code, __token_user_id;
 
-    if
-        __token_id is null then
-        perform error.raise_52277();
-    end if;
+	if
+		__token_id is null then
+		perform error.raise_52277();
+	end if;
 
-    if
-        __token_state_code <> 'valid' then
-        perform error.raise_52278(__token_uid);
-    end if;
+	if
+		__token_state_code <> 'valid' then
+		perform error.raise_52278(__token_uid);
+	end if;
 
-    if
-        _target_user_id is not null and _target_user_id <> __token_user_id then
-        perform error.raise_52279(__token_uid);
-    end if;
+	if
+		_target_user_id is not null and _target_user_id <> __token_user_id then
+		perform error.raise_52279(__token_uid);
+	end if;
 
-    perform
-        add_journal_msg(_modified_by, null, _user_id
-            , format('User: %s validated a token for user: %s'
-                            , _modified_by, _target_user_id)
-            , case when _target_user_id is not null then 'user' else 'token' end
-            , case when _target_user_id is not null then _target_user_id else __token_id end
-            ,
-                        array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
-            , 50402);
-
-
-    if
-        _set_as_used then
-        return query
-            select used_token.__token_id
-                 , used_token.__token_uid
-                 , used_token.__token_state_code
-                 , used_token.__used_at
-                 , used_token.__user_id
-            from auth.set_token_as_used(_modified_by, _user_id, __token_id, _ip_address, _user_agent,
-                                        _origin) used_token;
-    else
-        return query
-            select token_id, uid, token_state_code, used_at, user_id
-            from auth.token
-            where token_id = __token_id;
-    end if;
+	perform
+		add_journal_msg(_modified_by, 1, _user_id
+			, format('User: %s validated a token for user: %s'
+											, _modified_by, _target_user_id)
+			, 'token'
+			, __token_id
+			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
+			, 50402);
 
 
-    perform unsecure.expire_tokens(_modified_by);
+	if
+		_set_as_used then
+		return query
+			select used_token.__token_id
+					 , used_token.__token_uid
+					 , used_token.__token_state_code
+					 , used_token.__used_at
+					 , used_token.__user_id
+					 , used_token.__user_oid
+			from auth.set_token_as_used(_modified_by, _user_id, __token_id, _ip_address, _user_agent,
+																	_origin) used_token;
+	else
+		return query
+			select token_id, uid, token_state_code, used_at, user_id, user_oid
+			from auth.token
+			where token_id = __token_id;
+	end if;
+
+
+	perform unsecure.expire_tokens(_modified_by);
 end;
 $$;
 
-create or replace function auth.set_token_as_used(_modified_by text, _user_id bigint, _token_id bigint,
-                                               _ip_address text,
-                                               _user_agent text,
-                                               _origin text)
-    returns table
-            (
-                __token_id         bigint,
-                __token_uid        text,
-                __token_state_code text,
-                __used_at          timestamptz,
-                __user_id          bigint
-            )
-    language plpgsql
+create or replace function auth.set_token_as_used(_modified_by text,
+																									_user_id bigint,
+																									_token_uid text,
+																									_token text,
+																									_token_type_code text,
+																									_ip_address text,
+																									_user_agent text,
+																									_origin text
+)
+	returns table
+					(
+						__token_id         bigint,
+						__token_uid        text,
+						__token_state_code text,
+						__used_at          timestamptz,
+						__user_id          bigint,
+						__user_oid         text
+					)
+	language plpgsql
 as
 $$
+declare
+	__token_id  bigint;
+	__token_uid text;
 begin
 
-    perform
-        auth.has_permission(null, _user_id, 'system.tokens.set_as_used');
+	perform
+		auth.has_permission( _user_id, 'system.tokens.set_as_used');
 
-    if
-        not exists(select from token where token_id = _token_id and token_state_code = 'valid') then
-        perform error.raise_52278(_token_id);
-    end if;
+	select token_id, uid
+	from token
+	where (helpers.is_not_empty_string(_token_uid) or helpers.is_not_empty_string(_token))
+		and (helpers.is_empty_string(_token_uid) or uid = _token_uid)
+		and (helpers.is_empty_string(_token) or token = _token)
+		and token_type_code = _token_type_code
+		and token_state_code = 'valid'
+	into __token_id, __token_uid;
 
-    return query
-        update auth.token
-            set modified_by = _modified_by, modified = now(), token_state_code = 'used', used_at = now(), ip_address = _ip_address, user_agent = _user_agent, origin = _origin
-            where token_id = _token_id
-            returning token_id
-                , uid
-                , token_state_code
-                , used_at
-                , user_id;
 
-    perform
-        add_journal_msg(_modified_by, null, _user_id
-            , format('User: %s set token (id: %s) as used'
-                            , _modified_by, _token_id)
-            , 'token'
-            , _token_id
-            , array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
-            , _event_id := 50403);
+	if not helpers.is_empty_string(__token_uid) then
+		perform error.raise_52278(__token_uid);
+	end if;
+
+	return query
+		update auth.token
+			set modified_by = _modified_by, modified = now(), token_state_code = 'used', used_at = now(), ip_address = _ip_address, user_agent = _user_agent, origin = _origin
+			where
+					(helpers.is_empty_string(_token_uid) or _token_uid = uid)
+					and token = _token
+			returning token_id
+				, uid
+				, token_state_code
+				, used_at
+				, user_id
+				, user_oid;
+
+	perform
+		add_journal_msg(_modified_by, 1, _user_id
+			, format('User: %s set token (uid: %s) as used'
+											, _modified_by, _token_uid)
+			, 'token'
+			, __token_id
+			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
+			, _event_id := 50403);
 
 end;
 $$;
 
-create or replace function auth.set_token_as_used(_modified_by text, _user_id bigint, _token text,
-                                                  _token_type text,
-                                                  _ip_address text,
-                                                  _user_agent text,
-                                                  _origin text)
-    returns table
-            (
-                __token_id         bigint,
-                __token_uid        text,
-                __token_state_code text,
-                __used_at          timestamptz,
-                __user_id          bigint
-            )
-    language plpgsql
+create or replace function auth.set_token_as_used(_modified_by text,
+																									_user_id bigint,
+																									_token text,
+																									_token_type text,
+																									_ip_address text,
+																									_user_agent text,
+																									_origin text)
+	returns table
+					(
+						__token_id         bigint,
+						__token_uid        text,
+						__token_state_code text,
+						__used_at          timestamptz,
+						__user_id          bigint,
+						__user_oid         text
+					)
+	language plpgsql
 as
 $$
+declare
+	__token_uid text;
 begin
-    return query
-        with token_id as (select token_id
-                          from auth.token
-                          where token_type_code = _token_type
-                            and token = _token)
-        select *
-        from auth.set_token_as_used(_modified_by, _user_id, token_id,
-                                    _ip_address,
-                                    _user_agent,
-                                    _origin);
+
+	select uid
+	from auth.token
+	where token_type_code = _token_type
+		and token = _token
+	into __token_uid;
+
+	return query
+		select *
+		from auth.set_token_as_used(_modified_by,
+																_user_id,
+																__token_uid,
+																_ip_address,
+																_user_agent,
+																_origin
+			);
 end;
 $$;
+
+
 /***
  *     ██████╗ ██████╗  ██████╗ ██╗   ██╗██████╗ ███████╗
  *    ██╔════╝ ██╔══██╗██╔═══██╗██║   ██║██╔══██╗██╔════╝
