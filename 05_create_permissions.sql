@@ -5047,7 +5047,7 @@ end;
 $$;
 
 create function auth.get_user_data(_user_id bigint, _target_user_id bigint)
-	returns setof user_data
+	returns setof auth.user_data
 	language plpgsql
 as
 $$
@@ -5059,7 +5059,7 @@ begin
 	end if;
 
 	select *
-	from user_data
+	from auth.user_data
 	where user_id = _target_user_id;
 
 end;
