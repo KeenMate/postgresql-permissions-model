@@ -5024,6 +5024,7 @@ begin
 end;
 $$;
 
+-- this method is a stub, overwrite it in your script if you need to do so
 create function auth.update_user_data(_modified_by text, _user_id bigint, _target_user_id bigint, _provider text,
                                       _user_data jsonb)
     returns table
@@ -5036,10 +5037,10 @@ as
 $$
 begin
 
-    if
-        __user_id <> _target_user_id then
-        perform auth.has_permission(null, _user_id, 'system.users.update_user');
-    end if;
+--     if
+--         __user_id <> _target_user_id then
+--         perform auth.has_permission(null, _user_id, 'system.users.update_user');
+--     end if;
 
 
 end;
