@@ -4609,7 +4609,7 @@ $$;
 
 -- for email authentication
 create or replace function auth.register_user(_created_by text, _user_id int, _email text, _password_hash text,
-                                           _display_name text, _user_data text)
+																				 _display_name text, _user_data jsonb default null)
     returns table
             (
                 __user_id      bigint,
@@ -4943,7 +4943,7 @@ create or replace function auth.ensure_user_from_provider(_created_by text, _use
                                                        _provider_uid text,
                                                        _username text,
                                                        _display_name text, _email text default null,
-                                                       _user_data text default null)
+                                                       _user_data jsonb default null)
     returns table
             (
                 __user_id      bigint,
@@ -5025,7 +5025,7 @@ end;
 $$;
 
 create function auth.update_user_data(_modified_by text, _user_id bigint, _target_user_id bigint, _provider text,
-                                      _user_data text)
+                                      _user_data jsonb)
     returns table
             (
                 __user_id      bigint,
