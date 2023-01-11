@@ -2164,7 +2164,7 @@ $$;
 --     __ug_id int;
 -- begin
 --     perform
---         auth.has_permission(1, _user_id, 'system.manage_tenants.assign_owner');
+--         auth.has_permission(1, _user_id, 'system.tenants.assign_owner');
 --
 --     select ug.user_group_id
 --     from auth.user_group ug
@@ -2256,7 +2256,7 @@ $$
 begin
     perform
         auth.has_permissions(_tenant_id, _user_id,
-                             array ['system.manage_groups.create_group']);
+                             array ['system.groups.create_group']);
 
     return query
         select *
@@ -2278,7 +2278,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     return query
         update auth.user_group
@@ -2310,7 +2310,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     return query
         update auth.user_group
@@ -2350,7 +2350,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     return query
         update auth.user_group
@@ -2390,7 +2390,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.lock_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.lock_group');
 
     return query
         update auth.user_group
@@ -2430,7 +2430,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     return query
         update auth.user_group
@@ -2469,7 +2469,7 @@ declare
 begin
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.delete_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.delete_group');
 
     select is_system, tenant_id
     from auth.user_group ug
@@ -2592,7 +2592,7 @@ create function auth.create_user_group_member(_created_by text, _user_id bigint,
 as
 $$
 begin
-    perform auth.can_manage_user_group(_user_id, _tenant_id, _user_group_id, 'system.manage_groups.create_member');
+    perform auth.can_manage_user_group(_user_id, _tenant_id, _user_group_id, 'system.groups.create_member');
 
     return query
         select *
@@ -2609,7 +2609,7 @@ create function auth.delete_user_group_member(_deleted_by text, _user_id bigint,
 as
 $$
 begin
-    perform auth.can_manage_user_group(_user_id, _tenant_id, _user_group_id, 'system.manage_groups.delete_member');
+    perform auth.can_manage_user_group(_user_id, _tenant_id, _user_group_id, 'system.groups.delete_member');
 
     delete
     from auth.user_group_member
@@ -2707,7 +2707,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.get_members');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.get_members');
 
     return query
         select *
@@ -2740,7 +2740,7 @@ begin
     end if;
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.create_mapping');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.create_mapping');
 
     select is_active, tenant_id
     from auth.user_group ug
@@ -2799,7 +2799,7 @@ declare
     __mapped_role        text;
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.delete_mapping');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.delete_mapping');
 
     -- expire user_permission_cache for affected users
     with affected_users as (select user_id
@@ -2851,7 +2851,7 @@ declare
 begin
     perform
         auth.has_permissions(_tenant_id, _user_id,
-                             array ['system.manage_groups.create_group']);
+                             array ['system.groups.create_group']);
 
 
     select *
@@ -2876,7 +2876,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     delete
     from auth.user_group_member ugm
@@ -2907,7 +2907,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.update_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.update_group');
 
     update auth.user_group
     set modified    = now()
@@ -2984,7 +2984,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_groups.get_group');
+        auth.has_permission(_tenant_id, _user_id, 'system.groups.get_group');
 
     return query
         select *
@@ -3018,7 +3018,7 @@ declare
     __tenant_member_group_id int;
 begin
     perform
-        auth.has_permission(1, _user_id, 'system.manage_tenants.create_tenant');
+        auth.has_permission(1, _user_id, 'system.tenants.create_tenant');
 
     insert into tenant (created_by, modified_by, title, code, is_removable, is_assignable)
     values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
@@ -3080,7 +3080,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(1, _user_id, 'system.manage_tenants.get_tenants');
+        auth.has_permission(1, _user_id, 'system.tenants.get_tenants');
 
     return query
         select created
@@ -3142,7 +3142,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_tenants.get_users');
+        auth.has_permission(_tenant_id, _user_id, 'system.tenants.get_users');
 
     return query with tenant_users as (select ui.user_id
                                             , ui.username
@@ -3187,7 +3187,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_tenants.get_groups');
+        auth.has_permission(_tenant_id, _user_id, 'system.tenants.get_groups');
 
     return query
         select ugs.user_group_id
@@ -3226,7 +3226,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_tenants.get_tenants');
+        auth.has_permission(_tenant_id, _user_id, 'system.tenants.get_tenants');
 
     return query
         select ugs.user_id
@@ -3281,10 +3281,10 @@ begin
     then
         if _user_group_id is not null then
             perform auth.has_permission(_tenant_id, _user_id
-                , 'system.manage_tenants.assign_group_owner');
+                , 'system.tenants.assign_group_owner');
         else
             perform auth.has_permission(_tenant_id, _user_id
-                , 'system.manage_tenants.assign_owner');
+                , 'system.tenants.assign_owner');
         end if;
     end if;
 
@@ -3315,10 +3315,10 @@ begin
     then
         if _user_group_id is not null then
             perform auth.has_permission(_tenant_id, _user_id
-                , 'system.manage_tenants.assign_group_owner');
+                , 'system.tenants.assign_group_owner');
         else
             perform auth.has_permission(_tenant_id, _user_id
-                , 'system.manage_tenants.assign_owner');
+                , 'system.tenants.assign_owner');
         end if;
     end if;
 
@@ -3544,7 +3544,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_permissions.update_permission');
+        auth.has_permission(null, _user_id, 'system.permissions.update_permission');
 
     return query
         select *
@@ -3580,7 +3580,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.assign_permission');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.assign_permission');
 
     return query
         select *
@@ -3599,7 +3599,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.unassign_permission');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.unassign_permission');
 
     return query
         select *
@@ -3728,7 +3728,7 @@ declare
 begin
 
     perform
-        auth.has_permission(_user_id, _data_node_path::ext.ltree, 'system.manage_permissions.add_permission');
+        auth.has_permission(_user_id, _data_node_path::ext.ltree, 'system.permissions.add_permission');
 
     insert into auth.permission(created_by, modified_by, title, is_assignable, code)
     values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title))
@@ -3791,7 +3791,7 @@ declare
 begin
 
     perform
-        auth.has_permission(_user_id, 'system.manage_permissions.add_permission');
+        auth.has_permission(_user_id, 'system.permissions.add_permission');
 
     insert into auth.permission(created_by, modified_by, title, is_assignable, code)
     values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title))
@@ -3924,7 +3924,7 @@ $$
 begin
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.create_permission_set');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.create_permission_set');
 
     return query
         select *
@@ -3998,7 +3998,7 @@ begin
     end if;
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.update_permission_set');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.update_permission_set');
 
     return query
         select *
@@ -4072,7 +4072,7 @@ $$
 begin
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.update_permission_set');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.update_permission_set');
 
     return query
         select *
@@ -4148,7 +4148,7 @@ $$
 begin
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_permissions.update_permission_set');
+        auth.has_permission(_tenant_id, _user_id, 'system.permissions.update_permission_set');
 
     return query
         select *
@@ -4180,7 +4180,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.enable_user');
+        auth.has_permission(null, _user_id, 'system.users.enable_user');
 
     return query
         update auth.user_info
@@ -4216,7 +4216,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.disable_user');
+        auth.has_permission(null, _user_id, 'system.users.disable_user');
 
     return query
         update auth.user_info
@@ -4252,7 +4252,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.unlock_user');
+        auth.has_permission(null, _user_id, 'system.users.unlock_user');
 
     return query
         update auth.user_info
@@ -4288,7 +4288,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.lock_user');
+        auth.has_permission(null, _user_id, 'system.users.lock_user');
 
     return query
         update auth.user_info
@@ -4326,7 +4326,7 @@ declare
     __user_identity_id bigint;
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.enable_user_identity');
+        auth.has_permission(null, _user_id, 'system.users.enable_user_identity');
 
     select user_identity_id
     from auth.user_identity uid
@@ -4375,7 +4375,7 @@ declare
     __user_identity_id bigint;
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.disable_user_identity');
+        auth.has_permission(null, _user_id, 'system.users.disable_user_identity');
 
     select user_identity_id
     from auth.user_identity uid
@@ -4592,7 +4592,7 @@ begin
 
     if
         _user_id <> _target_user_id then
-        perform auth.has_permission(null, _user_id, 'system.manage_users.change_password');
+        perform auth.has_permission(null, _user_id, 'system.users.change_password');
     end if;
 
     perform unsecure.create_user_event(_modified_by, _user_id, 'change_password',
@@ -4629,7 +4629,7 @@ declare
 begin
 
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.register_user');
+        auth.has_permission(null, _user_id, 'system.users.register_user');
 
     perform
         auth.validate_provider_is_active('email');
@@ -4737,7 +4737,7 @@ $$
 begin
 
     perform
-        auth.has_permission(_tenant_id, _user_id, 'system.manage_users.add_to_default_groups');
+        auth.has_permission(_tenant_id, _user_id, 'system.users.add_to_default_groups');
 
     return query
         select *
@@ -4797,7 +4797,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.get_user_identity');
+        auth.has_permission(null, _user_id, 'system.users.get_user_identity');
 
     return query
         select uid.user_identity_id
@@ -4831,7 +4831,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(null, _user_id, 'system.manage_users.get_user_identity');
+        auth.has_permission(null, _user_id, 'system.users.get_user_identity');
 
     return query
         select uid.user_identity_id
@@ -5045,6 +5045,25 @@ begin
 end;
 $$;
 
+create function auth.get_user_data(_user_id bigint, _target_user_id bigint)
+	returns setof user_data
+	language plpgsql
+as
+$$
+begin
+
+	if
+		_user_id <> _target_user_id then
+		perform auth.has_permission(_user_id, 'system.users.read_user');
+	end if;
+
+	select *
+	from user_data
+	where user_id = _target_user_id;
+
+end;
+$$;
+
 --
 -- create function auth.get_tenant_permissions(_tenant_id int, _user_id bigint)
 --     returns table
@@ -5194,77 +5213,77 @@ begin
 
     perform unsecure.create_permission_by_path_as_system('Token', 'system', false);
 
-    perform unsecure.create_permission_by_path_as_system('Manage permissions', 'system', false);
-    perform unsecure.create_permission_by_path_as_system('Create permission', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Update permission', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Delete permission', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Create permission set', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Update permission set', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Delete permission set', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Assign permission', 'system.manage_permissions');
-    perform unsecure.create_permission_by_path_as_system('Unassign permission', 'system.manage_permissions');
+    perform unsecure.create_permission_by_path_as_system('Permissions', 'system', false);
+    perform unsecure.create_permission_by_path_as_system('Create permission', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Update permission', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Delete permission', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Create permission set', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Update permission set', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Delete permission set', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Assign permission', 'system.permissions');
+    perform unsecure.create_permission_by_path_as_system('Unassign permission', 'system.permissions');
 
-    perform unsecure.create_permission_by_path_as_system('Manage users', 'system');
-    perform unsecure.create_permission_by_path_as_system('Register user', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Add to default groups', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Enable user', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Disable user', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Lock user', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Unlock user', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Get user identity', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Enable user identity', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Disable user identity', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Change password', 'system.manage_users');
-    perform unsecure.create_permission_by_path_as_system('Read user events', 'system.manage_users');
+    perform unsecure.create_permission_by_path_as_system('Users', 'system');
+    perform unsecure.create_permission_by_path_as_system('Register user', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Add to default groups', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Enable user', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Disable user', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Lock user', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Unlock user', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Get user identity', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Enable user identity', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Disable user identity', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Change password', 'system.users');
+    perform unsecure.create_permission_by_path_as_system('Read user events', 'system.users');
 
-    perform unsecure.create_permission_by_path_as_system('Manage tenants', 'system');
-    perform unsecure.create_permission_by_path_as_system('Create tenant', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Update tenant', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Assign owner', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Assign group owner', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Get tenants', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Get users', 'system.manage_tenants');
-    perform unsecure.create_permission_by_path_as_system('Get groups', 'system.manage_tenants');
+    perform unsecure.create_permission_by_path_as_system('Tenants', 'system');
+    perform unsecure.create_permission_by_path_as_system('Create tenant', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Update tenant', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Assign owner', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Assign group owner', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Get tenants', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Get users', 'system.tenants');
+    perform unsecure.create_permission_by_path_as_system('Get groups', 'system.tenants');
 
 
-    perform unsecure.create_permission_by_path_as_system('Manage providers', 'system');
-    perform unsecure.create_permission_by_path_as_system('Create provider', 'system.manage_providers');
-    perform unsecure.create_permission_by_path_as_system('Update provider', 'system.manage_providers');
-    perform unsecure.create_permission_by_path_as_system('Delete provider', 'system.manage_providers');
-    perform unsecure.create_permission_by_path_as_system('Get users', 'system.manage_providers');
+    perform unsecure.create_permission_by_path_as_system('Providers', 'system');
+    perform unsecure.create_permission_by_path_as_system('Create provider', 'system.providers');
+    perform unsecure.create_permission_by_path_as_system('Update provider', 'system.providers');
+    perform unsecure.create_permission_by_path_as_system('Delete provider', 'system.providers');
+    perform unsecure.create_permission_by_path_as_system('Get users', 'system.providers');
 
-    perform unsecure.create_permission_by_path_as_system('Manage groups', 'system');
-    perform unsecure.create_permission_by_path_as_system('Get group', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Create group', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Update group', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Delete group', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Lock group', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Get groups', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Create member', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Delete member', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Get members', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Create mapping', 'system.manage_groups');
-    perform unsecure.create_permission_by_path_as_system('Delete mapping', 'system.manage_groups');
+    perform unsecure.create_permission_by_path_as_system('Groups', 'system');
+    perform unsecure.create_permission_by_path_as_system('Get group', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Create group', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Update group', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Delete group', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Lock group', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Get groups', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Create member', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Delete member', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Get members', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Create mapping', 'system.groups');
+    perform unsecure.create_permission_by_path_as_system('Delete mapping', 'system.groups');
 
     perform unsecure.create_perm_set_as_system('System admin', 1, true, _is_assignable := true,
-                                               _permissions := array ['system.manage_tenants', 'system.manage_providers'
-                                                   , 'system.manage_users','system.manage_groups']);
+                                               _permissions := array ['system.tenants', 'system.providers'
+                                                   , 'system.users','system.groups']);
 
     perform unsecure.create_perm_set_as_system('Tenant creator', 1, true, _is_assignable := true,
-                                               _permissions := array ['system.manage_tenants.create_tenant']);
+                                               _permissions := array ['system.tenants.create_tenant']);
 
     perform unsecure.create_perm_set_as_system('Tenant admin', 1, true, _is_assignable := true,
-                                               _permissions := array ['system.manage_tenants']);
+                                               _permissions := array ['system.tenants']);
 
     perform unsecure.create_perm_set_as_system('Tenant owner', null, true, _is_assignable := true,
-                                               _permissions := array ['system.manage_groups'
-                                                   , 'system.manage_tenants.update_tenant'
-                                                   , 'system.manage_tenants.assign_owner'
-                                                   , 'system.manage_tenants.get_users']);
+                                               _permissions := array ['system.groups'
+                                                   , 'system.tenants.update_tenant'
+                                                   , 'system.tenants.assign_owner'
+                                                   , 'system.tenants.get_users']);
 
     perform unsecure.create_perm_set_as_system('Tenant member', null, true, _is_assignable := true,
-                                               _permissions := array ['system.manage_tenants.get_groups'
-                                                   , 'system.manage_tenants.get_users']);
+                                               _permissions := array ['system.tenants.get_groups'
+                                                   , 'system.tenants.get_users']);
 
     perform unsecure.create_user_group_as_system(1, 'Tenant admins', true, true);
     perform unsecure.assign_permission_as_system(1, 2, null, 'tenant_admin');
