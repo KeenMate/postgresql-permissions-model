@@ -29,10 +29,13 @@ from auth.ensure_user_from_provider(_created_by := 'system', _user_id := 1, _pro
 
 select *
 from auth.register_user('registrator', 1, 'lucie.novakova1@keenmate.com', '123456', _display_name := 'Lucie Novakova',
-                        _user_data := '{firstName: "Lucie", lastname: "Novakova"}');
+                        _user_data := '{"firstName": "Lucie", "lastname": "Novakova"}');
 
 select *
 from auth.get_provider_users('system', 1, 'aad');
+
+select *
+from auth.get_provider_users('system', 1, 'email');
 
 select *
 from unsecure.create_user_group_member_as_system('ondrej.valenta@keenmate.com', 'Tenant admins', 1);
