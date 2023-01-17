@@ -4691,7 +4691,7 @@ as
 $$
 declare
 	__normalized_email text;
-	__new_user         user_info;
+	__new_user         auth.user_info;
 begin
 
 	perform
