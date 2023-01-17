@@ -2250,7 +2250,7 @@ create function unsecure.create_user_group(_created_by text, _user_id bigint, _t
 																					 _is_system bool default false, _is_default bool default false)
 	returns table
 					(
-						__group_id int
+						__user_group_id int
 					)
 	language plpgsql
 	rows 1
@@ -2294,7 +2294,7 @@ as
 $$
 select ug.*
 from unsecure.create_user_group('system', 1, _title, _tenant_id, _is_assignable, true, false, _is_system) g
-			 inner join auth.user_group ug on ug.user_group_id = g.__group_id;
+			 inner join auth.user_group ug on ug.user_group_id = g.__user_group_id;
 
 $$;
 
@@ -2303,7 +2303,7 @@ create function auth.create_user_group(_created_by text, _user_id bigint, _title
 																			 _is_external bool default false, _is_default bool default false)
 	returns table
 					(
-						__group_id int
+						__user_group_id int
 					)
 	language plpgsql
 	rows 1
@@ -2326,7 +2326,7 @@ create function auth.update_user_group(_modified_by text, _user_id bigint, _tena
 																			 _is_assignable bool, _is_active bool, _is_external bool, _is_default bool)
 	returns table
 					(
-						__group_id int
+						__user_group_id int
 					)
 	language plpgsql
 	rows 1
@@ -2354,7 +2354,7 @@ $$;
 create function auth.enable_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
 	returns table
 					(
-						__group_id      int,
+						__user_group_id int,
 						__is_active     bool,
 						__is_assignable bool,
 						__modified      timestamptz,
@@ -2394,7 +2394,7 @@ $$;
 create function auth.disable_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
 	returns table
 					(
-						__group_id      int,
+						__user_group_id int,
 						__is_active     bool,
 						__is_assignable bool,
 						__modified      timestamptz,
@@ -2434,7 +2434,7 @@ $$;
 create function auth.lock_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
 	returns table
 					(
-						__group_id      int,
+						__user_group_id int,
 						__is_active     bool,
 						__is_assignable bool,
 						__modified      timestamptz,
@@ -2474,7 +2474,7 @@ $$;
 create function auth.unlock_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
 	returns table
 					(
-						__group_id      int,
+						__user_group_id int,
 						__is_active     bool,
 						__is_assignable bool,
 						__modified      timestamptz,
@@ -2617,8 +2617,8 @@ as
 
 $$
 declare
-	__user_id  bigint;
-	__group_id int;
+	__user_id       bigint;
+	__user_group_id int;
 begin
 	select ui.user_id
 	from auth.user_info ui
@@ -2628,11 +2628,11 @@ begin
 	select user_group_id
 	from auth.user_group ug
 	where lower(ug.title) = lower(_group_title)
-	into __group_id;
+	into __user_group_id;
 
 	return query
 		select ugm.*
-		from unsecure.create_user_group_member('system', 1, _tenant_id, __group_id, __user_id) r
+		from unsecure.create_user_group_member('system', 1, _tenant_id, __user_group_id, __user_id) r
 					 inner join auth.user_group_member ugm on ugm.member_id = r.__user_group_member_id;
 end;
 $$;
@@ -2896,7 +2896,7 @@ create function auth.create_external_user_group(_created_by text, _user_id bigin
 																								_mapped_role text default null)
 	returns table
 					(
-						__group_id int
+						__user_group_id int
 					)
 	language plpgsql
 	rows 1
@@ -3090,7 +3090,7 @@ begin
 			, array ['title', _title]
 			, 50001);
 
-	select __group_id
+	select __user_group_id
 	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Admins'
 		, __last_id, true, true, false, true)
 	into __tenant_owner_group_id;
@@ -3098,7 +3098,7 @@ begin
 	perform unsecure.assign_permission(_created_by, _user_id
 		, __last_id, __tenant_owner_group_id, null, 'tenant_admin');
 
-	select __group_id
+	select __user_group_id
 	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Members'
 		, __last_id, true, true, false, true)
 	into __tenant_member_group_id;

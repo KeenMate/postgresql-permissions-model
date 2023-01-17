@@ -5,31 +5,34 @@ from auth.enable_provider('system', 1, 'email');
 
 select *
 from auth.ensure_user_from_provider(_created_by := 'system', _user_id := 1, _provider_code := 'aad',
-                                    _provider_uid := '123456',
-                                    _username := 'ondrej.valenta@keenmate.com', _display_name := 'Ondrej Valenta',
-                                    _email := 'ondrej.valenta@keenmate.com', _user_data := null);
+																		_provider_uid := '123456',
+																		_username := 'ondrej.valenta@keenmate.com', _display_name := 'Ondrej Valenta',
+																		_email := 'ondrej.valenta@keenmate.com', _user_data := null);
 
 select *
 from auth.ensure_user_from_provider(_created_by := 'system', _user_id := 1, _provider_code := 'aad',
-                                    _provider_uid := '456825',
-                                    _username := 'albert.moravec@keenmate.com', _display_name := 'Albert Moravec',
-                                    _email := 'albert.moravec@keenmate.com', _user_data := null);
+																		_provider_uid := '456825',
+																		_username := 'albert.moravec@keenmate.com', _display_name := 'Albert Moravec',
+																		_email := 'albert.moravec@keenmate.com', _user_data := null);
 
 select *
 from auth.ensure_user_from_provider(_created_by := 'system', _user_id := 1, _provider_code := 'aad',
-                                    _provider_uid := '45682511',
-                                    _username := 'filip.jakab@keenmate.com', _display_name := 'Filip Jakab',
-                                    _email := 'filip.jakab@keenmate.com', _user_data := null);
+																		_provider_uid := '45682511',
+																		_username := 'filip.jakab@keenmate.com', _display_name := 'Filip Jakab',
+																		_email := 'filip.jakab@keenmate.com', _user_data := null);
 
 select *
 from auth.ensure_user_from_provider(_created_by := 'system', _user_id := 1, _provider_code := 'aad',
-                                    _provider_uid := '45682132123',
-                                    _username := 'jan.rada@keenmate.com', _display_name := 'Jan Rada',
-                                    _email := 'jan.rada@keenmate.com', _user_data := null);
+																		_provider_uid := '45682132123',
+																		_username := 'jan.rada@keenmate.com', _display_name := 'Jan Rada',
+																		_email := 'jan.rada@keenmate.com', _user_data := null);
 
 select *
 from auth.register_user('registrator', 1, 'lucie.novakova1@keenmate.com', '123456', _display_name := 'Lucie Novakova',
-                        _user_data := '{"firstName": "Lucie", "lastname": "Novakova"}');
+												_user_data := '{
+													"firstName": "Lucie",
+													"lastname": "Novakova"
+												}');
 
 select *
 from auth.get_provider_users('system', 1, 'aad');
@@ -72,17 +75,17 @@ from auth.create_external_user_group('system', 2, 3, 'External group 1', 'aad', 
 -- create an external partners rule set with dummy permissions in tenant: Jan Rada
 select *
 from unsecure.create_perm_set_as_system('My external partners', 3, false, true,
-                                        array ['system.areas.public', 'system.areas.admin', 'system.manage_providers', 'system.manage_permissions.create_permission']);
+																				array ['system.areas.public', 'system.areas.admin', 'system.manage_providers', 'system.manage_permissions.create_permission']);
 
 -- remove incorrect permissions from My external partners permission set
 select *
 from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, 3, 7,
-                                      array ['system.manage_providers', 'system.manage_permissions.create_permission']);
+																			array ['system.manage_providers', 'system.manage_permissions.create_permission']);
 
 -- Add correct permissions to My external partners permission set
 select *
 from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, 3, 7,
-                                   array ['system.manage_tenants.get_users']);
+																	 array ['system.manage_tenants.get_users']);
 
 -- assign my_external_partners rule set to External group 1 in tenant: Jan Rada
 select *
@@ -135,8 +138,8 @@ from auth.get_user_by_email_for_authentication(1, 'lucie.novakova1@keenmate.com'
 
 select *
 from auth.create_auth_event('authenticator', 1, 'email_verification', 6,
-                            '123.123.232.12', 'the best user agent there is',
-                            'domain.com');
+														'123.123.232.12', 'the best user agent there is',
+														'domain.com');
 
 select *
 from auth.create_token('authenticator', 1, 2, 1, 'email_verification', 'email', '111jjjj2222jjjj333');
@@ -145,7 +148,7 @@ from auth.create_token('authenticator', 1, 2, 1, 'email_verification', 'email', 
 
 select *
 from auth.validate_token('authenticator', 1, null, '111jjjj2222jjjj333', '123.2.34.5', 'my agent', 'keenmate.com',
-                         true);
+												 true);
 
 select *
 from auth.get_user_group_members('ondrej', 1, 3, 8);
@@ -164,7 +167,7 @@ from token;
 select token_id, token_state_code
 from auth.token
 where token = '4FDC32F629CE'
-  and ((null is not null and token.user_id = null) or true);
+	and ((null is not null and token.user_id = null) or true);
 
 
 
@@ -174,7 +177,7 @@ from user_info;
 
 select *
 from permission_assignment pa
-         inner join effective_permissions ep on pa.perm_set_id = ep.perm_set_id
+			 inner join effective_permissions ep on pa.perm_set_id = ep.perm_set_id
 where group_id = 6;
 
 
@@ -183,11 +186,11 @@ from create_user_group_as_system('');
 
 select *
 from add_journal_msg('ondrej', 1, 1
-    , format('User %s assigned new owner: %s to tenant: %s'
-                         , 'ondrej', 2, 2)
-    , 'tenant', 2
-    , array ['target_user_id', 2::text]
-    , 50004);
+	, format('User %s assigned new owner: %s to tenant: %s'
+											 , 'ondrej', 2, 2)
+	, 'tenant', 2
+	, array ['target_user_id', 2::text]
+	, 50004);
 
 
 select *
@@ -206,8 +209,8 @@ where tenant_id = 2;
 
 select *
 from user_group ug
-         inner join public.user_group_member ugm on ug.user_group_id = ugm.group_id
-         inner join public.user_info ui on ugm.user_id = ui.user_id;
+			 inner join public.user_group_member ugm on ug.user_group_id = ugm.group_id
+			 inner join public.user_info ui on ugm.user_id = ui.user_id;
 
 --
 select *
