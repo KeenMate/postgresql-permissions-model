@@ -886,8 +886,9 @@ from auth.perm_set ps
  *    ------------------------------------------------------------------------------------------------------------------------------------------------
  */
 
-create or replace function add_journal_msg_jsonb(_created_by text, _tenant_id int
+create or replace function add_journal_msg_jsonb(_created_by text
 , _user_id bigint, _msg text
+, _tenant_id int default 1
 , _data_group text default 'system'
 , _data_object_id bigint default null
 , _payload jsonb default null
@@ -907,7 +908,8 @@ end;
 $$;
 
 create or replace function add_journal_msg(_created_by text
-, _tenant_id int, _user_id bigint, _msg text
+, _user_id bigint, _msg text
+, _tenant_id int default 1
 , _data_group text default 'system'
 , _data_object_id bigint default null
 , _payload text[] default null
@@ -921,8 +923,8 @@ $$
 -- noinspection SqlConstantExpression
 
 select *
-from add_journal_msg_jsonb(_created_by, _tenant_id, _user_id
-	, _msg, _data_group, _data_object_id,
+from add_journal_msg_jsonb(_created_by, _user_id
+	, _msg, _tenant_id, _data_group, _data_object_id,
 													 case when _payload is null then null else jsonb_build_object(variadic _payload) end
 	, _event_id
 	, _data_object_code)
@@ -930,6 +932,7 @@ $$;
 
 
 create or replace function search_journal_msgs(_user_id int,
+																							 _search_text text,
 																							 _from timestamptz default null, _to timestamptz default null,
 																							 _tenant_id int default 1,
 																							 _target_user_id int default 1,
@@ -977,7 +980,8 @@ begin
 					 as (select journal_id
 										, count(1) over () as total_items
 							 from journal
-							 where ((_tenant_id is null and __can_read_global_journal) or tenant_id = _tenant_id)
+							 where (_search_text is null or message like '%' || _search_text || '%')
+								 and ((_tenant_id is null and __can_read_global_journal) or tenant_id = _tenant_id)
 								 and (_target_user_id is null or user_id = _target_user_id)
 								 and (_event_id is null or event_id = _event_id)
 								 and (_data_group is null or data_group = _data_group)
@@ -1477,10 +1481,10 @@ begin
 
 	if (_throw_err) then
 
-		perform add_journal_msg('system', _tenant_id, _target_user_id
+		perform add_journal_msg('system', _target_user_id
 			, format('User: (id: %s) has no permission: %s'
 															, _target_user_id, array_to_string(_perm_codes, '; '))
-			, 'perm', _target_user_id
+			, _tenant_id, 'perm', _target_user_id
 			, _event_id := 50003);
 
 		perform
@@ -1613,10 +1617,10 @@ begin
 		select __last_id;
 
 	perform
-		add_journal_msg(_created_by, null, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s created new authentication provider: %s'
 											, _created_by, _provider_name)
-			, 'provider', __last_id
+			, 1, 'provider', __last_id
 			, array ['provider_code', _provider_code, 'provider_name', _provider_name, 'is_active', _is_active::text]
 			, 50011);
 end;
@@ -1647,10 +1651,10 @@ begin
 			returning provider_id;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s updated authentication provider: %s'
 											, _modified_by, _provider_name)
-			, 'provider', _provider_id
+			, 1, 'provider', _provider_id
 			, array ['provider_code', _provider_code, 'provider_name', _provider_name, 'is_active', _is_active::text]
 			, 50012);
 end;
@@ -1681,10 +1685,10 @@ begin
 				returning __provider_id;
 
 	perform
-		add_journal_msg(_deleted_by, null, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s deleted authentication provider: %s'
 											, _deleted_by, _provider_code)
-			, 'provider', __provider_id
+			, 1, 'provider', __provider_id
 			, null
 			, 50013);
 end;
@@ -1720,10 +1724,10 @@ begin
 		order by ui.display_name;
 
 	perform
-		add_journal_msg(_requested_by, null, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested a list of all users for authentication provider: %s'
 											, _requested_by, _provider_code)
-			, 'provider', __provider_id
+			, 1, 'provider', __provider_id
 			, null
 			, 50016);
 end;
@@ -1752,10 +1756,10 @@ begin
 			returning provider_id;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s enabled authentication provider: %s'
 											, _modified_by, _provider_code)
-			, 'provider', __provider_id
+			, 1, 'provider', __provider_id
 			, null
 			, 50014);
 end;
@@ -1784,10 +1788,10 @@ begin
 			returning provider_id;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s disabled authentication provider: %s'
 											, _modified_by, _provider_code)
-			, 'provider', __provider_id
+			, 1, 'provider', __provider_id
 			, null
 			, 50015);
 end;
@@ -1982,10 +1986,10 @@ begin
 		into __last_id, __token_uid, __token_expires_at;
 
 	perform
-		add_journal_msg(_created_by, 1, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s created a new token for user: %s'
 											, _created_by, _target_user_id)
-			, 'token'
+			, 1, 'token'
 			, __last_id
 			, null
 			, 50401);
@@ -2052,10 +2056,10 @@ begin
 	end if;
 
 	perform
-		add_journal_msg(_modified_by, 1, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s validated a token for user: %s'
 											, _modified_by, _target_user_id)
-			, 'token'
+			, 1, 'token'
 			, __token_id
 			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
 			, 50402);
@@ -2142,10 +2146,10 @@ begin
 				, user_oid;
 
 	perform
-		add_journal_msg(_modified_by, 1, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('Token (uid: %s) set as used by user: %s'
 											, _token_uid, _modified_by)
-			, 'token'
+			, 1, 'token'
 			, __token_id
 			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
 			, _event_id := 50403);
@@ -2271,10 +2275,10 @@ begin
 		select __last_id;
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
-			, format('User: %s added new group: %s in tenant: %s'
+		add_journal_msg(_created_by, _user_id
+			, format('User: %s created group: %s in tenant: %s'
 											, _created_by, _title, _tenant_id)
-			, 'group', __last_id
+			, _tenant_id, 'group', __last_id
 			,
 										array ['title', _title, 'is_default', _is_default::text
 											, 'is_system', _is_system::text
@@ -2322,7 +2326,7 @@ begin
 end ;
 $$;
 
-create function auth.update_user_group(_modified_by text, _user_id bigint, _tenant_id int, _ug_id int, _title text,
+create function auth.update_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int, _title text,
 																			 _is_assignable bool, _is_active bool, _is_external bool, _is_default bool)
 	returns table
 					(
@@ -2346,8 +2350,22 @@ begin
 				, is_external = _is_external
 				, is_default = _is_default
 			where tenant_id = _tenant_id
-				and user_group_id = _ug_id
+				and user_group_id = _user_group_id
 			returning user_group_id;
+
+	perform
+		add_journal_msg(_modified_by, _user_id
+			, format('User: %s updated group: %s in tenant: %s'
+											, _modified_by, _title, _tenant_id)
+			, _tenant_id, 'group', _user_group_id
+			,
+										array ['title', _title
+											, 'is_default', _is_default::text
+											, 'is_assignable', _is_assignable::text
+											, 'is_active', _is_active::text
+											, 'is_default', _is_default::text
+											]
+			, 50202);
 end;
 $$;
 
@@ -2382,10 +2400,10 @@ begin
 				, modified_by;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s enabled user group: %s in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50204);
 end;
@@ -2422,10 +2440,10 @@ begin
 				, modified_by;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s disabled user group: %s in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50205);
 end;
@@ -2462,10 +2480,10 @@ begin
 				, modified_by;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s enabled user group: %s in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50207);
 end;
@@ -2502,10 +2520,10 @@ begin
 				, modified_by;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s disabled user group: %s in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50206);
 end;
@@ -2550,10 +2568,10 @@ begin
 				returning user_group_id;
 
 	perform
-		add_journal_msg(_deleted_by, _tenant_id, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s removed user group: %s in tenant: %s'
 											, _deleted_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50203);
 end;
@@ -2601,10 +2619,10 @@ begin
 		returning member_id;
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s added new user: %s to group: %s in tenant: %s'
 											, _created_by, _target_user_id, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, array ['target_user_id', _target_user_id::text]
 			, 50131);
 end;
@@ -2673,10 +2691,10 @@ begin
 		and user_id = _target_user_id;
 
 	perform
-		add_journal_msg(_deleted_by, _tenant_id, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s removed user: %s from group: %s in tenant: %s'
 											, _deleted_by, _target_user_id, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, array ['target_user_id', _target_user_id::text]
 			, 50133);
 end;
@@ -2732,10 +2750,10 @@ begin
 		where ugm.group_id = _user_group_id;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested user group members: %s in tenant: %s'
 											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50210);
 end;
@@ -2829,11 +2847,11 @@ begin
 
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s added new provider: %s mapping: %s to group: %s in tenant: %s'
 											, _created_by, _provider_code, coalesce(_mapped_object_id, _mapped_role),
 							 _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			,
 										array ['provider_code', _provider_code, 'mapped_object_id'
 											, _mapped_object_id::text, 'mapped_object_name'
@@ -2876,10 +2894,10 @@ begin
 
 
 	perform
-		add_journal_msg(_deleted_by, _tenant_id, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s removed group mapping: %s from group: %s in tenant: %s'
 											, _deleted_by, __mapped_object_name, __user_group_id, _tenant_id)
-			, 'group', __user_group_id
+			, _tenant_id, 'group', __user_group_id
 			,
 										array ['provider_code', __provider_code, 'mapped_object_id'
 											, __mapped_object_id::text, 'mapped_object_name', __mapped_object_name, 'mapped_role', __mapped_role]
@@ -2947,10 +2965,10 @@ begin
 
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s set user group as external in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50208);
 end;
@@ -2972,10 +2990,10 @@ begin
 	where user_group_id = _user_group_id;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s set user group as hybrid in tenant: %s'
 											, _modified_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50209);
 end;
@@ -3012,10 +3030,10 @@ begin
 							 where user_group_id = _user_group_id;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested group info: %s in tenant: %s'
 											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, null
 			, 50211);
 end
@@ -3083,10 +3101,10 @@ begin
 		into __last_id;
 
 	perform
-		add_journal_msg(_created_by, __last_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s created new tenant: %s'
 											, _created_by, _title)
-			, 'tenant', __last_id
+			, __last_id, 'tenant', __last_id
 			, array ['title', _title]
 			, 50001);
 
@@ -3219,10 +3237,10 @@ begin
 							 group by tu.user_id, tu.username, tu.display_name;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested a list of all users for tenant: %s'
 											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
+			, _tenant_id, 'tenant', _tenant_id
 			, null
 			, 50005);
 end;
@@ -3263,10 +3281,10 @@ begin
 		order by ugs.group_title;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested a list of all groups for tenant: %s'
 											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
+			, _tenant_id, 'tenant', _tenant_id
 			, null
 			, 50006);
 end;
@@ -3305,10 +3323,10 @@ begin
 		order by ui.display_name;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested a list of members for tenant: %s'
 											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
+			, _tenant_id, 'tenant', _tenant_id
 			, null
 			, 50005);
 end;
@@ -3355,10 +3373,10 @@ begin
 			returning owner_id;
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s added new tenant/group owner in tenant: %s'
 											, _created_by, _tenant_id)
-			, 'tenant', _tenant_id
+			, _tenant_id, 'tenant', _tenant_id
 			, array ['user_group_id', _user_group_id::text]
 			, 50004);
 end;
@@ -3390,10 +3408,10 @@ begin
 		and user_group_id = _user_group_id;
 
 	perform
-		add_journal_msg(_deleted_by, _tenant_id, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s deleted new tenant/group owner in tenant: %s'
 											, _deleted_by, _tenant_id)
-			, 'tenant', _tenant_id
+			, _tenant_id, 'tenant', _tenant_id
 			, array ['user_group_id', _user_group_id::text]
 			, 50004);
 end;
@@ -3485,17 +3503,17 @@ begin
 
 	if
 		_user_group_id is not null then
-		perform add_journal_msg(_created_by, _tenant_id, _user_id
+		perform add_journal_msg(_created_by, _user_id
 			, format('User: %s assigned new permission: %s to group: %s in tenant: %s'
 															, _created_by, coalesce(_perm_set_code, _perm_code), _user_group_id, _tenant_id)
-			, 'group', _user_group_id
+			, _tenant_id, 'group', _user_group_id
 			, array ['assignment_id', __last_id::text, 'perm_set_code', _perm_set_code, 'permission_code', _perm_code]
 			, 50304);
 	else
-		perform add_journal_msg(_created_by, _tenant_id, _user_id
+		perform add_journal_msg(_created_by, _user_id
 			, format('User: %s assigned new permission: %s to user: %s in tenant: %s'
 															, _created_by, coalesce(_perm_set_code, _perm_code), _target_user_id, _tenant_id)
-			, 'user', _target_user_id
+			, _tenant_id, 'user', _target_user_id
 			, array ['assignment_id', __last_id::text, 'perm_set_code', _perm_set_code, 'permission_code', _perm_code]
 			, 50304);
 	end if;
@@ -3526,17 +3544,17 @@ begin
 
 	if
 		__user_group_id is not null then
-		perform add_journal_msg(_deleted_by, _tenant_id, _user_id
+		perform add_journal_msg(_deleted_by, _user_id
 			, format('User: %s unassigned permission from group: %s in tenant: %s'
 															, _deleted_by, __user_group_id, _tenant_id)
-			, 'group', __user_group_id
+			, _tenant_id, 'group', __user_group_id
 			, array ['assignment_id', _assignment_id::text]
 			, 50305);
 	else
-		perform add_journal_msg(_deleted_by, _tenant_id, _user_id
+		perform add_journal_msg(_deleted_by, _user_id
 			, format('User: %s unassigned permission from user: %s in tenant: %s'
 															, _deleted_by, __user_group_id, _tenant_id)
-			, 'user', __target_user_id
+			, _tenant_id, 'user', __target_user_id
 			, array ['assignment_id', _assignment_id::text]
 			, 50304);
 	end if;
@@ -3586,10 +3604,10 @@ begin
 		into __permission_full_code;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s set permission: %s as assignable: %s'
 											, _modified_by, __permission_full_code, _is_assignable)
-			, 'permission', __permission_id
+			, 1, 'permission', __permission_id
 			, null
 			, 50306);
 end;
@@ -3939,10 +3957,10 @@ begin
 										on p.full_code = perm_code::ext.ltree;
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s created new permission set: %s'
 											, _created_by, _title)
-			, 'perm_set', __last_id
+			, _tenant_id, 'perm_set', __last_id
 			,
 										array ['title', _title, 'is_system', _is_system::text, 'is_assignable', _is_assignable::text, 'permissions', array_to_string(_permissions, ', ')]
 			, 50301);
@@ -4024,10 +4042,10 @@ begin
 		into __last_id;
 
 	perform
-		add_journal_msg(_modified_by, _tenant_id, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s updated permission set: %s'
 											, _modified_by, _title)
-			, 'perm_set', __last_id
+			, _tenant_id, 'perm_set', __last_id
 			,
 										array ['title', _title, 'is_assignable', _is_assignable::text]
 			, 50302);
@@ -4102,10 +4120,10 @@ begin
 		and psp.perm_set_id is null;
 
 	perform
-		add_journal_msg(_created_by, _tenant_id, _user_id
+		add_journal_msg(_created_by, _user_id
 			, format('User: %s added permission to permission set: %s'
 											, _created_by, array_to_string(_permissions, ', '))
-			, 'perm_set', _perm_set_id
+			, _tenant_id, 'perm_set', _perm_set_id
 			, array ['permissions', array_to_string(_permissions, ', ')]
 			, 50311);
 
@@ -4179,10 +4197,10 @@ begin
 																						on psp.perm_set_id = ps.perm_set_id and ps.tenant_id = _tenant_id);
 
 	perform
-		add_journal_msg(_deleted_by, _tenant_id, _user_id
+		add_journal_msg(_deleted_by, _user_id
 			, format('User: %s deleted permission from permission set: %s'
 											, _deleted_by, array_to_string(_permissions, ', '))
-			, 'perm_set', _perm_set_id
+			, _tenant_id, 'perm_set', _perm_set_id
 			, array ['permissions', array_to_string(_permissions, ', ')]
 			, 50313);
 
@@ -4259,10 +4277,10 @@ begin
 				, is_locked;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s enabled user: %s'
 											, _modified_by, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, null
 			, 50104);
 end;
@@ -4295,10 +4313,10 @@ begin
 				, is_locked;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s disabled user: %s'
 											, _modified_by, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, null
 			, 50105);
 end;
@@ -4331,10 +4349,10 @@ begin
 				, is_locked;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s unlocked user: %s'
 											, _modified_by, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, null
 			, 50106);
 end;
@@ -4367,10 +4385,10 @@ begin
 				, is_locked;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s locked user: %s'
 											, _modified_by, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, null
 			, 50107);
 end;
@@ -4416,10 +4434,10 @@ begin
 				, is_active;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s enabled user''s (id: %s) identity (provider code: %s)'
 											, _modified_by, _user_id, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, array ['provider_code', _provider_code]
 			, 50108);
 end;
@@ -4465,10 +4483,10 @@ begin
 				, is_active;
 
 	perform
-		add_journal_msg(_modified_by, null, _user_id
+		add_journal_msg(_modified_by, _user_id
 			, format('User: %s disabled user''s (id: %s) identity (provider code: %s)'
 											, _modified_by, _user_id, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, array ['provider_code', _provider_code]
 			, 50109);
 end;
@@ -4559,12 +4577,11 @@ begin
 		where user_id = __last_id;
 
 	perform
-		add_journal_msg('system', null, _user_id
+		add_journal_msg('system', _user_id
 			, format('User: (id: %s) added new user: %s'
 											, _user_id, _username)
-			, 'user', __last_id
-			,
-										array ['username', __normalized_username, 'email', __normalized_email
+			, 1, 'user', __last_id
+			, array ['username', __normalized_username, 'email', __normalized_email
 											, 'display_name', _display_name]
 			, _event_id := 50101);
 end;
@@ -4596,10 +4613,10 @@ begin
 		returning user_id, provider_code, uid;
 
 	perform
-		add_journal_msg('system', null, _user_id
+		add_journal_msg('system', _user_id
 			, format('User: (id: %s) added new user identity to user: %s'
 											, _user_id, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, array ['provider_code', _provider_code, 'provider_uid', __provider_uid, 'is_active', _is_active::text]
 			, _event_id := 50134);
 end;
@@ -4631,10 +4648,10 @@ begin
 				, uid;
 
 	perform
-		add_journal_msg('system', null, _user_id
+		add_journal_msg('system', _user_id
 			, format('User: (id: %s) changed user''s password (id: %s)'
 											, _user_id, _target_user_id)
-			, 'user', _target_user_id
+			, 1, 'user', _target_user_id
 			, _event_id := 50136);
 end;
 $$;
@@ -5310,6 +5327,8 @@ begin
 	insert into const.tenant_access_type(code)
 	values ('authenticated');
 
+	perform unsecure.create_primary_tenant();
+
 	insert into const.sys_param(created_by, group_code, code, number_value)
 	values ('initial', 'auth', 'perm_cache_timeout_in_s', 15); -- 15seconds intentionally for better debugging
 
@@ -5327,8 +5346,6 @@ begin
 
 	perform unsecure.assign_permission_as_system(null, 1, null, 'system');
 	perform unsecure.set_permission_as_assignable('system', 1, 1, null, false);
-
-	perform unsecure.create_primary_tenant();
 
 	perform unsecure.create_permission_by_path_as_system('Authentication', 'system', false);
 	perform unsecure.create_permission_by_path_as_system('Get data', 'system.authentication');
