@@ -39,3 +39,8 @@ Features present in keen auth permission db
 - lock/unlock
 - get/add/remove members
 - get/add/remove mappings
+
+# To add
+- get group permissions
+- delete user group relations (ug_mapping)
+- 
