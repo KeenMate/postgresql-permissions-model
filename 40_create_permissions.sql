@@ -143,7 +143,7 @@ $$;
 
 -- User has no correct permission in tenant
 
-create function error.raise_52109(_tenant_id int, _user_id bigint, _perm_codes text[]) returns void
+create function error.raise_52109(_tenant_id int default 1, _user_id bigint, _perm_codes text[]) returns void
     language plpgsql as
 $$
 begin
@@ -250,7 +250,7 @@ $$;
 
 -- Permission set is not defined in tenant
 
-create function error.raise_52177(_perm_set_id int, _tenant_id int) returns void
+create function error.raise_52177(_perm_set_id int, _tenant_id int default 1) returns void
     language plpgsql as
 $$
 begin
@@ -448,7 +448,7 @@ $$;
 
 -- User group has defined owners but the user is not one of them
 -- User is not tenant or user group owner
-create function error.raise_52401(_user_id bigint, _tenant_id int, _user_group_id int) returns void
+create function error.raise_52401(_user_id bigint, _tenant_id int default 1, _user_group_id int) returns void
     language plpgsql as
 $$
 begin
@@ -1037,7 +1037,7 @@ end;
 $$;
 
 create
-    or replace function get_journal_payload(_user_id int, _tenant_id int, _journal_id bigint)
+    or replace function get_journal_payload(_user_id int, _tenant_id int default 1, _journal_id bigint)
     returns table
             (
                 __journal_id bigint,
@@ -1072,7 +1072,7 @@ $$;
  *
  */
 
-create function auth.throw_no_access(_tenant_id int, _username text)
+create function auth.throw_no_access(_tenant_id int default 1, _username text)
     returns void
     language plpgsql
 as
@@ -1083,7 +1083,7 @@ begin
 end;
 $$;
 
-create function auth.throw_no_permission(_tenant_id int, _user_id bigint, _perm_codes text[])
+create function auth.throw_no_permission(_tenant_id int default 1, _user_id bigint, _perm_codes text[])
     returns void
     language plpgsql
 as
@@ -1105,7 +1105,7 @@ begin
 end;
 $$;
 
-create function auth.throw_no_permission(_tenant_id int, _user_id bigint, _perm_code text)
+create function auth.throw_no_permission(_tenant_id int default 1, _user_id bigint, _perm_code text)
     returns void
     language plpgsql
 as
@@ -1128,7 +1128,7 @@ end;
 $$;
 
 create
-    or replace function unsecure.clear_permission_cache(_deleted_by text, _tenant_id int, _target_user_id bigint)
+    or replace function unsecure.clear_permission_cache(_deleted_by text, _tenant_id int default 1, _target_user_id bigint)
     returns void
     language sql
 as
@@ -1227,7 +1227,7 @@ begin
 end;
 $$;
 
-create function unsecure.recalculate_user_permissions(_created_by text, _tenant_id int, _target_user_id bigint)
+create function unsecure.recalculate_user_permissions(_created_by text, _tenant_id int default 1, _target_user_id bigint)
     returns table
             (
                 __groups      text[],
@@ -1341,7 +1341,7 @@ begin
 end;
 $$;
 
-create function auth.has_owner(_tenant_id int, _user_group_id int default null)
+create function auth.has_owner(_tenant_id int default 1, _user_group_id int default null)
     returns bool
     language plpgsql
     immutable
@@ -1356,7 +1356,7 @@ begin
 end;
 $$;
 
-create function auth.is_owner(_user_id bigint, _tenant_id int, _user_group_id int default null)
+create function auth.is_owner(_user_id bigint, _tenant_id int default 1, _user_group_id int default null)
     returns bool
     language plpgsql
     immutable
@@ -1375,7 +1375,7 @@ begin
 end;
 $$;
 
-create function auth.is_group_member(_user_id bigint, _tenant_id int, _user_group_id int default null)
+create function auth.is_group_member(_user_id bigint, _tenant_id int default 1, _user_group_id int default null)
     returns bool
     language plpgsql
     immutable
@@ -1394,7 +1394,7 @@ begin
 end;
 $$;
 
-create function auth.can_manage_user_group(_user_id bigint, _tenant_id int, _user_group_id int, _permission text) returns bool
+create function auth.can_manage_user_group(_user_id bigint, _tenant_id int default 1, _user_group_id int, _permission text) returns bool
     language plpgsql
     immutable
 as
@@ -1432,7 +1432,7 @@ end;
 $$;
 
 
-create or replace function auth.has_permissions(_tenant_id int, _target_user_id bigint, _perm_codes text[],
+create or replace function auth.has_permissions(_tenant_id int default 1, _target_user_id bigint, _perm_codes text[],
                                                 _throw_err bool default true)
     returns bool
     language plpgsql
@@ -1536,7 +1536,7 @@ select *
 from auth.has_permissions(1, _target_user_id, _perm_codes, _throw_err);
 $$;
 
-create function auth.has_permission(_tenant_id int, _target_user_id bigint, _perm_code text,
+create function auth.has_permission(_tenant_id int default 1, _target_user_id bigint, _perm_code text,
                                     _throw_err bool default true)
     returns bool
     language plpgsql
@@ -2261,7 +2261,7 @@ $$;
 
 -- NOT USED ANYMORE, USER create_owner instead
 --
--- create function public.assign_tenant_owner(_created_by text, _user_id bigint, _tenant_id int, _target_user_id bigint)
+-- create function public.assign_tenant_owner(_created_by text, _user_id bigint, _tenant_id int default 1, _target_user_id bigint)
 --     returns setof auth.user_group_member
 --     language plpgsql
 --     rows 1
@@ -2349,7 +2349,7 @@ from unsecure.create_user_group('system', 1, _title, _tenant_id, _is_assignable,
 
 $$;
 
-create function auth.create_user_group(_created_by text, _user_id bigint, _title text, _tenant_id int,
+create function auth.create_user_group(_created_by text, _user_id bigint, _title text, _tenant_id int default 1,
                                        _is_assignable bool default true, _is_active bool default true,
                                        _is_external bool default false, _is_default bool default false)
     returns table
@@ -2369,11 +2369,12 @@ begin
         select *
         from unsecure.create_user_group(_created_by, _user_id, _title, _tenant_id
             , _is_assignable, _is_active, _is_external, false,
+
                                         _is_default);
 end ;
 $$;
 
-create function auth.update_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int, _title text,
+create function auth.update_user_group(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int, _title text,
                                        _is_assignable bool, _is_active bool, _is_external bool, _is_default bool)
     returns table
             (
@@ -2416,7 +2417,7 @@ begin
 end;
 $$;
 
-create function auth.enable_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.enable_user_group(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns table
             (
                 __user_group_id int,
@@ -2456,7 +2457,7 @@ begin
 end;
 $$;
 
-create function auth.disable_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.disable_user_group(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns table
             (
                 __user_group_id int,
@@ -2536,7 +2537,7 @@ begin
 end;
 $$;
 
-create function auth.unlock_user_group(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.unlock_user_group(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns table
             (
                 __user_group_id int,
@@ -2576,7 +2577,7 @@ begin
 end;
 $$;
 
-create function auth.delete_user_group(_deleted_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.delete_user_group(_deleted_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns table
             (
                 __user_group_id int
@@ -2625,7 +2626,7 @@ end;
 $$;
 
 
-create function unsecure.create_user_group_member(_created_by text, _user_id bigint, _tenant_id int, _user_group_id int,
+create function unsecure.create_user_group_member(_created_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int,
                                                   _target_user_id bigint)
     returns table
             (
@@ -2702,7 +2703,7 @@ begin
 end;
 $$;
 
-create function auth.create_user_group_member(_created_by text, _user_id bigint, _tenant_id int, _user_group_id int,
+create function auth.create_user_group_member(_created_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int,
                                               _target_user_id int)
     returns table
             (
@@ -2723,7 +2724,7 @@ end;
 
 $$;
 
-create function auth.delete_user_group_member(_deleted_by text, _user_id bigint, _tenant_id int, _user_group_id int,
+create function auth.delete_user_group_member(_deleted_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int,
                                               _target_user_id bigint)
     returns void
     language plpgsql
@@ -2747,7 +2748,7 @@ begin
 end;
 $$;
 
-create function unsecure.get_user_group_members(_requested_by text, _user_id bigint, _tenant_id int,
+create function unsecure.get_user_group_members(_requested_by text, _user_id bigint, _tenant_id int default 1,
                                                 _user_group_id int)
     returns table
             (
@@ -2806,7 +2807,7 @@ begin
 end;
 $$;
 
-create function auth.get_user_group_members(_requested_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.get_user_group_members(_requested_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns table
             (
                 __created                    timestamptz,
@@ -2837,7 +2838,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns setof auth.user_group_mapping
     language plpgsql
 as
@@ -2861,7 +2862,7 @@ begin
 end;
 $$;
 
-create function auth.create_user_group_mapping(_created_by text, _user_id bigint, _tenant_id int, _user_group_id int,
+create function auth.create_user_group_mapping(_created_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int,
                                                _provider_code text,
                                                _mapped_object_id text default null,
                                                _mapped_object_name text default null,
@@ -2931,7 +2932,7 @@ begin
 end;
 $$;
 
-create function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _tenant_id int, _ug_mapping_id int)
+create function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _tenant_id int default 1, _ug_mapping_id int)
     returns void
     language plpgsql
 as
@@ -2977,7 +2978,7 @@ end;
 $$;
 
 -- Creates a group with mapping that is locked so no members can be added manually
-create function auth.create_external_user_group(_created_by text, _user_id bigint, _tenant_id int, _title text,
+create function auth.create_external_user_group(_created_by text, _user_id bigint, _tenant_id int default 1, _title text,
                                                 _provider text,
                                                 _is_assignable bool default true, _is_active bool default true,
                                                 _mapped_object_id text default null,
@@ -3014,7 +3015,7 @@ begin
 end ;
 $$;
 
-create function auth.set_user_group_as_external(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.set_user_group_as_external(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns void
     language plpgsql
 as
@@ -3045,7 +3046,7 @@ begin
 end;
 $$;
 
-create function auth.set_user_group_as_hybrid(_modified_by text, _user_id bigint, _tenant_id int, _user_group_id int)
+create function auth.set_user_group_as_hybrid(_modified_by text, _user_id bigint, _tenant_id int default 1, _user_group_id int)
     returns void
     language plpgsql
 as
@@ -3070,7 +3071,7 @@ begin
 end;
 $$;
 
-create function unsecure.get_user_group_by_id(_requested_by text, _user_id bigint, _tenant_id int,
+create function unsecure.get_user_group_by_id(_requested_by text, _user_id bigint, _tenant_id int default 1,
                                               _user_group_id int)
     returns table
             (
@@ -3110,7 +3111,7 @@ begin
 end
 $$;
 
-create function auth.get_user_group_by_id(_requested_by text, _user_id bigint, _tenant_id int,
+create function auth.get_user_group_by_id(_requested_by text, _user_id bigint, _tenant_id int default 1,
                                           _user_group_id int)
     returns table
             (
@@ -3244,7 +3245,7 @@ begin
 end;
 $$;
 
-create function auth.get_tenant_by_id(_tenant_id int)
+create function auth.get_tenant_by_id(_tenant_id int default 1)
     returns table
             (
                 __created       timestamptz,
@@ -3276,7 +3277,7 @@ where tenant_id = _tenant_id;
 $$;
 
 create
-    or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _tenant_id int)
+    or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _tenant_id int default 1)
     returns table
             (
                 __user_id      bigint,
@@ -3318,7 +3319,7 @@ end;
 $$;
 
 create
-    or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _tenant_id int)
+    or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _tenant_id int default 1)
     returns table
             (
                 __user_group_id integer,
@@ -3362,7 +3363,7 @@ end;
 $$;
 
 create
-    or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _tenant_id int)
+    or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _tenant_id int default 1)
     returns table
             (
                 __user_id            bigint,
@@ -3414,7 +3415,7 @@ $$;
  *     #######   ###  ###  ##    ## ######## ##     ##  ######
  */
 
-create or replace function auth.create_owner(_created_by text, _user_id bigint, _target_user_id bigint, _tenant_id int
+create or replace function auth.create_owner(_created_by text, _user_id bigint, _target_user_id bigint, _tenant_id int default 1
 , _user_group_id int default null)
     returns table
             (
@@ -3453,7 +3454,7 @@ begin
 end;
 $$;
 
-create function auth.delete_owner(_deleted_by text, _user_id bigint, _target_user_id bigint, _tenant_id int
+create function auth.delete_owner(_deleted_by text, _user_id bigint, _target_user_id bigint, _tenant_id int default 1
 , _user_group_id int)
     returns void
     language plpgsql
@@ -4001,7 +4002,7 @@ create function unsecure.create_perm_set(
     _created_by text,
     _user_id bigint,
     _title text,
-    _tenant_id int default null,
+    _tenant_id int default 1 default null,
     _is_system bool default false,
     _is_assignable bool default true,
     _permissions text[] default null)
@@ -4071,7 +4072,7 @@ create function auth.create_perm_set(
     _created_by text,
     _user_id text,
     _title text,
-    _tenant_id int default null,
+    _tenant_id int default 1 default null,
     _is_system bool default false,
     _is_assignable bool default true,
     _permissions text[] default null)
@@ -4095,7 +4096,7 @@ $$;
 create function unsecure.update_perm_set(
     _modified_by text,
     _user_id text,
-    _tenant_id int,
+    _tenant_id int default 1,
     _perm_set_id int,
     _title text,
     _is_assignable bool default true
@@ -4138,7 +4139,7 @@ $$;
 create function auth.update_perm_set(
     _modified_by text,
     _user_id text,
-    _tenant_id int,
+    _tenant_id int default 1,
     _perm_set_id int,
     _title text,
     _is_assignable bool default true
@@ -4167,7 +4168,7 @@ end;
 $$;
 
 create
-    or replace function unsecure.add_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int,
+    or replace function unsecure.add_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int default 1,
                                                           _perm_set_id int, _permissions text[] default null)
     returns table
             (
@@ -4216,7 +4217,7 @@ begin
 end;
 $$;
 
-create function auth.add_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int, _perm_set_id int,
+create function auth.add_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int default 1, _perm_set_id int,
                                               _permissions text[] default null)
     returns table
             (
@@ -4243,7 +4244,7 @@ $$;
 
 
 create
-    or replace function unsecure.delete_perm_set_permissions(_deleted_by text, _user_id bigint, _tenant_id int,
+    or replace function unsecure.delete_perm_set_permissions(_deleted_by text, _user_id bigint, _tenant_id int default 1,
                                                              _perm_set_id int, _permissions text[] default null)
     returns table
             (
@@ -4293,7 +4294,7 @@ begin
 end;
 $$;
 
-create function auth.delete_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int, _perm_set_id int,
+create function auth.delete_perm_set_permissions(_created_by text, _user_id bigint, _tenant_id int default 1, _perm_set_id int,
                                                  _permissions text[] default null)
     returns table
             (
@@ -4584,7 +4585,7 @@ $$;
 
 create
     or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _target_user_id bigint,
-                                                           _tenant_id int,
+                                                           _tenant_id int default 1,
                                                            _provider_code text,
                                                            _provider_groups text[] default null,
                                                            _provider_roles text[] default null)
@@ -4858,7 +4859,7 @@ end;
 $$;
 
 create function unsecure.add_user_to_default_groups(_created_by text, _user_id bigint, _target_user_id bigint,
-                                                    _tenant_id int)
+                                                    _tenant_id int default 1)
     returns table
             (
                 __user_id          bigint,
@@ -4914,7 +4915,7 @@ end;
 $$;
 
 create function auth.add_user_to_default_groups(_created_by text, _user_id bigint, _target_user_id bigint,
-                                                _tenant_id int)
+                                                _tenant_id int default 1)
     returns table
             (
                 __user_id          bigint,
@@ -5319,7 +5320,7 @@ end;
 $$;
 
 --
--- create function auth.get_tenant_permissions(_tenant_id int, _user_id bigint)
+-- create function auth.get_tenant_permissions(_tenant_id int default 1, _user_id bigint)
 --     returns table
 --             (
 --                 __user_id     bigint,
