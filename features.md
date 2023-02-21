@@ -12,11 +12,6 @@ Features present in keen auth permission db
 - assign/unassign permission
 - has permissions
 
-### Tenants
-- create/update
-- assign owner/group owner
-- get tenants/groups/members/permissions
-
 ### Users
 - get identity + by email
 - register
@@ -29,18 +24,23 @@ Features present in keen auth permission db
 - get user events
 - get user data
 
-### Groups
-- CRUD
-- lock/unlock
-- get/add/remove members
-- get/add/remove mappings
+### Tenants
+- create/update
+- assign owner/group owner
+- get tenants/groups/members/permissions
 
 ### Providers
 - create/update/delete
 - get provider users
 - enable/disable
 
+### Groups
+- CRUD
+- lock/unlock
+- get/add/remove members
+- get/add/remove mappings
+
 # To add
-- get effective permissions
+- get group permissions
 - delete user group relations (ug_mapping)
 - 
