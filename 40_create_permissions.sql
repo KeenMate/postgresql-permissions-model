@@ -2332,9 +2332,9 @@ from unsecure.create_user_group('system', 1, _title, _tenant_id, _is_assignable,
 
 $$;
 
-create function auth.create_user_group(_created_by text, _user_id bigint, _title text, _tenant_id int default 1,
+create function auth.create_user_group(_created_by text, _user_id bigint, _title text,
 																			 _is_assignable bool default true, _is_active bool default true,
-																			 _is_external bool default false, _is_default bool default false)
+																			 _is_external bool default false, _is_default bool default false, _tenant_id int default 1)
 	returns table
 					(
 						__user_group_id int
