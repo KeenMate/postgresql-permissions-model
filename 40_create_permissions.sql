@@ -2838,16 +2838,16 @@ as
 $$
 begin
 
-	perform auth.has_permission(_user_id, 'system.groups.get_mappings', _tenant_id);
+	perform auth.has_permission(_user_id, 'system.groups.get_mapping', _tenant_id);
 
 	return query select *
 							 from auth.user_group_mapping ugm
 							 where ugm.group_id = _user_group_id;
 
 	perform
-		add_journal_msg(_requested_by, _tenant_id, _user_id
+		add_journal_msg(_requested_by, _user_id
 			, format('User: %s requested user group mappings for group: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
+											, _requested_by, _user_group_id, _tenant_id), _tenant_id
 			, 'group', _user_group_id
 			,
 										NULL
