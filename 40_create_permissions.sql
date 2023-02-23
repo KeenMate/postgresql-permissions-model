@@ -1521,7 +1521,7 @@ begin
 			, _event_id := 50003);
 
 		perform
-			auth.throw_no_permission(_tenant_id, _target_user_id, _perm_codes);
+			auth.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
 	end if;
 
 	return false;
@@ -2279,9 +2279,10 @@ $$;
 -- $$;
 
 create function unsecure.create_user_group(_created_by text, _user_id bigint, _title text
-	, _tenant_id int default 1, _is_assignable bool default true, _is_active bool default true,
+	, _is_assignable bool default true, _is_active bool default true,
 																					 _is_external bool default false,
-																					 _is_system bool default false, _is_default bool default false)
+																					 _is_system bool default false, _is_default bool default false,
+																					 _tenant_id int default 1)
 	returns table
 					(
 						__user_group_id int
@@ -2320,21 +2321,23 @@ end ;
 $$;
 
 create function unsecure.create_user_group_as_system(_title text
-, _is_system bool default false, _is_assignable bool default true, _tenant_id int default 1)
+, _is_system bool default false, _is_assignable bool default true, _is_default bool default false
+, _tenant_id int default 1)
 	returns setof auth.user_group
 	language sql
 	rows 1
 as
 $$
 select ug.*
-from unsecure.create_user_group('system', 1, _title, _tenant_id, _is_assignable, true, false, _is_system) g
+from unsecure.create_user_group('system', 1, _title, _is_assignable, true, false, _is_system, _is_default, _tenant_id) g
 			 inner join auth.user_group ug on ug.user_group_id = g.__user_group_id;
 
 $$;
 
 create function auth.create_user_group(_created_by text, _user_id bigint, _title text,
 																			 _is_assignable bool default true, _is_active bool default true,
-																			 _is_external bool default false, _is_default bool default false, _tenant_id int default 1)
+																			 _is_external bool default false, _is_default bool default false,
+																			 _tenant_id int default 1)
 	returns table
 					(
 						__user_group_id int
@@ -2350,9 +2353,9 @@ begin
 
 	return query
 		select *
-		from unsecure.create_user_group(_created_by, _user_id, _title, _tenant_id
+		from unsecure.create_user_group(_created_by, _user_id, _title
 			, _is_assignable, _is_active, _is_external, false,
-																		_is_default);
+																		_is_default, _tenant_id);
 end ;
 $$;
 
@@ -2994,9 +2997,9 @@ begin
 
 
 	select *
-	from unsecure.create_user_group(_created_by, _user_id, _title, _tenant_id
+	from unsecure.create_user_group(_created_by, _user_id, _title
 		, _is_assignable, _is_active, true,
-																	false)
+																	false, _tenant_id)
 	into __last_id;
 
 	perform
@@ -3177,19 +3180,19 @@ begin
 
 	select __user_group_id
 	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Admins'
-		, __last_id, true, true, false, true)
+		, true, true, false, true, __last_id)
 	into __tenant_owner_group_id;
 
 	perform unsecure.assign_permission(_created_by, _user_id
-		, __last_id, __tenant_owner_group_id, null, 'tenant_admin');
+		, __tenant_owner_group_id, null, 'tenant_admin', __last_id);
 
 	select __user_group_id
 	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Members'
-		, __last_id, true, true, false, true)
+		, true, true, false, true, __last_id)
 	into __tenant_member_group_id;
 
 	perform unsecure.assign_permission(_created_by, _user_id
-		, __last_id, __tenant_member_group_id, null, 'tenant_member');
+		, __tenant_member_group_id, null, 'tenant_member', __last_id);
 
 	if
 		(_tenant_owner_id is not null) then
@@ -4683,7 +4686,8 @@ declare
 begin
 	__normalized_username := 'api_key_' || _api_key;
 
-	insert into auth.user_info (created_by, modified_by, user_type_code, code, username, original_username, display_name)
+	insert into auth.user_info (created_by, modified_by, user_type_code, code, username, original_username,
+															display_name)
 	values (_created_by, _created_by, 'api', __normalized_username, __normalized_username, __normalized_username,
 					__normalized_username)
 	returning user_id into __last_id;
@@ -5647,7 +5651,8 @@ begin
 		select up.assignment_id
 		from auth.perm_set ps
 					 inner join auth.permission_assignment pa
-											on pa.user_id = __api_user_id and ps.perm_set_id = pa.perm_set_id and pa.tenant_id = _tenant_id,
+											on pa.user_id = __api_user_id and ps.perm_set_id = pa.perm_set_id and
+												 pa.tenant_id = _tenant_id,
 				 lateral unsecure.unassign_permission(_created_by, _user_id, pa.assignment_id, _tenant_id) as up
 		where ps.code = _perm_set_code
 		into __null_bigint;
@@ -5857,7 +5862,8 @@ begin
 
 	perform unsecure.create_permission_by_path_as_system('Journal', _is_assignable := true);
 	perform unsecure.create_permission_by_path_as_system('Read journal', 'system.journal', _is_assignable := true);
-	perform unsecure.create_permission_by_path_as_system('Read global journal', 'system.journal', _is_assignable := true);
+	perform unsecure.create_permission_by_path_as_system('Read global journal', 'system.journal',
+																											 _is_assignable := true);
 	perform unsecure.create_permission_by_path_as_system('Get payload', 'system.journal', _is_assignable := true);
 
 	perform unsecure.create_permission_by_path_as_system('Areas', 'system', false);
@@ -5928,10 +5934,10 @@ begin
 																							 , 'system.users','system.groups', 'system.journal']);
 
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
-																						 _permissions := array ['system.tenants.create_tenant', 'system.journal.read_journal', 'system.journal.get_journal_payload']);
+																						 _permissions := array ['system.tenants.create_tenant', 'system.journal.read_journal', 'system.journal.get_payload']);
 
 	perform unsecure.create_perm_set_as_system('Tenant admin', true, _is_assignable := true,
-																						 _permissions := array ['system.tenants', 'system.journal.read_journal', 'system.journal.get_journal_payload']);
+																						 _permissions := array ['system.tenants', 'system.journal.read_journal', 'system.journal.get_payload']);
 
 	perform unsecure.create_perm_set_as_system('Tenant owner', true, _is_assignable := true,
 																						 _permissions := array ['system.groups'
