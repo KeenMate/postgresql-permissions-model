@@ -3136,6 +3136,152 @@ begin
 end
 $$;
 
+-- drop  function unsecure.get_effective_group_permissions(_requested_by text, _user_id bigint, _group_id int,
+--                                                      _tenant_id int default 1)
+
+create function unsecure.get_effective_group_permissions(_requested_by text, _user_id bigint, _user_group_id int,
+																												 _tenant_id int default 1)
+	returns table
+					(
+						__full_code        text,
+						__permission_title text,
+						__perm_set_title   text,
+						__perm_set_code    text,
+						__perm_set_id      integer,
+						__assignment_id    bigint
+					)
+	language plpgsql
+as
+$$
+begin
+
+	return query
+--         Get all assigned permissions from permsets
+		select distinct ep.permission_code::text as full_code,
+										ep.permission_title,
+										ep.perm_set_title,
+										ep.perm_set_code,
+										ep.perm_set_id,
+										pa.assignment_id
+		from auth.permission_assignment pa
+					 inner join auth.effective_permissions ep
+											on pa.perm_set_id = ep.perm_set_id and pa.group_id = _user_group_id
+		where ep.perm_set_is_assignable = true
+			and ep.permission_is_assignable = true
+		union
+--         Get permissions that are directly assigned
+		select distinct sp.full_code::text,
+										sp.title,
+										null,
+										null,
+										null::integer,
+										pa.assignment_id
+		from auth.permission_assignment pa
+					 inner join auth.permission p on pa.permission_id = p.permission_id and _user_group_id = pa.group_id
+					 inner join auth.permission sp
+											on sp.node_path <@ p.node_path and sp.is_assignable = true;
+
+	perform
+		add_journal_msg(_requested_by, _user_id
+			, format('User: %s requested effective permissions of user group: %s in tenant: %s'
+											, _requested_by, _user_group_id, _tenant_id)
+			, _tenant_id, 'group', _user_group_id
+			, null
+			, 50211);
+end;
+$$;
+
+create function auth.get_effective_group_permissions(_requested_by text, _user_id bigint, _group_id int,
+																										 _tenant_id int default 1)
+	returns table
+					(
+						__full_code        text,
+						__permission_title text,
+						__perm_set_title   text,
+						__perm_set_code    text,
+						__perm_set_id      integer,
+						__assignment_id    bigint
+					)
+	language plpgsql
+as
+$$
+BEGIN
+	perform auth.has_permission(_user_id, 'system.groups.get_permissions', _tenant_id);
+
+	return query select * from unsecure.get_effective_group_permissions(_requested_by, _user_id, _group_id, _tenant_id);
+end;
+$$;
+
+-- drop function unsecure.get_assigned_group_permissions(_requested_by text, _user_id bigint, _group_id int,
+--                                                      _tenant_id int default 1)
+
+create function unsecure.get_assigned_group_permissions(_requested_by text, _user_id bigint, _user_group_id int,
+																												_tenant_id int default 1)
+	returns table
+					(
+						__permissions    jsonb,
+						__perm_set_title text,
+						__perm_set_id    integer,
+						__perm_set_code  text,
+						__assignment_id  bigint
+					)
+	language plpgsql
+as
+$$
+begin
+
+	return query
+		with permission_ids as (select distinct coalesce(pa.permission_id, psp.permission_id) as permission_id,
+																						ps.title                                      as perm_set_title,
+																						pa.perm_set_id,
+																						ps.code,
+																						pa.assignment_id
+														from permission_assignment pa
+																	 left join perm_set ps on ps.perm_set_id = pa.perm_set_id
+																	 left join perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
+														where group_id = _user_group_id)
+		select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
+																				p.permission_id)) as permissions,
+					 pids.perm_set_title,
+					 pids.perm_set_id,
+					 pids.code                                      as perm_set_code,
+					 pids.assignment_id
+		from permission_ids pids
+					 inner join permission p on pids.permission_id = p.permission_id
+		group by pids.assignment_id, pids.perm_set_title, pids.perm_set_id, pids.code
+		order by perm_set_title nulls last;
+
+	perform
+		add_journal_msg(_requested_by, _user_id
+			, format('User: %s requested assigned permissions of user group: %s in tenant: %s'
+											, _requested_by, _user_group_id, _tenant_id)
+			, _tenant_id, 'group', _user_group_id
+			, null
+			, 50211);
+
+end;
+$$;
+
+create function auth.get_assigned_group_permissions(_requested_by text, _user_id bigint, _user_group_id int,
+																										_tenant_id int default 1)
+	returns table
+					(
+						__permissions    jsonb,
+						__perm_set_title text,
+						__perm_set_id    integer,
+						__perm_set_code  text,
+						__assignment_id  bigint
+					)
+	language plpgsql
+as
+$$
+BEGIN
+	perform auth.has_permission(_user_id, 'system.groups.get_permissions', _tenant_id);
+
+	return query select *
+							 from unsecure.get_assigned_group_permissions(_requested_by, _user_id, _user_group_id, _tenant_id);
+end;
+$$;
 
 /***
  *    ######## ######## ##    ##    ###    ##    ## ########  ######
@@ -5917,6 +6063,7 @@ begin
 
 	perform unsecure.create_permission_by_path_as_system('Groups', 'system');
 	perform unsecure.create_permission_by_path_as_system('Get group', 'system.groups');
+	perform unsecure.create_permission_by_path_as_system('Get permissions', 'system.groups');
 	perform unsecure.create_permission_by_path_as_system('Create group', 'system.groups');
 	perform unsecure.create_permission_by_path_as_system('Update group', 'system.groups');
 	perform unsecure.create_permission_by_path_as_system('Delete group', 'system.groups');
