@@ -919,12 +919,12 @@ from auth.perm_set ps
 
 create or replace function add_journal_msg_jsonb(_created_by text
 , _user_id bigint, _msg text
-, _tenant_id int default 1
 , _data_group text default 'system'
 , _data_object_id bigint default null
 , _payload jsonb default null
 , _event_id int default null
-, _data_object_code text default null)
+, _data_object_code text default null
+, _tenant_id int default 1)
 	returns setof journal
 	language plpgsql
 	rows 1
@@ -941,12 +941,12 @@ $$;
 
 create or replace function add_journal_msg(_created_by text
 , _user_id bigint, _msg text
-, _tenant_id int default 1
 , _data_group text default 'system'
 , _data_object_id bigint default null
 , _payload text[] default null
 , _event_id int default null
-, _data_object_code text default null)
+, _data_object_code text default null
+, _tenant_id int default 1)
 	returns setof journal
 	language sql
 as
@@ -966,14 +966,15 @@ $$;
 create or replace function search_journal_msgs(_user_id int,
 																							 _search_text text,
 																							 _from timestamptz default null, _to timestamptz default null,
-																							 _tenant_id int default 1,
 																							 _target_user_id int default 1,
 																							 _event_id int default null,
 																							 _data_group text default null,
 																							 _data_object_id bigint default null,
 																							 _data_object_code text default null,
 																							 _payload_criteria jsonb DEFAULT NULL::jsonb,
-																							 _page integer DEFAULT 1, _page_size integer DEFAULT 10)
+																							 _page integer DEFAULT 1, _page_size integer DEFAULT 10,
+																							 _tenant_id int default 1
+)
 	returns
 		table
 		(
@@ -1021,6 +1022,7 @@ begin
 								 and (_data_object_code is null or data_object_code = _data_object_code)
 								 and (_payload_criteria is null or data_payload @> _payload_criteria)
 								 and created between coalesce(_from, now() - INTERVAL '100 years') and coalesce(_to, now() + INTERVAL '100 years')
+							 order by created desc
 							 offset ((_page - 1) * _page_size) limit _page_size)
 		select created
 				 , created_by
