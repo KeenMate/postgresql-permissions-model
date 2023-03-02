@@ -4144,6 +4144,127 @@ begin
 end;
 $$;
 
+-- TODO add some paging/search
+create or replace function unsecure.get_all_permissions(_requested_by text, _user_id bigint, _tenant_id int default 1)
+	returns table
+					(
+						__permission_id int,
+						__is_assignable bool,
+						__title         text,
+						__code          text,
+						__full_code     text,
+						__has_children  bool
+					)
+	language plpgsql
+as
+$$
+begin
+	return query select permission_id, is_assignable, title, code, full_code::text, has_children
+							 from permission
+							 order by full_code;
+	perform
+		add_journal_msg(_requested_by, _user_id
+			, format('User: %s requested all permissions '
+											, _requested_by)
+			, _tenant_id, 'user', null
+			, null
+			, 50310);
+end;
+$$;
+
+create or replace function auth.get_all_permissions(
+	_requested_by text,
+	_user_id bigint, _tenant_id int default 1)
+	returns table
+					(
+						__permission_id int,
+						__is_assignable bool,
+						__title         text,
+						__code          text,
+						__full_code     text,
+						__has_children  bool
+					)
+	language plpgsql
+as
+$$
+begin
+	perform auth.has_permission(_user_id, 'system.permissions.get_perm_sets', _tenant_id);
+
+	return query select * from unsecure.get_all_permissions(_requested_by, _user_id, _tenant_id);
+end;
+$$;
+
+
+-- drop function unsecure.get_perm_sets(_tenant_id int )
+create or replace function unsecure.get_perm_sets(
+	_requested_by text,
+	_user_id bigint, _tenant_id int default 1)
+	returns table
+					(
+						__perm_set_id   int,
+						__title         text,
+						__code          text,
+						__is_system     bool,
+						__is_assignable bool,
+						__permissions   jsonb
+					)
+	language plpgsql
+as
+$$
+begin
+	return query
+		select ps.perm_set_id,
+					 ps.title,
+					 ps.code,
+					 ps.is_system,
+					 ps.is_assignable,
+					 jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
+																				p.permission_id))
+		from perm_set ps
+					 inner join perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
+					 inner join permission p on p.permission_id = psp.permission_id
+		where ps.tenant_id = _tenant_id
+		group by ps.perm_set_id,
+						 ps.title,
+						 ps.code,
+						 ps.is_system,
+						 ps.is_assignable;
+
+	perform
+		add_journal_msg(_requested_by, _user_id
+			, format('User: %s request perm sets in tenant: %s'
+											, _requested_by, _tenant_id)
+			, _tenant_id, 'perm_set', _tenant_id
+			,
+										null, 50300);
+
+end;
+$$;
+
+-- drop function unsecure.get_perm_sets(_tenant_id int )
+create or replace function auth.get_perm_sets(
+	_requested_by text,
+	_user_id bigint, _tenant_id int default 1)
+	returns table
+					(
+						__perm_set_id   int,
+						__title         text,
+						__code          text,
+						__is_system     bool,
+						__is_assignable bool,
+						__permissions   jsonb
+					)
+	language plpgsql
+as
+$$
+begin
+	perform auth.has_permission(_user_id, 'system.permissions.get_perm_sets', _tenant_id);
+
+	return query select * from unsecure.get_perm_sets(_requested_by, _user_id, _tenant_id);
+end;
+$$;
+
+
 
 create function unsecure.create_perm_set(
 	_created_by text,
@@ -5565,6 +5686,85 @@ $$;
 -- end;
 -- $$;
 
+-- drop function unsecure.get_assigned_user_permissions
+create or replace function unsecure.get_assigned_user_permissions(_requested_by text, _user_id bigint,
+																																	_target_user_id int,
+																																	_tenant_id int default 1)
+	returns table
+					(
+						__permissions    jsonb,
+						__perm_set_title text,
+						__perm_set_id    integer,
+						__perm_set_code  text,
+						__assignment_id  bigint,
+						__group_id       int
+					)
+	language plpgsql
+as
+$$
+begin
+	return query with assigments as (select pa.*
+																	 from permission_assignment pa
+																					left join user_group_member ugm on pa.group_id = ugm.group_id
+																	 where (ugm.user_id = _target_user_id
+																		 or pa.user_id = _target_user_id)
+																		 and (tenant_id = _tenant_id
+																		 or tenant_id = 1))
+							 select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
+																									 p.permission_id))
+															as permissions,
+											ps.title,
+											ps.perm_set_id,
+											ps.code as perm_set_code,
+											a.assignment_id,
+											a.group_id
+							 from assigments a
+											left join perm_set ps
+																on a.perm_set_id = ps.perm_set_id
+											left join perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
+											left join permission p on (coalesce(a.permission_id, psp.permission_id) = p.permission_id)
+							 group by ps.title,
+												ps.perm_set_id,
+												a.assignment_id,
+												a.group_id
+							 order by ps.title nulls last;
+
+
+	perform
+		add_journal_msg(_requested_by, _user_id
+			, format('User: %s requested assigned permissions of user: %s in tenant: %s'
+											, _requested_by, _target_user_id, _tenant_id)
+			, _tenant_id, 'user', _target_user_id
+			, null
+			, 50211);
+
+end;
+$$;
+
+
+create or replace function auth.get_assigned_user_permissions(_requested_by text, _user_id bigint, _target_user_id int,
+																															_tenant_id int default 1)
+	returns table
+					(
+						__permissions    jsonb,
+						__perm_set_title text,
+						__perm_set_id    integer,
+						__perm_set_code  text,
+						__assignment_id  bigint,
+						__group_id       int
+					)
+	language plpgsql
+as
+$$
+begin
+	perform auth.has_permission(_user_id, 'system.users.get_permissions', _tenant_id);
+
+	return query select *
+							 from unsecure.get_assigned_user_permissions(_requested_by, _user_id, _target_user_id, _tenant_id);
+
+end;
+$$;
+
 
 /***
  *     █████╗ ██████╗ ██╗    ██╗  ██╗███████╗██╗   ██╗███████╗
@@ -6030,6 +6230,7 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Delete permission set', 'system.permissions');
 	perform unsecure.create_permission_by_path_as_system('Assign permission', 'system.permissions');
 	perform unsecure.create_permission_by_path_as_system('Unassign permission', 'system.permissions');
+	perform unsecure.create_permission_by_path_as_system('Get perm sets', 'system.permissions');
 
 	perform unsecure.create_permission_by_path_as_system('Users', 'system');
 	perform unsecure.create_permission_by_path_as_system('Register user', 'system.users');
@@ -6044,6 +6245,7 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Change password', 'system.users');
 	perform unsecure.create_permission_by_path_as_system('Read user events', 'system.users');
 	perform unsecure.create_permission_by_path_as_system('Update user data', 'system.users');
+	perform unsecure.create_permission_by_path_as_system('Get permissions', 'system.users');
 
 	perform unsecure.create_permission_by_path_as_system('Tenants', 'system');
 	perform unsecure.create_permission_by_path_as_system('Create tenant', 'system.tenants');
