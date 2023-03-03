@@ -5589,7 +5589,7 @@ begin
 
 	if
 		_user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, 'system.users.read_user');
+		perform auth.has_permission(_user_id, 'system.users.get_data');
 	end if;
 
 	select *
@@ -6247,6 +6247,7 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Change password', 'system.users');
 	perform unsecure.create_permission_by_path_as_system('Read user events', 'system.users');
 	perform unsecure.create_permission_by_path_as_system('Update user data', 'system.users');
+  	perform unsecure.create_permission_by_path_as_system('Get data', 'system.users');
 	perform unsecure.create_permission_by_path_as_system('Get permissions', 'system.users');
 
 	perform unsecure.create_permission_by_path_as_system('Tenants', 'system');
