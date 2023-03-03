@@ -6364,6 +6364,10 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Create mapping', 'system.groups');
 	perform unsecure.create_permission_by_path_as_system('Delete mapping', 'system.groups');
 
+	perform unsecure.create_permission_by_path_as_system('Api keys', 'system');
+	perform unsecure.create_permission_by_path_as_system('Search', 'system.api_keys');
+	perform unsecure.create_permission_by_path_as_system('Update permissions', 'system.api_keys');
+
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
 																						 _permissions := array ['system.tenants', 'system.providers'
 																							 , 'system.users','system.groups', 'system.journal']);
