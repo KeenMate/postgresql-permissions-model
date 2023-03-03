@@ -41,65 +41,66 @@ select *
 from auth.get_provider_users('system', 1, 'email');
 
 select *
-from unsecure.create_user_group_member_as_system('ondrej.valenta@keenmate.com', 'Tenant admins', 1);
+from unsecure.create_user_group_member_as_system('ondrej.valenta@keenmate.com', 'Tenant admins', _tenant_id := 1);
 
 select *
-from create_tenant('ondrej.valenta', 2, 'Albert Moravec', _tenant_owner_id := 3);
+from auth.create_tenant('ondrej.valenta', 1000, 'Albert Moravec', _tenant_owner_id := 1001);
 
 select *
-from auth.create_owner('ondrej.valenta', 1, 4, 2, null);
+from auth.create_owner('ondrej.valenta', 1, 1002, 1, 2);
 
 select *
-from auth.create_user_group('filip.jakab', 4, 'Our customers', 2);
+from auth.create_user_group('filip.jakab', 1002, 'Our customers', _tenant_id := 2);
 
 -- albert.moravec, owner of the tenant, creates a new user group member (jan.rada)
 select *
-from auth.create_user_group_member('albert.moravec', 3, 2, 4, 5);
+from auth.create_user_group_member('albert.moravec', 1001, 5, 1004, _tenant_id := 2);
 
 -- create tenant: Jan Rada, Account ondrej.valenta is not the owner, so the account has not permissions
 select *
-from create_tenant('ondrej.valenta', 2, 'Jan Rada');
+from auth.create_tenant('ondrej.valenta', 1000, 'Jan Rada');
 
 -- assign tenant owner to user jan.rada as system account
 select *
-from create_owner('ondrej.valenta', 1, 5, 3);
+from auth.create_owner('ondrej.valenta', 1000, 1003, _tenant_id := 3);
 
 -- jan.rada adds ondrej.valenta@keenmate.com as member of Tenant Owner of tenant: Jan Rada
 select *
-from auth.create_owner('jan.rada', 5, 2, 3);
+from auth.create_owner('jan.rada', 1003, 1000, _tenant_id := 3);
 
 -- create an external group with mapping to aad_rada in aad auth provider in tenant: Jan Rada
 select *
-from auth.create_external_user_group('system', 2, 3, 'External group 1', 'aad', _mapped_object_id := 'aad_rada');
+from auth.create_external_user_group('system', 1000, 'External group 1', 'aad', _mapped_object_id := 'aad_rada', _tenant_id := 3);
 
 -- create an external partners rule set with dummy permissions in tenant: Jan Rada
 select *
-from unsecure.create_perm_set_as_system('My external partners', 3, false, true,
-																				array ['system.areas.public', 'system.areas.admin', 'system.manage_providers', 'system.manage_permissions.create_permission']);
+from unsecure.create_perm_set_as_system('My external partners', false, true,
+																				array ['system.areas.public', 'system.areas.admin', 'system.manage_providers', 'system.manage_permissions.create_permission'],
+																				_tenant_id := 3);
 
 -- remove incorrect permissions from My external partners permission set
 select *
-from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, 3, 7,
-																			array ['system.manage_providers', 'system.manage_permissions.create_permission']);
+from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, 7,
+																			array ['system.manage_providers', 'system.manage_permissions.create_permission'], _tenant_id := 3);
 
 -- Add correct permissions to My external partners permission set
 select *
-from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, 3, 7,
-																	 array ['system.manage_tenants.get_users']);
+from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, 7,
+																	 array ['system.manage_tenants.get_users'], _tenant_id := 3);
 
 -- assign my_external_partners rule set to External group 1 in tenant: Jan Rada
 select *
-from unsecure.assign_permission_as_system(3, 9, null, 'my_external_partners');
+from unsecure.assign_permission_as_system(9, null, 'my_external_partners', _tenant_id := 3);
 
 -- imitate after login check for user: Jan Rada in tenant: Jan Rada with aad groups: [aad_rada]
 -- creates a record in auth.user_permission_cache
 select *
-from auth.ensure_groups_and_permissions('authenticator', 1, 5, 3, 'aad', array ['aad_rada']);
+from auth.ensure_groups_and_permissions('authenticator', 1, 1004, 'aad', array ['aad_rada'], _tenant_id := 3);
 
 -- check if user: Jan Rada has permission in tenant: Jan Rada has permission: system.manage_groups.create_group
 -- checks if the record in auth.user_permission_cache is still valid and uses it or reevaluate everything and store it again for 15 seconds
 select *
-from auth.has_permission(3, 5, 'system.areas.public');
+from auth.has_permission(1004, 'system.areas.public', _tenant_id := 3);
 -- user permission check does not change for user: Jan Rada for 15 seconds and then on next check it is reevaluated
 select *
 from auth.user_permission_cache;
@@ -111,7 +112,7 @@ select *
 from auth.get_tenant_groups('system', 1, 1);
 
 select *
-from user_group_members;
+from auth.user_group_members;
 
 select *
 from auth.disable_user('kerberos', 1, 6);
@@ -208,9 +209,9 @@ from journal
 where tenant_id = 2;
 
 select *
-from user_group ug
-			 inner join public.user_group_member ugm on ug.user_group_id = ugm.group_id
-			 inner join public.user_info ui on ugm.user_id = ui.user_id;
+from auth.user_group ug
+			 inner join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
+			 inner join auth.user_info ui on ugm.user_id = ui.user_id;
 
 --
 select *
@@ -232,7 +233,7 @@ select *
 from auth.create_user_group_member('System', 1, 1, 3, 2);
 
 select *
-from user_group_members;
+from auth.user_group_members;
 
 select *
 from auth.delete_user_group_member('system', 2, 1, 10, 2)
