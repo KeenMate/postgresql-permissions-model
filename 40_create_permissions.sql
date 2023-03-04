@@ -865,11 +865,11 @@ create index ix_journal on journal (tenant_id, data_group, coalesce(data_object_
 
 create table auth.api_key
 (
-	api_key_id         int   not null primary key generated always as identity,
-	tenant_id          int references auth.tenant (tenant_id) on delete cascade default 1,
-	title              text  not null,
-	description        text,
-	api_key            text  not null unique,
+	api_key_id  int   not null primary key generated always as identity,
+	tenant_id   int   not null references auth.tenant (tenant_id) on delete cascade default 1,
+	title       text  not null,
+	description text,
+	api_key     text  not null unique,
 	secret_hash        bytea not null,
 	expire_at          timestamptz,
 	notification_email text
@@ -1902,7 +1902,7 @@ begin
 	--     perform auth.has_permission( _user_id, 'system.authentication.create_user_event');
 
 	if
-		_user_id is not null and (__requester_username is null or __requester_username = '') then
+			_user_id is not null and (__requester_username is null or __requester_username = '') then
 		select username
 		from auth.user_info ui
 		where ui.user_id = _user_id
@@ -4051,7 +4051,7 @@ begin
 -- 				(lower(_title) = 'system') then
 -- 				__p := ext.text2ltree(__last_id::text);
 -- 			else
-			__p := ext.text2ltree('1.' || __last_id::text);
+				__p := ext.text2ltree('1.' || __last_id::text);
 -- 			end if;
 
 			update auth.permission
@@ -6008,6 +6008,7 @@ create or replace function auth.create_api_key(_created_by text, _user_id bigint
 as
 $$
 declare
+	__permission_code text;
 	__api_secret      text;
 	__api_secret_hash bytea;
 	__api_key         text;
@@ -6032,19 +6033,17 @@ begin
 	from unsecure.create_api_user(_created_by, _user_id, __api_key, coalesce(_tenant_id, 1))
 	into __api_user_id;
 
-	if _perm_set_code is not null then
-		select p.assignment_id
-		from unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
-																		_perm_set_code := _perm_set_code) as p
-		into __null_bigint;
+	if _perm_set_code is not null and _perm_set_code <> '' then
+		perform unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
+																			 _perm_set_code := _perm_set_code);
 	end if;
 
-	if _permission_codes is not null then
-		select p.assignment_id
-		from unnest(_permission_codes) as permission_code
-			 , lateral unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
-																						_perm_code := permission_code) as p
-		into __null_bigint;
+	if _permission_codes is not null and _permission_codes <> (array [])::text[] then
+		foreach __permission_code in array _permission_codes
+			loop
+				perform unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
+																					 _perm_code := __permission_code);
+			end loop;
 	end if;
 
 	return query
@@ -6099,7 +6098,8 @@ begin
 					 as (select api_key_id
 										, count(*) over () as total_items
 							 from auth.api_key
-							 where (helpers.is_empty_string(__search_text) or lower(title) like '%' || __search_text || '%')
+							 where (_tenant_id is null or tenant_id = _tenant_id)
+								 and (helpers.is_empty_string(__search_text) or lower(title) like '%' || __search_text || '%')
 							 order by created desc
 							 offset ((_page - 1) * _page_size) limit _page_size)
 		select ak.api_key_id
@@ -6163,12 +6163,12 @@ begin
 	-- TODO: check if user has permission to update api key
 
 
-	update auth.api_key
-	set modified_by = _updated_by
-		, modified    = now()
-		, title       = _title
-		, description = _description
-	where api_key_id = _api_key_id
+		update auth.api_key
+			set modified_by = _updated_by
+				, modified = now()
+				, title = _title
+				, description = _description
+			where api_key_id = _api_key_id
 	returning tenant_id
 		into __tenant_id;
 
@@ -6208,7 +6208,7 @@ create or replace function auth.assign_api_key_permissions(_created_by text, _us
 as
 $$
 declare
-	__null_bigint bigint;
+	__permission_code text;
 	__api_user_id bigint;
 begin
 
@@ -6221,20 +6221,18 @@ begin
 	into __api_user_id;
 
 	if _perm_set_code is not null then
-		select p.assignment_id
-		from unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
+		perform unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
 																		_perm_set_code := _perm_set_code,
-																		_tenant_id := _tenant_id) as p
-		into __null_bigint;
+																			 _tenant_id := _tenant_id);
 	end if;
 
 	if _permission_codes is not null then
-		select p.assignment_id
-		from unnest(_permission_codes) as permission_code
-			 , lateral unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
-																						_perm_code := permission_code,
-																						_tenant_id := _tenant_id) as p
-		into __null_bigint;
+		foreach __permission_code in array _permission_codes
+			loop
+				perform unsecure.assign_permission(_created_by, _user_id, _target_user_id := __api_user_id,
+																					 _perm_code := __permission_code,
+																					 _tenant_id := _tenant_id);
+			end loop;
 	end if;
 
 	return query
@@ -6283,6 +6281,8 @@ create or replace function auth.unassign_api_key_permissions(_deleted_by text
 as
 $$
 declare
+	__permission_code text;
+	__assignment_id   bigint;
 	__null_bigint bigint;
 	__api_user_id bigint;
 begin
@@ -6307,14 +6307,19 @@ begin
 	end if;
 
 	if _permission_codes is not null then
-		select up.assignment_id
-		from unnest(_permission_codes) as permission_code
-					 inner join auth.permission p on p.full_code = permission_code.permission_code::ext.ltree
+		foreach __permission_code in array _permission_codes
+			loop
+				for __assignment_id in
+					select pa.assignment_id
+					from auth.permission p
 					 inner join auth.permission_assignment pa
 											on pa.user_id = __api_user_id and p.permission_id = pa.permission_id and
 												 pa.tenant_id = _tenant_id
-			 , lateral unsecure.unassign_permission(_deleted_by, _user_id, pa.assignment_id, _tenant_id) as up
-		into __null_bigint;
+					where p.full_code = __permission_code::ext.ltree
+					loop
+						perform unsecure.unassign_permission(_created_by, _user_id, __assignment_id, _tenant_id);
+					end loop;
+			end loop;
 	end if;
 
 	return query
@@ -6395,15 +6400,14 @@ declare
 begin
 
 	-- TODO: check if user has permission to update api key
-
 	__api_secret := coalesce(_api_secret, auth.generate_api_secret());
 	__api_secret_hash := auth.generate_api_secret_hash(__api_secret);
 
-	update auth.api_key
-	set modified_by = _updated_by
-		, modified    = now()
-		, secret_hash = __api_secret_hash
-	where api_key_id = _api_key_id
+		update auth.api_key
+			set modified_by = _updated_by
+				, modified = now()
+				, secret_hash = __api_secret_hash
+			where api_key_id = _api_key_id
 	returning tenant_id
 		into __tenant_id;
 
@@ -6622,7 +6626,7 @@ begin
 
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
 																						 _permissions := array ['system.tenants', 'system.providers'
-																							 , 'system.users','system.groups', 'system.journal']);
+																							 , 'system.users','system.groups', 'system.journal', 'system.api_keys']);
 
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 																						 _permissions := array ['system.tenants.create_tenant', 'system.journal.read_journal', 'system.journal.get_payload']);
