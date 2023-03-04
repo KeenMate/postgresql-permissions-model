@@ -9,58 +9,64 @@
 
 ## Security
 
-| Event code | Description                       |
-|------------|-----------------------------------|
-| 50001      | Tenant created                    |
-| 50002      | Tenant updated                    |
-| 50003      | Tenant deleted                    |
-| 50004      | Assign tenant owner               |
-| 50005      | Get tenant users                  |
-| 50006      | Get tenant groups                 |
-| 50011      | Provider created                  |
-| 50012      | Provider updated                  |
-| 50013      | Provider deleted                  |
-| 50014      | Provider enabled                  |
-| 50015      | Provider disabled                 |
-| 50016      | Get provider users                |
-| 50101      | User created                      |
-| 50102      | User updated                      |
-| 50103      | User deleted                      |
-| 50104      | User enabled                      |
-| 50105      | User disabled                     |
-| 50106      | User unlocked                     |
-| 50107      | User locked                       |
-| 50108      | User identity enabled             |
-| 50109      | User identity disabled            |
-| 50131      | User added to group               |
-| 50133      | User deleted from group           |
-| 50134      | User identity created             |
-| 50135      | User identity deleted             |
-| 50136      | User password changed             |
-| 50201      | Group created                     |
-| 50202      | Group updated                     |
-| 50203      | Group deleted                     |
-| 50204      | Group enabled                     |
-| 50205      | Group disabled                    |
-| 50206      | Group unlocked                    |
-| 50207      | Group locked                      |
-| 50208      | Group set as external group       |
-| 50209      | Group set as hybrid group         |
-| 50210      | User requested group members list |
-| 50211      | User requested user group info    |
-| 50231      | Group mapping created             |
-| 50233      | Group mapping deleted             |
-| 50301      | Permission set created            |
-| 50302      | Permission set updated            |
-| 50303      | Permission set deleted            |
-| 50304      | Permission assigned               |
-| 50305      | Permission unassigned             |
-| 50306      | Permission assignability changed  |
-| 50311      | Permissions added to perm set     |
-| 50313      | Permissions removed from perm set |
-| 50401      | Token created                     |
-| 50402      | Token validated                   |
-| 50403      | Token set as used                 |
+| Event code | Description                            |
+|------------|----------------------------------------|
+| 50001      | Tenant created                         |
+| 50002      | Tenant updated                         |
+| 50003      | Tenant deleted                         |
+| 50004      | Assign tenant owner                    |
+| 50005      | Get tenant users                       |
+| 50006      | Get tenant groups                      |
+| 50011      | Provider created                       |
+| 50012      | Provider updated                       |
+| 50013      | Provider deleted                       |
+| 50014      | Provider enabled                       |
+| 50015      | Provider disabled                      |
+| 50016      | Get provider users                     |
+| 50101      | User created                           |
+| 50102      | User updated                           |
+| 50103      | User deleted                           |
+| 50104      | User enabled                           |
+| 50105      | User disabled                          |
+| 50106      | User unlocked                          |
+| 50107      | User locked                            |
+| 50108      | User identity enabled                  |
+| 50109      | User identity disabled                 |
+| 50131      | User added to group                    |
+| 50133      | User deleted from group                |
+| 50134      | User identity created                  |
+| 50135      | User identity deleted                  |
+| 50136      | User password changed                  |
+| 50201      | Group created                          |
+| 50202      | Group updated                          |
+| 50203      | Group deleted                          |
+| 50204      | Group enabled                          |
+| 50205      | Group disabled                         |
+| 50206      | Group unlocked                         |
+| 50207      | Group locked                           |
+| 50208      | Group set as external group            |
+| 50209      | Group set as hybrid group              |
+| 50210      | User requested group members list      |
+| 50211      | User requested user group info         |
+| 50231      | Group mapping created                  |
+| 50233      | Group mapping deleted                  |
+| 50301      | Permission set created                 |
+| 50302      | Permission set updated                 |
+| 50303      | Permission set deleted                 |
+| 50304      | Permission assigned                    |
+| 50305      | Permission unassigned                  |
+| 50306      | Permission assignability changed       |
+| 50311      | Permissions added to perm set          |
+| 50313      | Permissions removed from perm set      |
+| 50401      | Token created                          |
+| 50402      | Token validated                        |
+| 50403      | Token set as used                      |
+| 50501      | API key created                        |
+| 50502      | API key updated                        |
+| 50503      | API key deleted                        |
+| 50504      | API key perm set/permission assigned   |
+| 50505      | API key perm set/permission unassigned |
+| 50506      | API key secret updated                 |
 
 ## Security Error codes
 
