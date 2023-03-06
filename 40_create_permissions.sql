@@ -5992,11 +5992,16 @@ $$
 select sha256(convert_to(_secret, 'UTF8')::bytea);
 $$;
 
+-- drop function auth.create_api_key(_created_by text, _user_id bigint
+-- , _title text, _description text
+-- , _perm_set_code text, _permission_codes text[]
+-- , _api_key text , _api_secret text
+-- , _tenant_id int );
 create or replace function auth.create_api_key(_created_by text, _user_id bigint
 , _title text, _description text
 , _perm_set_code text, _permission_codes text[]
 , _api_key text default null, _api_secret text default null
-, _tenant_id bigint default 1)
+, _tenant_id int default 1)
 	returns table
 					(
 						__api_key_id int,
@@ -6086,7 +6091,7 @@ $$
 declare
 	__search_text text;
 begin
-	perform auth.has_permission(_user_id, 'system.api_keys.read_api_keys', _tenant_id);
+	perform auth.has_permission(_user_id, 'system.api_keys.search', _tenant_id);
 
 	__search_text := helpers.unaccent_text(_search_text);
 
@@ -6095,12 +6100,12 @@ begin
 
 	return query
 		with filtered_rows
-					 as (select api_key_id
+					 as (select ak.api_key_id
 										, count(*) over () as total_items
-							 from auth.api_key
-							 where (_tenant_id is null or tenant_id = _tenant_id)
-								 and (helpers.is_empty_string(__search_text) or lower(title) like '%' || __search_text || '%')
-							 order by created desc
+							 from auth.api_key ak
+							 where (_tenant_id is null or ak.tenant_id = _tenant_id)
+								 and (helpers.is_empty_string(__search_text) or lower(ak.title) like '%' || __search_text || '%')
+							 order by ak.title, ak.api_key
 							 offset ((_page - 1) * _page_size) limit _page_size)
 		select ak.api_key_id
 				 , ak.tenant_id
@@ -6118,7 +6123,7 @@ end;
 $$;
 
 -- drop function auth.get_api_key_permissions(_user_id bigint, _api_key_id bigint)
-create or replace function auth.get_api_key_permissions(_user_id bigint, _api_key_id bigint)
+create or replace function auth.get_api_key_permissions(_user_id bigint, _api_key_id bigint, _tenant_id int)
 	returns table
 					(
 						__assignment_id               bigint,
@@ -6140,7 +6145,8 @@ begin
 		from auth.api_key ak
 					 inner join auth.user_info ui on user_type_code = 'api' and code = auth.generate_api_key_username(ak.api_key)
 			 , lateral (select * from auth.get_user_permissions(_user_id, ui.user_id)) as p
-		where ak.api_key_id = _api_key_id;
+		where ak.api_key_id = _api_key_id
+			and tenant_id = _tenant_id;
 end;
 $$;
 
