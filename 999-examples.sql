@@ -70,40 +70,40 @@ from auth.create_owner('jan.rada', 1003, 1000, _tenant_id := 3);
 
 -- create an external group with mapping to aad_rada in aad auth provider in tenant: Jan Rada
 select *
-from auth.create_external_user_group('system', 1000, 'External group 1', 'aad', _mapped_object_id := 'aad_rada', _tenant_id := 3);
+from auth.create_external_user_group('system', 1000, 'External group 1', 'aad', _mapped_object_id := 'aad_rada',
+																		 _tenant_id := 3);
 
 -- create an external partners rule set with dummy permissions in tenant: Jan Rada
 select *
 from unsecure.create_perm_set_as_system('My external partners', false, true,
-																				array ['system.areas.public', 'system.areas.admin', 'system.manage_providers', 'system.manage_permissions.create_permission'],
+																				array ['areas.public', 'areas.admin', 'manage_providers', 'manage_permissions.create_permission'],
 																				_tenant_id := 3);
 
 -- remove incorrect permissions from My external partners permission set
 select *
-from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, 7,
-																			array ['system.manage_providers', 'system.manage_permissions.create_permission'], _tenant_id := 3);
+from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, 6,
+																			array ['manage_providers', 'manage_permissions.create_permission'],
+																			_tenant_id := 3);
 
 -- Add correct permissions to My external partners permission set
 select *
-from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, 7,
-																	 array ['system.manage_tenants.get_users'], _tenant_id := 3);
+from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, 6,
+																	 array ['manage_tenants.get_users'], _tenant_id := 3);
 
 -- assign my_external_partners rule set to External group 1 in tenant: Jan Rada
 select *
-from unsecure.assign_permission_as_system(9, null, 'my_external_partners', _tenant_id := 3);
+from unsecure.assign_permission_as_system(8, null, 'my_external_partners', _tenant_id := 3);
 
 -- imitate after login check for user: Jan Rada in tenant: Jan Rada with aad groups: [aad_rada]
 -- creates a record in auth.user_permission_cache
 select *
-from auth.ensure_groups_and_permissions('authenticator', 1, 1004, 'aad', array ['aad_rada'], _tenant_id := 3);
+from auth.ensure_groups_and_permissions('authenticator', 1, 1003, 'aad', array ['aad_rada'], _tenant_id := 3);
 
 -- check if user: Jan Rada has permission in tenant: Jan Rada has permission: system.manage_groups.create_group
 -- checks if the record in auth.user_permission_cache is still valid and uses it or reevaluate everything and store it again for 15 seconds
 select *
-from auth.has_permission(1004, 'system.areas.public', _tenant_id := 3);
+from auth.has_permission(1003, 'areas.public', _tenant_id := 3);
 -- user permission check does not change for user: Jan Rada for 15 seconds and then on next check it is reevaluated
-select *
-from auth.user_permission_cache;
 
 select *
 from auth.get_tenant_users('system', 1, 3);
@@ -115,22 +115,22 @@ select *
 from auth.user_group_members;
 
 select *
-from auth.disable_user('kerberos', 1, 6);
+from auth.disable_user('kerberos', 1, 1004);
 
 select *
-from auth.enable_user('kerberos', 1, 6);
+from auth.enable_user('kerberos', 1, 1004);
 
 select *
-from auth.lock_user('kerberos', 1, 6);
+from auth.lock_user('kerberos', 1, 1004);
 
 select *
-from auth.unlock_user('kerberos', 1, 6);
+from auth.unlock_user('kerberos', 1, 1004);
 
 select *
-from auth.disable_user_identity('kerberos', 1, 6, 'email');
+from auth.disable_user_identity('kerberos', 1, 1004, 'email');
 
 select *
-from auth.enable_user_identity('kerberos', 1, 6, 'email');
+from auth.enable_user_identity('kerberos', 1, 1004, 'email');
 
 
 select *
@@ -138,27 +138,35 @@ from auth.get_user_by_email_for_authentication(1, 'lucie.novakova1@keenmate.com'
 
 
 select *
-from auth.create_auth_event('authenticator', 1, 'email_verification', 6,
+from auth.create_user_event('authenticator', 1, 'email_verification', 1004,
 														'123.123.232.12', 'the best user agent there is',
 														'domain.com');
 
 select *
-from auth.create_token('authenticator', 1, 2, 1, 'email_verification', 'email', '111jjjj2222jjjj333');
+from auth.create_token('authenticator', 1, 1004, null, null, 'email_verification', 'email', '111jjjj2222jjjj333');
 
 --4FDC32F629CE
-
 select *
-from auth.validate_token('authenticator', 1, null, '111jjjj2222jjjj333', '123.2.34.5', 'my agent', 'keenmate.com',
+from auth.validate_token('authenticator', 1, null, null, '111jjjj2222jjjj333', 'email_verification', '123.2.34.5', 'my agent', 'keenmate.com',
 												 true);
 
 select *
-from auth.get_user_group_members('ondrej', 1, 3, 8);
+from auth.get_user_group_members('ondrej', 1,  8, 3);
 
 select *
 from auth.get_tenant_members('ondrej', 1, 3);
 
 select *
 from auth.get_tenant_groups('ondrej', 1, 3);
+
+
+select * from auth.permission
+order by full_code;
+
+
+
+
+
 
 
 select *
@@ -225,9 +233,9 @@ select *
 from has_permissions(1);
 
 select *
-from throw_no_permission(1, 2, 'system.a.b');
+from throw_no_permission(1, 2, 'a.b');
 select *
-from throw_no_permission(1, 2, array ['system.a.b', 'd.e.f'])
+from throw_no_permission(1, 2, array ['a.b', 'd.e.f'])
 
 select *
 from auth.create_user_group_member('System', 1, 1, 3, 2);
