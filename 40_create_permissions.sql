@@ -5683,78 +5683,29 @@ begin
 	end if;
 
 	return query
-		with __user_group_permissions as (select pa.assignment_id
-																					 , ugm.member_id
-																					 , ug.title as user_group_title
-																					 , p.full_code::text
-																					 , p.title
-																			from auth.user_group_member ugm
-																						 inner join auth.user_group ug on ugm.group_id = ug.user_group_id
-																						 inner join auth.permission_assignment pa on ug.user_group_id = pa.group_id
-																						 inner join auth.permission p on pa.permission_id = p.permission_id
-																			where ugm.user_id = _target_user_id
-																				and ug.is_active)
-			 , __user_perm_set_permissions as (select pa.assignment_id
-																							, ps.code
-																							, ps.title as perm_set_title
-																							, pspp.full_code::text
-																							, pspp.title
-																				 from auth.permission_assignment pa
-																								inner join auth.perm_set ps on pa.perm_set_id = ps.perm_set_id
-																								inner join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
-																								inner join auth.permission pspp on pspp.permission_id = psp.permission_id
-																				 where pa.user_id = _target_user_id)
-			 , __user_permission_assignemnts as (select pa.assignment_id
-																								, p.full_code::text
-																								, p.title
-																					 from auth.permission_assignment pa
-																									inner join auth.permission p on pa.permission_id = p.permission_id
-																					 where pa.user_id = _target_user_id)
-		select assignment_id
-				 , null
-				 , null
-				 , member_id
-				 , user_group_title
-				 , 'group'
-				 , full_code
-				 , title
-		from __user_group_permissions
-		union all
-		select assignment_id
-				 , code
-				 , perm_set_title
-				 , null
-				 , null
-				 , 'perm_set'
-				 , full_code
-				 , title
-		from __user_perm_set_permissions
-		union all
-		select assignment_id
-				 , null
-				 , null
-				 , null
-				 , null
-				 , 'assignment'
-				 , full_code
-				 , title
-		from __user_permission_assignemnts;
+		select pa.assignment_id
+				 , ps.code as perm_set_code
+				 , ps.title as perm_set_title
+				 , ugm.member_id
+		     , ug.title
+		     , case
+						 when ugm is not null then 'user_group'
+						 when ps is not null then 'perm_set'
+						 else 'assignment'
+		       end
+				 , p.full_code
+				 , p.title
+from auth.permission_assignment pa
+			 left join auth.user_group ug on pa.group_id = ug.user_group_id
+			 left join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
 
+			 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
+  		 left join auth.perm_set_perm psp on psp.perm_set_id = ps.perm_set_id
 
-	--   return query
---     select pa.assignment_id
---          , coalesce(p.full_code, pspp.full_code)::text
---          , coalesce(p.title, pspp.title)
---          , ps.perm_set_id
---          , ps.code
---          , ps.title
---     from auth.user_info ui
---            inner join auth.permission_assignment pa on ui.user_id = pa.user_id
---            left join auth.permission p on pa.permission_id = p.permission_id
---            left join auth.perm_set ps on pa.perm_set_id = ps.perm_set_id
---            left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
---            left join auth.permission pspp on pspp.permission_id = psp.permission_id
---     where ui.user_id = _target_user_id;
+			 inner join auth.permission p on p.permission_id = pa.permission_id
+				or p.permission_id = psp.permission_id
+where pa.user_id = _target_user_id
+	or ugm.user_id = _target_user_id;
 end;
 $$;
 
@@ -6031,10 +5982,10 @@ begin
 	__api_secret := coalesce(_api_secret, auth.generate_api_secret());
 	__api_secret_hash := auth.generate_api_secret_hash(__api_secret);
 
-	insert into auth.api_key(created_by, modified_by, tenant_id, title, description, api_key, secret_hash, expire_at,
-													 notification_email)
-	values (_created_by, _created_by, _tenant_id, _title, _description, __api_key, __api_secret_hash, _expire_at,
-					_notification_email)
+	insert into auth.api_key( created_by, modified_by, tenant_id, title, description, api_key, secret_hash, expire_at
+													, notification_email)
+	values ( _created_by, _created_by, _tenant_id, _title, _description, __api_key, __api_secret_hash, _expire_at
+				 , _notification_email)
 	returning api_key_id
 		into __last_id;
 
@@ -6259,14 +6210,14 @@ begin
 	end if;
 
 	return query
-		select pa.assignment_id,
-					 pa.tenant_id,
-					 pa.perm_set_id,
-					 ps.code,
-					 ps.title,
-					 p.full_code::text,
-					 p.full_title,
-					 p.title
+		select pa.assignment_id
+				 , pa.tenant_id
+				 , pa.perm_set_id
+				 , ps.code
+				 , ps.title
+				 , p.full_code::text
+				 , p.full_title
+				 , p.title
 		from auth.permission_assignment pa
 					 left join auth.perm_set ps on pa.perm_set_id = ps.perm_set_id
 					 left join auth.permission p on pa.permission_id = p.permission_id
