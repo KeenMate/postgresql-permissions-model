@@ -650,7 +650,7 @@ create table auth.user_info
 	original_username       text                                    not null
 ) inherits (_template_timestamps);
 
-create unique index uq_auth_user_info on auth.user_info (email);
+create unique index uq_auth_user_info on auth.user_info (username);
 
 create table auth.tenant_user
 (
@@ -5020,9 +5020,9 @@ begin
 end;
 $$;
 
-create function unsecure.create_service_user_info(_created_by text, _user_id bigint, _username text,
+create or replace function unsecure.create_service_user_info(_created_by text, _user_id bigint, _username text,
+																									_display_name text,
 																									_email text default null,
-																									_display_name text default null,
 																									_custom_service_user_id bigint default null)
 	returns setof auth.user_info
 	language plpgsql
@@ -5057,7 +5057,7 @@ begin
 	else
 		insert into auth.user_info ( created_by, modified_by, user_id, user_type_code, username, original_username, email
 															 , display_name)
-		values ( _created_by, _created_by, __last_service_user_id
+		values ( _created_by, _created_by, __last_service_user_id + 1
 					 , 'service'
 					 , __normalized_username, trim(_username)
 					 , __normalized_email, _display_name)
@@ -6593,20 +6593,6 @@ begin
 	-- resetting sequence to 1000 to allocate space for system users
 	alter sequence auth.user_info_user_id_seq restart with 1000;
 
-	-- 	perform unsecure.create_permission_by_path_as_system('System', _is_assignable := true);
-
--- 	perform unsecure.create_user_group_as_system('System', true, true);
-
--- 	perform unsecure.create_user_group_member_as_system('system', 'System');
-
--- 	perform auth.lock_user_group('system', 1, 1);
-
--- 	perform unsecure.create_perm_set_as_system('System', true, _is_assignable := true,
--- 																						 _permissions := array ['system']);
-
--- 	perform unsecure.assign_permission_as_system(1, null, 'system');
--- 	perform unsecure.set_permission_as_assignable('system', 1, 1, null, false);
-
 	perform unsecure.create_permission_by_path_as_system('Authentication', null, false);
 	perform unsecure.create_permission_by_path_as_system('Get data', 'authentication');
 	perform unsecure.create_permission_by_path_as_system('Create auth event', 'authentication');
@@ -6715,12 +6701,11 @@ begin
 																						 _permissions := array ['tenants.get_groups'
 																							 , 'tenants.get_users']);
 
-	perform unsecure.create_user_group_as_system('Tenant admins', true, true);
-	perform unsecure.assign_permission_as_system(1, null, 'tenant_admin');
-
 	perform unsecure.create_user_group_as_system('System admins', true, true);
-	perform unsecure.assign_permission_as_system(2, null, 'system_admin');
+	perform unsecure.assign_permission_as_system(1, null, 'system_admin');
 
+	perform unsecure.create_user_group_as_system('Tenant admins', true, true);
+	perform unsecure.assign_permission_as_system(2, null, 'tenant_admin');
 
 	perform
 		auth.create_provider('initial', 1, 'email', 'Email authentication', false);

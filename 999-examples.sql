@@ -160,6 +160,25 @@ select *
 from auth.get_tenant_groups('ondrej', 1, 3);
 
 
+select *
+from auth.create_user_group_member('system', 1, 1,  1000);
+select *
+from auth.create_service_user_info('ondrej.valenta@keenmate.com', 1001, 'export_service_2', 'Export service 2');
+
+select *
+from auth.create_perm_set()
+
+select * from auth.get_user_permissions(1, 1001);
+
+
+select * from user_group_members
+
+
+
+select * from auth.user_info;
+
+select * from auth.get_user_permissions(1, );
+
 select * from auth.permission
 order by full_code;
 
