@@ -5020,23 +5020,50 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_api_user(_created_by text, _user_id bigint, _api_key text,
-																										_tenant_id int default 1)
+create function unsecure.create_service_user_info(_created_by text, _user_id bigint, _username text,
+																									_email text default null,
+																									_display_name text default null,
+																									_custom_service_user_id bigint default null)
 	returns setof auth.user_info
 	language plpgsql
 	rows 1
 as
 $$
 declare
-	__last_id             bigint;
-	__normalized_username text;
+	__last_id              bigint;
+	__last_service_user_id bigint;
+	__normalized_username  text;
+	__normalized_email     text;
 begin
-	__normalized_username := 'api_key_' || _api_key;
+	__normalized_username := lower(trim(_username));
+	__normalized_email := lower(trim(_email));
 
-	insert into auth.user_info (created_by, modified_by, user_type_code, code, username, original_username, display_name)
-	values ( _created_by, _created_by, 'api', __normalized_username, __normalized_username, __normalized_username
-				 , __normalized_username)
-	returning user_id into __last_id;
+	__last_service_user_id := _custom_service_user_id;
+
+	if (__last_service_user_id is null) then
+		select max(user_id)
+		from auth.user_info
+		where user_id between 1::bigint and 999::bigint
+		into __last_service_user_id;
+	end if;
+
+	if (__last_service_user_id is null) then
+		insert into auth.user_info ( created_by, modified_by, user_type_code, username, original_username, email
+															 , display_name)
+		values ( _created_by, _created_by, 'service', __normalized_username, trim(_username), __normalized_email
+					 , _display_name)
+		returning user_id
+			into __last_id;
+	else
+		insert into auth.user_info ( created_by, modified_by, user_id, user_type_code, username, original_username, email
+															 , display_name)
+		values ( _created_by, _created_by, __last_service_user_id
+					 , 'service'
+					 , __normalized_username, trim(_username)
+					 , __normalized_email, _display_name)
+		returning user_id
+			into __last_id;
+	end if;
 
 	return query
 		select *
@@ -5045,12 +5072,39 @@ begin
 
 	perform
 		add_journal_msg('system', _user_id
-			, format('User: (id: %s) created new API key user: %s'
-											, _user_id, __normalized_username)
+			, format('User: (id: %s) added new service user: %s'
+											, _user_id, _username)
 			, 'user', __last_id
-			, array ['username', __normalized_username]
+			, array ['username', __normalized_username, 'email', __normalized_email
+											, 'display_name', _display_name]
 			, _event_id := 50101
-			, _tenant_id := _tenant_id);
+			, _tenant_id := 1);
+end;
+$$;
+
+create function auth.create_service_user_info(_created_by text, _user_id bigint, _username text,
+																							_email text default null,
+																							_display_name text default null,
+																							_custom_service_user_id bigint default null)
+	returns table
+					(
+						__user_id      bigint,
+						__username     text,
+						__email        text,
+						__display_name text
+					)
+	language plpgsql
+	rows 1
+as
+$$
+begin
+	perform auth.has_permission(_user_id, 'users.create_service_user');
+
+	return query
+		select user_id, username, email, display_name
+		from unsecure.create_service_user_info(_created_by, _user_id, _username,
+																					 _email, _display_name,
+																					 _custom_service_user_id);
 end;
 $$;
 
@@ -5684,28 +5738,28 @@ begin
 
 	return query
 		select pa.assignment_id
-				 , ps.code as perm_set_code
+				 , ps.code  as perm_set_code
 				 , ps.title as perm_set_title
 				 , ugm.member_id
-		     , ug.title
-		     , case
+				 , ug.title
+				 , case
 						 when ugm is not null then 'user_group'
 						 when ps is not null then 'perm_set'
 						 else 'assignment'
-		       end
+			end
 				 , p.full_code
 				 , p.title
-from auth.permission_assignment pa
-			 left join auth.user_group ug on pa.group_id = ug.user_group_id
-			 left join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
+		from auth.permission_assignment pa
+					 left join auth.user_group ug on pa.group_id = ug.user_group_id
+					 left join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
 
-			 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
-  		 left join auth.perm_set_perm psp on psp.perm_set_id = ps.perm_set_id
+					 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
+					 left join auth.perm_set_perm psp on psp.perm_set_id = ps.perm_set_id
 
-			 inner join auth.permission p on p.permission_id = pa.permission_id
-				or p.permission_id = psp.permission_id
-where pa.user_id = _target_user_id
-	or ugm.user_id = _target_user_id;
+					 inner join auth.permission p on p.permission_id = pa.permission_id
+			or p.permission_id = psp.permission_id
+		where pa.user_id = _target_user_id
+			 or ugm.user_id = _target_user_id;
 end;
 $$;
 
@@ -5944,17 +5998,46 @@ $$
 select sha256(convert_to(_secret, 'UTF8')::bytea);
 $$;
 
--- drop function auth.create_api_key(_created_by text, _user_id bigint
--- , _title text, _description text
--- , _perm_set_code text, _permission_codes text[]
--- , _api_key text , _api_secret text
--- , _tenant_id int );
+create or replace function unsecure.create_api_user(_created_by text, _user_id bigint, _api_key text,
+																										_tenant_id int default 1)
+	returns setof auth.user_info
+	language plpgsql
+	rows 1
+as
+$$
+declare
+	__last_id             bigint;
+	__normalized_username text;
+begin
+	__normalized_username := 'api_key_' || _api_key;
+
+	insert into auth.user_info (created_by, modified_by, user_type_code, code, username, original_username, display_name)
+	values ( _created_by, _created_by, 'api', __normalized_username, __normalized_username, __normalized_username
+				 , __normalized_username)
+	returning user_id into __last_id;
+
+	return query
+		select *
+		from auth.user_info
+		where user_id = __last_id;
+
+	perform
+		add_journal_msg('system', _user_id
+			, format('User: (id: %s) created new API key user: %s'
+											, _user_id, __normalized_username)
+			, 'user', __last_id
+			, array ['username', __normalized_username]
+			, _event_id := 50101
+			, _tenant_id := _tenant_id);
+end;
+$$;
+
 create or replace function auth.create_api_key(_created_by text, _user_id bigint
 , _title text, _description text
 , _perm_set_code text, _permission_codes text[]
 , _api_key text default null, _api_secret text default null
 , _expire_at timestamptz default null, _notification_email text default null
-, _tenant_id bigint default 1)
+, _tenant_id int default 1)
 	returns table
 					(
 						__api_key_id int,
@@ -5975,8 +6058,7 @@ declare
 	__null_bigint     bigint;
 begin
 
-	-- TODO: Permission check
-
+	perform auth.has_permission(_user_id, 'api_keys.create_api_key', _tenant_id);
 
 	__api_key := coalesce(_api_key, auth.generate_api_key());
 	__api_secret := coalesce(_api_secret, auth.generate_api_secret());
@@ -6114,7 +6196,8 @@ end;
 $$;
 
 create or replace function auth.update_api_key(_updated_by text, _user_id bigint
-, _api_key_id bigint, _title text, _description text, _expire_at timestamptz, _notification_email text)
+, _api_key_id bigint, _title text, _description text, _expire_at timestamptz, _notification_email text
+, _tenant_id int default 1)
 	returns table
 					(
 						__api_key_id         int,
@@ -6127,11 +6210,9 @@ create or replace function auth.update_api_key(_updated_by text, _user_id bigint
 	rows 1
 as
 $$
-declare
-	__tenant_id int;
 begin
 
-	-- TODO: check if user has permission to update api key
+	perform auth.has_permission(_user_id, 'api_keys.update_api_key', _tenant_id);
 
 	update auth.api_key
 	set modified_by        = _updated_by
@@ -6141,24 +6222,24 @@ begin
 		, expire_at          = _expire_at
 		, notification_email = _notification_email
 	where api_key_id = _api_key_id
-	returning tenant_id
-		into __tenant_id;
+		and tenant_id = _tenant_id;
 
 	return query
 		select api_key_id, title, description, expire_at, notification_email
 		from auth.api_key
-		where api_key_id = _api_key_id;
+		where api_key_id = _api_key_id
+			and tenant_id = _tenant_id;
 
 	perform
 		add_journal_msg(_updated_by, _user_id
 			, format('User: %s updated API key: %s in tenant: %s'
-											, _updated_by, _title, __tenant_id)
+											, _updated_by, _title, _tenant_id)
 			, 'api_key', _api_key_id
 			, array ['title', _title, 'description', _description,
 											'expire_at', _expire_at::text,
 											'notification_email', _notification_email]
 			, 50502
-			, _tenant_id := coalesce(__tenant_id, 1));
+			, _tenant_id := _tenant_id);
 end;
 $$;
 
@@ -6186,7 +6267,7 @@ declare
 	__api_user_id     bigint;
 begin
 
-	-- TODO: check if user has permission to update api key
+	perform auth.has_permission(_user_id, 'api_keys.update_permissions', _tenant_id);
 
 	select user_id
 	from auth.api_key ak
@@ -6261,7 +6342,7 @@ declare
 	__api_user_id     bigint;
 begin
 
-	-- TODO: check if user has permission to update api key
+	perform auth.has_permission(_user_id, 'api_keys.update_permissions', _tenant_id);
 
 	select user_id
 	from auth.api_key ak
@@ -6330,7 +6411,7 @@ declare
 	__api_user_id bigint;
 begin
 
-	-- TODO: check if user has permission to update api key
+	perform auth.has_permission(_user_id, 'api_keys.delete_api_key', _tenant_id);
 
 	select user_id
 	from auth.api_key ak
@@ -6358,7 +6439,7 @@ end;
 $$;
 
 create function auth.update_api_key_secret(_updated_by text, _user_id bigint, _api_key_id int,
-																					 _api_secret text default null)
+																					 _api_secret text default null, _tenant_id int default 1)
 	returns table
 					(
 						__api_key_id int,
@@ -6369,12 +6450,12 @@ create function auth.update_api_key_secret(_updated_by text, _user_id bigint, _a
 as
 $$
 declare
-	__tenant_id       int;
 	__api_secret      text;
 	__api_secret_hash bytea;
 begin
 
-	-- TODO: check if user has permission to update api key
+	perform auth.has_permission(_user_id, 'api_keys.update_api_secret', _tenant_id);
+
 	__api_secret := coalesce(_api_secret, auth.generate_api_secret());
 	__api_secret_hash := auth.generate_api_secret_hash(__api_secret);
 
@@ -6383,20 +6464,19 @@ begin
 		, modified    = now()
 		, secret_hash = __api_secret_hash
 	where api_key_id = _api_key_id
-	returning tenant_id
-		into __tenant_id;
+		and tenant_id = _tenant_id;
 
 	return query
-		select __api_key_id, __api_secret;
+		select _api_key_id, __api_secret;
 
 	perform
 		add_journal_msg(_updated_by, _user_id
 			, format('User: %s updated API key secret in tenant: %s'
-											, _updated_by, __tenant_id)
+											, _updated_by, _tenant_id)
 			, 'api_key', _api_key_id
 			, null
 			, 50506
-			, _tenant_id := __tenant_id);
+			, _tenant_id := _tenant_id);
 
 end;
 $$;
@@ -6412,6 +6492,8 @@ create or replace function auth.validate_api_key(_requested_by text
 	returns table
 					(
 						__user_id               bigint,
+						__username              text,
+						__user_display_name     text,
 						__permission_full_codes text[]
 
 					)
@@ -6423,13 +6505,14 @@ declare
 	__api_user_id bigint;
 begin
 
-	-- TODO: check if user has permission to validate api key
+	perform auth.has_permission(_user_id, 'api_keys.validate_api_key', _tenant_id);
 
 	select user_id
 	from auth.api_key ak
 				 inner join auth.user_info ui on ui.code = auth.generate_api_key_username(ak.api_key)
 	where ak.api_key = _api_key
 		and ak.secret_hash = auth.generate_api_secret_hash(_api_secret)
+		and ak.tenant_id = _tenant_id
 	into __api_user_id;
 
 	if __api_user_id is null then
@@ -6437,8 +6520,9 @@ begin
 	end if;
 
 	return query
-		with pa as (select pa.perm_set_id, pa.permission_id
+		with pa as (select u.display_name, u.username, pa.perm_set_id, pa.permission_id
 								from auth.permission_assignment pa
+											 inner join auth.user_info u on u.user_id = pa.user_id
 								where pa.user_id = __api_user_id
 									and pa.tenant_id = _tenant_id)
 			 , permissions as (select ep.permission_code::text
@@ -6449,12 +6533,15 @@ begin
 												 select p.full_code::text
 												 from pa
 																inner join auth.permission p on pa.permission_id = p.permission_id)
-		select __api_user_id, array_agg(permission_code)
-		from permissions;
+		select ui.user_id, ui.username, ui.display_name, array_agg(permission_code)
+		from user_info ui
+					 inner join permissions p on true
+		where ui.user_id = __api_user_id
+		group by ui.user_id, ui.username, ui.display_name;
 
 	perform auth.create_user_event(_requested_by, _user_id,
 																 'api_key_validating', __api_user_id, _ip_address,
-																 _user_agent, _origin, _tenant_id);
+																 _user_agent, _origin);
 
 end;
 $$;
@@ -6497,6 +6584,8 @@ begin
 	values ('system');
 	insert into const.user_type(code)
 	values ('api');
+	insert into const.user_type(code)
+	values ('service');
 
 
 	perform unsecure.create_user_system();
@@ -6549,6 +6638,7 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Get perm sets', 'permissions');
 
 	perform unsecure.create_permission_by_path_as_system('Users');
+	perform unsecure.create_permission_by_path_as_system('Create service user', 'users');
 	perform unsecure.create_permission_by_path_as_system('Register user', 'users');
 	perform unsecure.create_permission_by_path_as_system('Add to default groups', 'users');
 	perform unsecure.create_permission_by_path_as_system('Enable user', 'users');
@@ -6596,6 +6686,11 @@ begin
 	perform unsecure.create_permission_by_path_as_system('Delete mapping', 'groups');
 
 	perform unsecure.create_permission_by_path_as_system('Api keys');
+	perform unsecure.create_permission_by_path_as_system('Create api key', 'api_keys');
+	perform unsecure.create_permission_by_path_as_system('Update api key', 'api_keys');
+	perform unsecure.create_permission_by_path_as_system('Delete api key', 'api_keys');
+	perform unsecure.create_permission_by_path_as_system('Update api secret', 'api_keys');
+	perform unsecure.create_permission_by_path_as_system('Validate api key', 'api_keys');
 	perform unsecure.create_permission_by_path_as_system('Search', 'api_keys');
 	perform unsecure.create_permission_by_path_as_system('Update permissions', 'api_keys');
 
