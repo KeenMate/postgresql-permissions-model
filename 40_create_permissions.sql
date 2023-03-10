@@ -296,6 +296,20 @@ begin
 end;
 $$;
 
+-- Permission is not assignable
+
+create function error.raise_52179(_parent_full_code text) returns void
+	language plpgsql as
+$$
+begin
+
+	raise
+		exception 'Parent permission (code: %) does not exist',
+		_parent_full_code
+		using errcode = 52179;
+end;
+$$;
+
 -- User group cannot be deleted because it's a system group
 
 create function error.raise_52271(_user_group_id int) returns void
@@ -1500,8 +1514,8 @@ begin
 
 	select permissions, expiration_date
 	from auth.user_permission_cache upc
-	where upc.tenant_id = _tenant_id
-		 or upc.tenant_id = 1 -- primary/master tenant
+	where (upc.tenant_id = _tenant_id
+		or upc.tenant_id = 1) -- primary/master tenant
 		and user_id = _target_user_id
 	into __perms, __expiration_date;
 
@@ -4024,8 +4038,11 @@ $$;
 -- $$;
 
 create
-	or replace function unsecure.create_permission_by_path_as_system(_title text
-, _parent_code text default ''
+	or replace function unsecure.create_permission(
+	_created_by text
+, _user_id bigint
+, _title text
+, _parent_full_code text default null
 , _is_assignable bool default true)
 	returns setof auth.permission
 	language plpgsql
@@ -4037,23 +4054,17 @@ declare
 	__p           ext.ltree;
 	__parent_id   int;
 	__parent_path text;
+	__full_code   ltree;
 begin
 
 	insert into auth.permission(created_by, modified_by, title, is_assignable, code)
-	values ('system', 'system', _title, _is_assignable, helpers.get_code(_title, '_'))
+	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title, '_'))
 	returning permission_id
 		into __last_id;
 
-	if
-		helpers.is_empty_string(_parent_code) then
+	if helpers.is_empty_string(_parent_full_code) then
 		begin
-			-- 			if
--- 				(lower(_title) = 'system') then
--- 				__p := ext.text2ltree(__last_id::text);
--- 			else
--- 				__p := ext.text2ltree('1.' || __last_id::text);
 			__p := ext.text2ltree(__last_id::text);
--- 			end if;
 
 			update auth.permission
 			set node_path = __p
@@ -4063,8 +4074,12 @@ begin
 		begin
 			select p.permission_id, node_path::text
 			from auth.permission p
-			where p.full_code = ext.text2ltree(_parent_code)
+			where p.full_code = ext.text2ltree(_parent_full_code)
 			into __parent_id, __parent_path;
+
+			if __parent_id is null then
+				perform error.raise_52179(_parent_full_code);
+			end if;
 
 			__p := ext.text2ltree(__parent_path || '.' || __last_id::text);
 
@@ -4080,83 +4095,43 @@ begin
 	end if;
 
 	perform unsecure.update_permission_full_title(__p);
-	perform unsecure.update_permission_full_code(__p);
-
-	return query
-		select *
-		from auth.permission
-		where node_path = __p;
-end;
-$$;
-
-create function auth.create_permission_by_path(_created_by text, _user_id int,
-																							 _data_node_path text, _title text,
-																							 _parent_path text default '',
-																							 _is_assignable bool default true)
-	returns setof auth.permission
-	language plpgsql
-	rows 1
-as
-$$
-declare
-	__last_id int;
-	__p       ext.ltree;
-begin
-
-	-- TODO add _data_node_path to perm check
-	-- auth.has_permission(_user_id, _data_node_path::ext.ltree, 'permissions.add_permission');
-	perform
-		auth.has_permission(_user_id, 'permissions.add_permission');
-
-	insert into auth.permission(created_by, modified_by, title, is_assignable, code)
-	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title))
-	returning permission_id
-		into __last_id;
-
-	if
-		helpers.is_empty_string(_parent_path) then
-		begin
-			-- 			if
--- 				(lower(_title) = 'system') then
--- 				__p := ext.text2ltree(__last_id::text);
--- 			else
--- 				__p := ext.text2ltree('1.' || __last_id::text);
-			__p := ext.text2ltree(__last_id::text);
--- 			end if;
-
-			update auth.permission
-			set node_path = __p
-			where permission_id = __last_id;
-		end;
-	else
-		begin
-			__p := ext.text2ltree(_parent_path || '.' || __last_id::varchar);
-
-			update auth.permission
-			set node_path = __p
-			where permission_id = __last_id;
-
-			update auth.permission
-			set has_children = true
-			where node_path = ext.text2ltree(_parent_path);
-		end;
-
-	end if;
-
-	perform unsecure.update_permission_full_title(__p);
-	perform unsecure.update_permission_full_code(__p);
+	select full_code
+	from unsecure.update_permission_full_code(__p)
+	into __full_code;
 
 	return query
 		select *
 		from auth.permission
 		where permission_id = __last_id;
+
+	perform
+		add_journal_msg(_created_by, _user_id
+			, format('User: %s created permission: %s'
+											, _created_by, __full_code)
+			, 'permission', __last_id
+			, null
+			, 50331
+			, _tenant_id := 1);
 end;
 $$;
 
 create
-	or replace function auth.create_permission_by_code(_created_by text, _user_id int, _title text,
-																										 _parent_code text default '',
-																										 _is_assignable bool default true)
+	or replace function unsecure.create_permission_as_system(_title text
+, _parent_code text default ''
+, _is_assignable bool default true)
+	returns setof auth.permission
+	language sql
+	rows 1
+as
+$$
+select *
+from unsecure.create_permission('system', 1, _title, _parent_code, _is_assignable);
+$$;
+
+create
+	or replace function auth.create_permission(_created_by text, _user_id int, _title text,
+																						 _parent_full_code text default null,
+																						 _is_assignable bool default true)
 	returns setof auth.permission
 	language plpgsql
 	rows 1
@@ -4172,47 +4147,8 @@ begin
 	perform
 		auth.has_permission(_user_id, 'permissions.add_permission');
 
-	insert into auth.permission(created_by, modified_by, title, is_assignable, code)
-	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title))
-	returning permission_id
-		into __last_id;
-
-	if
-		(_parent_code = '') then
-		begin
-			__p := ext.text2ltree('1.' || __last_id::text);
-
-			update auth.permission
-			set node_path = __p
-			where permission_id = __last_id;
-		end;
-	else
-		begin
-			select p.permission_id, node_path::text
-			from auth.permission p
-			where p.full_code = ext.text2ltree(_parent_code)
-			into __parent_id, __parent_path;
-
-			__p := ext.text2ltree(__parent_path || '.' || __last_id::text);
-
-			update auth.permission
-			set node_path = __p
-			where permission_id = __last_id;
-
-			update auth.permission
-			set has_children = true
-			where permission_id = __parent_id;
-		end;
-
-	end if;
-
-	perform unsecure.update_permission_full_title(__p);
-	perform unsecure.update_permission_full_code(__p);
-
 	return query
-		select *
-		from auth.permission
-		where node_path = __p;
+		select * from unsecure.create_permission(_created_by, _user_id, _title, _parent_full_code, _is_assignable);
 end;
 $$;
 
@@ -4409,7 +4345,7 @@ $$;
 
 create function auth.create_perm_set(
 	_created_by text,
-	_user_id text,
+	_user_id bigint,
 	_title text,
 	_is_system bool default false,
 	_is_assignable bool default true,
@@ -4434,7 +4370,7 @@ $$;
 
 create function unsecure.update_perm_set(
 	_modified_by text,
-	_user_id text,
+	_user_id bigint,
 	_perm_set_id int,
 	_title text,
 	_is_assignable bool default true,
@@ -4477,7 +4413,7 @@ $$;
 
 create function auth.update_perm_set(
 	_modified_by text,
-	_user_id text,
+	_user_id bigint,
 	_perm_set_id int,
 	_title text,
 	_is_assignable bool default true,
@@ -5021,9 +4957,9 @@ end;
 $$;
 
 create or replace function unsecure.create_service_user_info(_created_by text, _user_id bigint, _username text,
-																									_display_name text,
-																									_email text default null,
-																									_custom_service_user_id bigint default null)
+																														 _display_name text,
+																														 _email text default null,
+																														 _custom_service_user_id bigint default null)
 	returns setof auth.user_info
 	language plpgsql
 	rows 1
@@ -5715,7 +5651,7 @@ end;
 $$;
 
 -- drop function auth.get_user_permissions(_user_id bigint, _target_user_id bigint)
-create or replace function auth.get_user_permissions(_user_id bigint, _target_user_id bigint)
+create or replace function auth.get_user_permissions(_user_id bigint, _target_user_id bigint, _tenant_id int default 1)
 	returns table
 					(
 						__assignment_id               bigint,
@@ -5733,7 +5669,7 @@ as
 $$
 begin
 	if _user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, 'users.get_permissions');
+		perform auth.has_permission(_user_id, 'users.get_permissions', _tenant_id);
 	end if;
 
 	return query
@@ -5747,7 +5683,7 @@ begin
 						 when ps is not null then 'perm_set'
 						 else 'assignment'
 			end
-				 , p.full_code
+				 , p.full_code::text
 				 , p.title
 		from auth.permission_assignment pa
 					 left join auth.user_group ug on pa.group_id = ug.user_group_id
@@ -6593,92 +6529,92 @@ begin
 	-- resetting sequence to 1000 to allocate space for system users
 	alter sequence auth.user_info_user_id_seq restart with 1000;
 
-	perform unsecure.create_permission_by_path_as_system('Authentication', null, false);
-	perform unsecure.create_permission_by_path_as_system('Get data', 'authentication');
-	perform unsecure.create_permission_by_path_as_system('Create auth event', 'authentication');
+	perform unsecure.create_permission_as_system('Authentication', null, false);
+	perform unsecure.create_permission_as_system('Get data', 'authentication');
+	perform unsecure.create_permission_as_system('Create auth event', 'authentication');
 
-	perform unsecure.create_permission_by_path_as_system('Journal', _is_assignable := true);
-	perform unsecure.create_permission_by_path_as_system('Read journal', 'journal', _is_assignable := true);
-	perform unsecure.create_permission_by_path_as_system('Read global journal', 'journal',
-																											 _is_assignable := true);
-	perform unsecure.create_permission_by_path_as_system('Get payload', 'journal', _is_assignable := true);
+	perform unsecure.create_permission_as_system('Journal', _is_assignable := true);
+	perform unsecure.create_permission_as_system('Read journal', 'journal', _is_assignable := true);
+	perform unsecure.create_permission_as_system('Read global journal', 'journal',
+																							 _is_assignable := true);
+	perform unsecure.create_permission_as_system('Get payload', 'journal', _is_assignable := true);
 
-	perform unsecure.create_permission_by_path_as_system('Areas', null, false);
-	perform unsecure.create_permission_by_path_as_system('Public', 'areas');
-	perform unsecure.create_permission_by_path_as_system('Admin', 'areas');
+	perform unsecure.create_permission_as_system('Areas', null, false);
+	perform unsecure.create_permission_as_system('Public', 'areas');
+	perform unsecure.create_permission_as_system('Admin', 'areas');
 
-	perform unsecure.create_permission_by_path_as_system('Tokens', null, false);
-	perform unsecure.create_permission_by_path_as_system('Create token', 'tokens', true);
-	perform unsecure.create_permission_by_path_as_system('Validate token', 'tokens', true);
-	perform unsecure.create_permission_by_path_as_system('Set as used', 'tokens', true);
+	perform unsecure.create_permission_as_system('Tokens', null, false);
+	perform unsecure.create_permission_as_system('Create token', 'tokens', true);
+	perform unsecure.create_permission_as_system('Validate token', 'tokens', true);
+	perform unsecure.create_permission_as_system('Set as used', 'tokens', true);
 
-	perform unsecure.create_permission_by_path_as_system('Permissions', null, false);
-	perform unsecure.create_permission_by_path_as_system('Create permission', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Update permission', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Delete permission', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Create permission set', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Update permission set', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Delete permission set', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Assign permission', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Unassign permission', 'permissions');
-	perform unsecure.create_permission_by_path_as_system('Get perm sets', 'permissions');
+	perform unsecure.create_permission_as_system('Permissions', null, false);
+	perform unsecure.create_permission_as_system('Create permission', 'permissions');
+	perform unsecure.create_permission_as_system('Update permission', 'permissions');
+	perform unsecure.create_permission_as_system('Delete permission', 'permissions');
+	perform unsecure.create_permission_as_system('Create permission set', 'permissions');
+	perform unsecure.create_permission_as_system('Update permission set', 'permissions');
+	perform unsecure.create_permission_as_system('Delete permission set', 'permissions');
+	perform unsecure.create_permission_as_system('Assign permission', 'permissions');
+	perform unsecure.create_permission_as_system('Unassign permission', 'permissions');
+	perform unsecure.create_permission_as_system('Get perm sets', 'permissions');
 
-	perform unsecure.create_permission_by_path_as_system('Users');
-	perform unsecure.create_permission_by_path_as_system('Create service user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Register user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Add to default groups', 'users');
-	perform unsecure.create_permission_by_path_as_system('Enable user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Disable user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Lock user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Unlock user', 'users');
-	perform unsecure.create_permission_by_path_as_system('Get user identity', 'users');
-	perform unsecure.create_permission_by_path_as_system('Enable user identity', 'users');
-	perform unsecure.create_permission_by_path_as_system('Disable user identity', 'users');
-	perform unsecure.create_permission_by_path_as_system('Change password', 'users');
-	perform unsecure.create_permission_by_path_as_system('Read user events', 'users');
-	perform unsecure.create_permission_by_path_as_system('Update user data', 'users');
-	perform unsecure.create_permission_by_path_as_system('Get data', 'users');
-	perform unsecure.create_permission_by_path_as_system('Get permissions', 'users');
+	perform unsecure.create_permission_as_system('Users');
+	perform unsecure.create_permission_as_system('Create service user', 'users');
+	perform unsecure.create_permission_as_system('Register user', 'users');
+	perform unsecure.create_permission_as_system('Add to default groups', 'users');
+	perform unsecure.create_permission_as_system('Enable user', 'users');
+	perform unsecure.create_permission_as_system('Disable user', 'users');
+	perform unsecure.create_permission_as_system('Lock user', 'users');
+	perform unsecure.create_permission_as_system('Unlock user', 'users');
+	perform unsecure.create_permission_as_system('Get user identity', 'users');
+	perform unsecure.create_permission_as_system('Enable user identity', 'users');
+	perform unsecure.create_permission_as_system('Disable user identity', 'users');
+	perform unsecure.create_permission_as_system('Change password', 'users');
+	perform unsecure.create_permission_as_system('Read user events', 'users');
+	perform unsecure.create_permission_as_system('Update user data', 'users');
+	perform unsecure.create_permission_as_system('Get data', 'users');
+	perform unsecure.create_permission_as_system('Get permissions', 'users');
 
-	perform unsecure.create_permission_by_path_as_system('Tenants');
-	perform unsecure.create_permission_by_path_as_system('Create tenant', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Update tenant', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Assign owner', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Assign group owner', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Get tenants', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Get users', 'tenants');
-	perform unsecure.create_permission_by_path_as_system('Get groups', 'tenants');
+	perform unsecure.create_permission_as_system('Tenants');
+	perform unsecure.create_permission_as_system('Create tenant', 'tenants');
+	perform unsecure.create_permission_as_system('Update tenant', 'tenants');
+	perform unsecure.create_permission_as_system('Assign owner', 'tenants');
+	perform unsecure.create_permission_as_system('Assign group owner', 'tenants');
+	perform unsecure.create_permission_as_system('Get tenants', 'tenants');
+	perform unsecure.create_permission_as_system('Get users', 'tenants');
+	perform unsecure.create_permission_as_system('Get groups', 'tenants');
 
 
-	perform unsecure.create_permission_by_path_as_system('Providers');
-	perform unsecure.create_permission_by_path_as_system('Create provider', 'providers');
-	perform unsecure.create_permission_by_path_as_system('Update provider', 'providers');
-	perform unsecure.create_permission_by_path_as_system('Delete provider', 'providers');
-	perform unsecure.create_permission_by_path_as_system('Get users', 'providers');
+	perform unsecure.create_permission_as_system('Providers');
+	perform unsecure.create_permission_as_system('Create provider', 'providers');
+	perform unsecure.create_permission_as_system('Update provider', 'providers');
+	perform unsecure.create_permission_as_system('Delete provider', 'providers');
+	perform unsecure.create_permission_as_system('Get users', 'providers');
 
-	perform unsecure.create_permission_by_path_as_system('Groups');
-	perform unsecure.create_permission_by_path_as_system('Get group', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Get permissions', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Create group', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Update group', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Delete group', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Lock group', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Get groups', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Create member', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Delete member', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Get members', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Get mapping', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Create mapping', 'groups');
-	perform unsecure.create_permission_by_path_as_system('Delete mapping', 'groups');
+	perform unsecure.create_permission_as_system('Groups');
+	perform unsecure.create_permission_as_system('Get group', 'groups');
+	perform unsecure.create_permission_as_system('Get permissions', 'groups');
+	perform unsecure.create_permission_as_system('Create group', 'groups');
+	perform unsecure.create_permission_as_system('Update group', 'groups');
+	perform unsecure.create_permission_as_system('Delete group', 'groups');
+	perform unsecure.create_permission_as_system('Lock group', 'groups');
+	perform unsecure.create_permission_as_system('Get groups', 'groups');
+	perform unsecure.create_permission_as_system('Create member', 'groups');
+	perform unsecure.create_permission_as_system('Delete member', 'groups');
+	perform unsecure.create_permission_as_system('Get members', 'groups');
+	perform unsecure.create_permission_as_system('Get mapping', 'groups');
+	perform unsecure.create_permission_as_system('Create mapping', 'groups');
+	perform unsecure.create_permission_as_system('Delete mapping', 'groups');
 
-	perform unsecure.create_permission_by_path_as_system('Api keys');
-	perform unsecure.create_permission_by_path_as_system('Create api key', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Update api key', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Delete api key', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Update api secret', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Validate api key', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Search', 'api_keys');
-	perform unsecure.create_permission_by_path_as_system('Update permissions', 'api_keys');
+	perform unsecure.create_permission_as_system('Api keys');
+	perform unsecure.create_permission_as_system('Create api key', 'api_keys');
+	perform unsecure.create_permission_as_system('Update api key', 'api_keys');
+	perform unsecure.create_permission_as_system('Delete api key', 'api_keys');
+	perform unsecure.create_permission_as_system('Update api secret', 'api_keys');
+	perform unsecure.create_permission_as_system('Validate api key', 'api_keys');
+	perform unsecure.create_permission_as_system('Search', 'api_keys');
+	perform unsecure.create_permission_as_system('Update permissions', 'api_keys');
 
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
 																						 _permissions := array ['tenants', 'providers'

@@ -147,11 +147,12 @@ from auth.create_token('authenticator', 1, 1004, null, null, 'email_verification
 
 --4FDC32F629CE
 select *
-from auth.validate_token('authenticator', 1, null, null, '111jjjj2222jjjj333', 'email_verification', '123.2.34.5', 'my agent', 'keenmate.com',
+from auth.validate_token('authenticator', 1, null, null, '111jjjj2222jjjj333', 'email_verification', '123.2.34.5',
+												 'my agent', 'keenmate.com',
 												 true);
 
 select *
-from auth.get_user_group_members('ondrej', 1,  8, 3);
+from auth.get_user_group_members('ondrej', 1, 8, 3);
 
 select *
 from auth.get_tenant_members('ondrej', 1, 3);
@@ -161,30 +162,61 @@ from auth.get_tenant_groups('ondrej', 1, 3);
 
 
 select *
-from auth.create_user_group_member('system', 1, 1,  1000);
-select *
-from auth.create_service_user_info('ondrej.valenta@keenmate.com', 1001, 'export_service_2', 'Export service 2');
+from auth.create_user_group_member('system', 1, 1, 1000);
 
 select *
-from auth.create_perm_set()
+from auth.has_permission(1000, 'users.create_service_user', 1, false);
+select *
+from auth.has_permission(1001, 'users.create_service_user', 1, false);
 
-select * from auth.get_user_permissions(1, 1001);
+select *
+from auth.permission;
+
+select *
+from auth.create_service_user_info('ondrej.valenta@keenmate.com', 1000, 'export_service_2', 'Export service 2');
+
+select *
+from auth.create_permission('system', 1, 'Business', null);
+select *
+from auth.create_permission('system', 1, 'Orders', 'business');
+select *
+from auth.create_permission('system', 1, 'Create order', 'business.orders');
+
+select *
+from auth.create_perm_set('system', 1
+	, 'Export service'
+	, _permissions := array ['business.orders.create_order']);
+
+select *
+from auth.create_api_key('system', 1, 'Another service'
+  , 'Another service calling our system'
+  , null, null
+  , _api_key:= 'another_service', _api_secret := 'another_service_secret');
+
+-- _created_by text, _user_id bigint, _api_key_id integer, _perm_set_code text, _permission_codes text[], _tenant_id integer DEFAULT 1
+select *
+from auth.assign_api_key_permissions('system', 1, 1, 'export_service', null);
+
+select *
+from auth.get_user_permissions(1, 1005);
 
 
-select * from user_group_members
+select *
+from user_group_members
+select *
+from auth.user_permission_cache;
 
 
 
-select * from auth.user_info;
+select *
+from auth.user_info;
 
-select * from auth.get_user_permissions(1, );
+select *
+from auth.get_user_permissions(1,);
 
-select * from auth.permission
+select *
+from auth.permission
 order by full_code;
-
-
-
-
 
 
 
