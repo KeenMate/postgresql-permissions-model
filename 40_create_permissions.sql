@@ -6104,7 +6104,7 @@ end;
 $$;
 
 -- drop function auth.get_api_key_permissions(_user_id bigint, _api_key_id bigint)
-create or replace function auth.get_api_key_permissions(_user_id bigint, _api_key_id bigint, _tenant_id int)
+create or replace function auth.get_api_key_permissions(_user_id bigint, _api_key_id int, _tenant_id int)
 	returns table
 					(
 						__assignment_id               bigint,
@@ -6132,7 +6132,7 @@ end;
 $$;
 
 create or replace function auth.update_api_key(_updated_by text, _user_id bigint
-, _api_key_id bigint, _title text, _description text, _expire_at timestamptz, _notification_email text
+, _api_key_id int, _title text, _description text, _expire_at timestamptz, _notification_email text
 , _tenant_id int default 1)
 	returns table
 					(
@@ -6452,6 +6452,12 @@ begin
 	into __api_user_id;
 
 	if __api_user_id is null then
+
+		perform auth.create_user_event(_requested_by, _user_id,
+																	 'api_key_validating', __api_user_id, _ip_address,
+																	 _user_agent, _origin,
+																	 _event_data := jsonb_build_object('is_successful', false));
+
 		perform error.raise_52301(_api_key);
 	end if;
 
@@ -6470,18 +6476,18 @@ begin
 												 from pa
 																inner join auth.permission p on pa.permission_id = p.permission_id)
 		select ui.user_id, ui.username, ui.display_name, array_agg(permission_code)
-		from user_info ui
-					 inner join permissions p on true
+		from auth.user_info ui
+					 left join permissions p on true
 		where ui.user_id = __api_user_id
 		group by ui.user_id, ui.username, ui.display_name;
 
 	perform auth.create_user_event(_requested_by, _user_id,
 																 'api_key_validating', __api_user_id, _ip_address,
-																 _user_agent, _origin);
+																 _user_agent, _origin,
+																 _event_data := jsonb_build_object('is_successful', true));
 
 end;
 $$;
-
 
 /***
  *    ██╗███╗   ██╗██╗████████╗██╗ █████╗ ██╗         ██████╗  █████╗ ████████╗ █████╗
