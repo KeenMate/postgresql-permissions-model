@@ -1,11 +1,10 @@
 # Database event codes
 
-
 ## Common
 
-| Event code  | Description |
-| ------------- | ------------- |
-| 50003  | Permission denied  |
+| Event code | Description       |
+|------------|-------------------|
+| 50003      | Permission denied |
 
 ## Security
 
@@ -58,6 +57,7 @@
 | 50306      | Permission assignability changed       |
 | 50311      | Permissions added to perm set          |
 | 50313      | Permissions removed from perm set      |
+| 50331      | Permission created                     |
 | 50401      | Token created                          |
 | 50402      | Token validated                        |
 | 50403      | Token set as used                      |
@@ -92,6 +92,7 @@
 | 52176      | Permission is not assignable                                                          |
 | 52177      | Permission set is not defined in tenant                                               |
 | 52178      | Some permission is not assignable                                                     |
+| 52179      | Parent permission does not exist                                                      |
 | 52271      | User group cannot be deleted because it's a system group                              |
 | 52272      | Either user group id or target user id has to be not null                             |
 | 52273      | Either permission set code or permission code has to be not null                      |
