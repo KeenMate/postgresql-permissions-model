@@ -10,21 +10,21 @@
 
 create table __version
 (
-    version_id         int generated always as identity not null primary key,
-    component          text                             not null default 'main',
-    version            text                             not null,
-    title              text                             not null,
-    description        text,
-    execution_started  timestamptz                      not null default now(),
-    execution_finished timestamptz
+	version_id         int generated always as identity not null primary key,
+	component          text                             not null default 'main',
+	version            text                             not null,
+	title              text                             not null,
+	description        text,
+	execution_started  timestamptz                      not null default now(),
+	execution_finished timestamptz
 );
 
-create unique index uq_version on __version(component, version);
+create unique index uq_version on __version (component, version);
 
 create function start_version_update(_version text, _title text, _description text default null,
-                                     _component text default 'main')
-    returns setof __version
-    language sql
+																		 _component text default 'main')
+	returns setof __version
+	language sql
 as
 $$
 
@@ -35,14 +35,27 @@ returning *;
 $$;
 
 create function stop_version_update(_version text, _component text default 'main')
-    returns setof __version
-    language sql
+	returns setof __version
+	language sql
 as
 $$
 
 update __version
 set execution_finished = now()
-where component = _component and version = _version
+where component = _component
+	and version = _version
 returning *;
 
+$$;
+
+
+create function check_version(_version text, _component text default 'main')
+	returns bool
+	language sql
+as
+$$
+select exists(select *
+							from __version
+							where component = _component
+								and version = _version)
 $$;
