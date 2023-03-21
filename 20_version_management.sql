@@ -54,8 +54,7 @@ create function check_version(_version text, _component text default 'main')
 	language sql
 as
 $$
-select exists(select *
-							from __version
+select exists(select from __version
 							where component = _component
 								and version = _version)
 $$;

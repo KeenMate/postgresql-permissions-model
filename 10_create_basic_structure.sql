@@ -11,6 +11,7 @@
 
 create schema if not exists error;
 create schema if not exists const;
+create schema if not exists internal;
 create schema if not exists unsecure; -- functions without any permission validation
 create schema if not exists helpers;
 create schema if not exists ext;
