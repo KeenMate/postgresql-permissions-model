@@ -4054,7 +4054,7 @@ declare
 	__p           ext.ltree;
 	__parent_id   int;
 	__parent_path text;
-	__full_code   ltree;
+	__full_code   ext.ltree;
 begin
 
 	insert into auth.permission(created_by, modified_by, title, is_assignable, code)
