@@ -1017,7 +1017,7 @@ from add_journal_msg_jsonb(_created_by, _user_id
 $$;
 
 
-create or replace function search_journal_msgs(_user_id int,
+create or replace function search_journal_msgs(_user_id bigint,
 																							 _search_text text,
 																							 _from timestamptz default null, _to timestamptz default null,
 																							 _target_user_id int default 1,
@@ -1095,7 +1095,7 @@ end;
 $$;
 
 create
-	or replace function get_journal_payload(_user_id int, _tenant_id int, _journal_id bigint)
+	or replace function get_journal_payload(_user_id bigint, _tenant_id int, _journal_id bigint)
 	returns table
 					(
 						__journal_id bigint,
@@ -4129,7 +4129,7 @@ from unsecure.create_permission('system', 1, _title, _parent_code, _is_assignabl
 $$;
 
 create
-	or replace function auth.create_permission(_created_by text, _user_id int, _title text,
+	or replace function auth.create_permission(_created_by text, _user_id bigint, _title text,
 																						 _parent_full_code text default null,
 																						 _is_assignable bool default true)
 	returns setof auth.permission
@@ -5149,7 +5149,7 @@ $$;
 
 -- for email authentication
 create
-	or replace function auth.register_user(_created_by text, _user_id int, _email text, _password_hash text,
+	or replace function auth.register_user(_created_by text, _user_id bigint, _email text, _password_hash text,
 																				 _display_name text, _user_data jsonb default null)
 	returns table
 					(
@@ -5391,7 +5391,7 @@ $$;
 
 
 -- WARNING: returns password hash, do not use for anything else than authentication, SYSTEM account is the only one with proper permission
-create function auth.get_user_by_email_for_authentication(_user_id int, _email text)
+create function auth.get_user_by_email_for_authentication(_user_id bigint, _email text)
 	returns table
 					(
 						__user_id       bigint,
