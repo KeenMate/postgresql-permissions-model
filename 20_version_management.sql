@@ -48,13 +48,15 @@ returning *;
 
 $$;
 
-
 create function check_version(_version text, _component text default 'main')
 	returns bool
 	language sql
+	cost 1
 as
 $$
-select exists(select from __version
+select exists(select
+							from __version
 							where component = _component
-								and version = _version)
+								and version = _version);
+
 $$;
