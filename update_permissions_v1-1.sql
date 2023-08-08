@@ -49,7 +49,7 @@ begin
 			, _tenant_id := _tenant_id);
 
 end;
-$$;v
+$$;
 
 
 select *
