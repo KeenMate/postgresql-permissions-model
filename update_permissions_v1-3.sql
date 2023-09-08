@@ -6,12 +6,24 @@
  */
 
 select *
-from start_version_update('1.3', 'Ensure user info from now on does not call update_user_data function, CALL IT FROM BACKEND', 'This way it''s more consistent design pattern', _component := 'keen_auth_permissions');
+from start_version_update('1.3',
+													'ensure_user_info/ensure_user_from_provider from now on does not call update_user_data function, CALL IT FROM BACKEND. Fix of create_user_group_member',
+													'This way it''s more consistent design pattern', _component := 'keen_auth_permissions');
 
 
-create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
-    returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
-    language plpgsql
+create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text,
+																								 _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text,
+																								 _user_data jsonb DEFAULT NULL::jsonb)
+	returns TABLE
+					(
+						__user_id      bigint,
+						__code         text,
+						__uuid         text,
+						__username     text,
+						__email        text,
+						__display_name text
+					)
+	language plpgsql
 as
 $$
 declare
@@ -42,6 +54,122 @@ begin
 		where ui.user_id = __last_id;
 end;
 $$;
+
+-- Invalid parameter _user_id
+drop function auth.create_user_group_member(_created_by text, _user_id bigint, _user_group_id integer,
+																						_target_user_id integer, _tenant_id integer);
+create function auth.create_user_group_member(_created_by text, _user_id bigint, _user_group_id integer,
+																							_target_user_id bigint, _tenant_id integer DEFAULT 1)
+	returns TABLE
+					(
+						__user_group_member_id bigint
+					)
+	rows 1
+	language plpgsql
+as
+$$
+begin
+	perform auth.can_manage_user_group(_user_id, _user_group_id, 'groups.create_member', _tenant_id);
+
+	return query
+		select *
+		from unsecure.create_user_group_member(_created_by, _user_id
+			, _user_group_id, _target_user_id, _tenant_id);
+end;
+
+$$;
+
+
+-- removal of perform auth.update_user_data
+create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _provider_code text,
+																													_provider_uid text, _username text, _display_name text,
+																													_email text DEFAULT NULL::text,
+																													_user_data jsonb DEFAULT NULL::jsonb)
+	returns TABLE
+					(
+						__user_id      bigint,
+						__code         text,
+						__uuid         text,
+						__username     text,
+						__email        text,
+						__display_name text
+					)
+	language plpgsql
+as
+$$
+declare
+	__last_id            bigint;
+	__can_login          bool;
+	__is_user_active     bool;
+	__is_identity_active bool;
+begin
+
+	if
+		lower(_provider_code) = 'email' then
+		perform error.raise_52101(_username);
+	end if;
+
+	perform
+		auth.validate_provider_is_active(_provider_code);
+
+	select uid.user_id, u.is_active, uid.is_active, u.can_login
+	from auth.user_identity uid
+				 inner join auth.user_info u on uid.user_id = u.user_id
+	where uid.provider_code = _provider_code
+		and uid.uid = _provider_uid
+	into __last_id, __is_user_active, __is_identity_active, __can_login;
+
+	if __last_id is null then
+
+		-- create user because it does not exists
+
+		select user_id
+		from unsecure.create_user_info(_created_by, _user_id, lower(_username), lower(_email), _display_name,
+																	 _provider_code)
+		into __last_id;
+
+		perform
+			unsecure.create_user_identity(_created_by, _user_id, __last_id
+				, _provider_code, _provider_uid, _is_active := true);
+	else
+		if not __can_login then
+			perform error.raise_52112(__last_id);
+		end if;
+
+		if
+			not __is_user_active then
+			perform error.raise_52105(__last_id);
+		end if;
+
+		if
+			not __is_identity_active then
+			perform error.raise_52110(__last_id, _provider_code);
+		end if;
+	end if;
+
+	-- clean all previous uids for the same provider for given user
+	delete
+	from auth.user_identity
+	where user_id = __last_id
+		and provider_code = _provider_code
+		and uid <> _provider_uid;
+
+	perform unsecure.update_last_used_provider(__last_id, _provider_code);
+
+	return query
+		select ui.user_id
+				 , ui.code
+				 , ui.uuid::text
+				 , ui.username
+				 , ui.email
+				 , ui.display_name
+		from auth.user_identity uid
+					 inner join auth.user_info ui on uid.user_id = ui.user_id
+		where uid.provider_code = _provider_code
+			and uid.uid = _provider_uid;
+end;
+$$;
+
 
 
 select *
