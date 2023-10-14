@@ -85,7 +85,7 @@ create
 as
 $$
 declare
-	__update_username text:='auth_update_v1_4'
+	__update_username text:='auth_update_v1_4';
 begin
 	
 	perform unsecure.create_permission_as_system('Delete system user info', 'users');

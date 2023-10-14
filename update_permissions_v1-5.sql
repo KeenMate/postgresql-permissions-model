@@ -89,8 +89,8 @@ execute procedure triggers.calculate_user_info();
 
 -- update username, display name and email on login based on data coming from provider
 
-create or replace function unsecure.update_user_info_basic_data(_updated_by text, _user_id bigint, _user_info_id bigint,
-
+create or replace function unsecure.update_user_info_basic_data(_updated_by text, _user_id bigint,
+																																_target_user_id bigint,
 																																_username text, _display_name text,
 																																_email text DEFAULT NULL::text)
 	returns table
@@ -108,9 +108,19 @@ begin
 			original_username = _username,
 			display_name      = _display_name,
 			email             = _email
-	where user_id = _user_info_id;
+	where user_id = _target_user_id;
 
-	perform auth.create_user_event(_updated_by, _user_id, '');
+	perform auth.create_user_event(_updated_by, _user_id, 'update_user_info', _target_user_id);
+
+	perform
+		add_journal_msg(_updated_by, _user_id
+			, format('User basic data (upn: %s) updated by user: %s'
+											, _username, _updated_by)
+			, 'user_info', _target_user_id
+			, _payload := array ['username', _username, 'display_name', _display_name,
+			'email', _email]
+			, _event_id := 50102
+			, _tenant_id := 1);
 end;
 $$;
 
@@ -166,7 +176,12 @@ begin
 	else
 		-- update basic user data coming from
 
-		xxxx
+		if (trim(lower(_username)) <> __username
+			or _display_name <> __display_name
+			or _email <> __email) then
+			perform unsecure.update_user_info_basic_data(_created_by, _user_id, __last_id, _username, _display_name, _email);
+		end if;
+
 		if not __can_login then
 			perform error.raise_52112(__last_id);
 		end if;
@@ -205,8 +220,19 @@ begin
 end;
 $$;
 
-alter function ensure_user_from_provider(text, bigint, text, text, text, text, text, jsonb) owner to postgres;
-
+-- create
+-- 	or replace function auth.update_permission_data_v1_5()
+-- 	returns setof int
+-- 	language plpgsql
+-- as
+-- $$
+-- declare
+-- 	__update_username text := 'auth_update_v1_5';
+-- begin
+--
+--
+-- end;
+-- $$;
 
 select *
 from stop_version_update('1.5', _component := 'keen_auth_permissions');
