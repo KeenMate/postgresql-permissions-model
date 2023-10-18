@@ -8,6 +8,47 @@
 select *
 from start_version_update('1.6', E'Fix of validate_token', 'Tokens were invalidated after too late and expired token appeared as still valid', _component := 'keen_auth_permissions');
 
+drop function if exists auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text);
+create function auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
+    returns TABLE
+            (
+                __token_id         bigint,
+                __token_uid        text,
+                __token_state_code text,
+                __used_at          timestamp with time zone,
+                __user_id          bigint,
+                __user_oid         text,
+                __token_data       jsonb
+            )
+    language plpgsql
+as
+$$
+declare
+    __token_uid text;
+begin
+
+    select uid
+    from auth.token
+    where token_type_code = _token_type
+      and token = _token
+    into __token_uid;
+
+    return query
+        select *
+        from auth.set_token_as_used(_modified_by,
+                                    _user_id,
+                                    __token_uid,
+                                    _token,
+                                    _token_type,
+                                    _ip_address,
+                                    _user_agent,
+                                    _origin
+            );
+end;
+$$;
+
+
+
 create function validate_token(_modified_by text, _user_id bigint, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false) returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
 	language plpgsql
 as $$
@@ -78,6 +119,46 @@ begin
 	end if;
 end;
 $$;
+
+
+create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
+    returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
+    language plpgsql
+as
+$$
+declare
+	__last_id bigint;
+	__username text;
+begin
+
+	__username := trim(lower(_username));
+
+	select u.user_id
+	from auth.user_info u
+	where u.username = __username
+	into __last_id;
+
+	if
+		__last_id is null then
+		select user_id
+		from unsecure.create_user_info(_created_by, _user_id, __username, lower(_email), _display_name,
+																	 _provider_code)
+		into __last_id;
+	end if;
+
+	return query
+		select ui.user_id
+				 , ui.code
+				 , ui.uuid::text
+				 , ui.username
+				 , ui.email
+				 , ui.display_name
+		from auth.user_info ui
+		where ui.user_id = __last_id;
+end;
+$$;
+
+
 
 select *
 from stop_version_update('1.6', _component := 'keen_auth_permissions');
