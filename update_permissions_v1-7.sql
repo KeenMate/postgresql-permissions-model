@@ -33,7 +33,8 @@ begin
 		select ugm.member_id, ugm.group_id, ug.code, ug.title, ugm.manual_assignment, ugm.mapping_id
 		from auth.user_group_member ugm
 					 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
-		where ugm.user_id = _target_user_id;
+		where ugm.user_id = _target_user_id
+		order by ug.title;
 
 end;
 $$;
