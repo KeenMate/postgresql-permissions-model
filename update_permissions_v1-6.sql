@@ -6,52 +6,67 @@
  */
 
 select *
-from start_version_update('1.6', E'Fix of validate_token', 'Tokens were invalidated after too late and expired token appeared as still valid', _component := 'keen_auth_permissions');
+from start_version_update('1.6', E'Fix of validate_token', 'Tokens were invalidated after too late and expired token appeared as still valid',
+													_component := 'keen_auth_permissions');
 
-drop function if exists auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text);
-create function auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
-    returns TABLE
-            (
-                __token_id         bigint,
-                __token_uid        text,
-                __token_state_code text,
-                __used_at          timestamp with time zone,
-                __user_id          bigint,
-                __user_oid         text,
-                __token_data       jsonb
-            )
-    language plpgsql
+drop function if exists auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text,
+																												_origin text);
+create function auth.set_token_as_used_by_token(_modified_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text,
+																								_origin text)
+	returns TABLE
+					(
+						__token_id         bigint,
+						__token_uid        text,
+						__token_state_code text,
+						__used_at          timestamp with time zone,
+						__user_id          bigint,
+						__user_oid         text,
+						__token_data       jsonb
+					)
+	language plpgsql
 as
 $$
 declare
-    __token_uid text;
+	__token_uid text;
 begin
 
-    select uid
-    from auth.token
-    where token_type_code = _token_type
-      and token = _token
-    into __token_uid;
+	select uid
+	from auth.token
+	where token_type_code = _token_type
+		and token = _token
+	into __token_uid;
 
-    return query
-        select *
-        from auth.set_token_as_used(_modified_by,
-                                    _user_id,
-                                    __token_uid,
-                                    _token,
-                                    _token_type,
-                                    _ip_address,
-                                    _user_agent,
-                                    _origin
-            );
+	return query
+		select *
+		from auth.set_token_as_used(_modified_by,
+																_user_id,
+																__token_uid,
+																_token,
+																_token_type,
+																_ip_address,
+																_user_agent,
+																_origin
+				 );
 end;
 $$;
 
 
 
-create function validate_token(_modified_by text, _user_id bigint, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false) returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
+create function validate_token(_modified_by text, _user_id bigint, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text,
+															 _user_agent text, _origin text, _set_as_used boolean default false)
+	returns TABLE
+					(
+						___token_id         bigint,
+						___token_uid        text,
+						___token_state_code text,
+						___used_at          timestamp with time zone,
+						___user_id          bigint,
+						___user_oid         text,
+						___token_data       jsonb
+					)
 	language plpgsql
-as $$
+as
+$$
 declare
 	__token_id         bigint;
 	__token_uid        text;
@@ -120,14 +135,137 @@ begin
 end;
 $$;
 
-
-create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
-    returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
-    language plpgsql
+create or replace function auth.set_token_as_failed(_modified_by text,
+																										_user_id bigint,
+																										_token_uid text,
+																										_token text,
+																										_token_type_code text,
+																										_ip_address text,
+																										_user_agent text,
+																										_origin text
+)
+	returns table
+					(
+						__token_id         bigint,
+						__token_uid        text,
+						__token_state_code text,
+						__used_at          timestamptz,
+						__user_id          bigint,
+						__user_oid         text,
+						__token_data jsonb
+					)
+	language plpgsql
 as
 $$
 declare
-	__last_id bigint;
+	__token_id  bigint;
+	__token_uid text;
+begin
+
+	perform
+		auth.has_permission(_user_id, 'tokens.set_as_used');
+
+	select token_id, uid
+	from auth.token
+	where (helpers.is_not_empty_string(_token_uid) or helpers.is_not_empty_string(_token))
+		and uid = _token_uid
+		and token = _token
+		and token_type_code = _token_type_code
+		and token_state_code = 'valid'
+	into __token_id, __token_uid;
+
+
+	-- 	if helpers.is_empty_string(__token_uid) then
+-- 		perform error.raise_52278(__token_uid);
+-- 	end if;
+
+	return query
+		update auth.token
+			set modified_by = _modified_by, modified = now(), token_state_code = 'validation_failed', used_at = now(), ip_address = _ip_address, user_agent = _user_agent, origin = _origin
+			where
+					(helpers.is_empty_string(_token_uid) or _token_uid = uid)
+					and token = _token
+			returning token_id
+				, uid
+				, token_state_code
+				, used_at
+				, user_id
+				, user_oid
+				, token_data;
+
+	perform
+		add_journal_msg(_modified_by, _user_id
+			, format('Token (uid: %s) set as validation_failed by user: %s'
+											, _token_uid, _modified_by)
+			, 'token', __token_id
+			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
+			, _event_id := 50403
+			, _tenant_id := 1);
+
+end;
+$$;
+
+create or replace function auth.set_token_as_failed_by_token(_modified_by text,
+																														 _user_id bigint,
+																														 _token text,
+																														 _token_type text,
+																														 _ip_address text,
+																														 _user_agent text,
+																														 _origin text)
+	returns table
+					(
+						__token_id         bigint,
+						__token_uid        text,
+						__token_state_code text,
+						__used_at          timestamptz,
+						__user_id          bigint,
+						__user_oid         text,
+						__token_data jsonb
+					)
+	language plpgsql
+as
+$$
+declare
+	__token_uid text;
+begin
+
+	select uid
+	from auth.token
+	where token_type_code = _token_type
+		and token = _token
+	into __token_uid;
+
+	return query
+		select *
+		from auth.set_token_as_failed(_modified_by,
+																	_user_id,
+																	__token_uid,
+																	_token,
+																	_token_type,
+																	_ip_address,
+																	_user_agent,
+																	_origin
+				 );
+end;
+$$;
+
+
+create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _provider_code text default null::text,
+																								 _email text default null::text, _user_data jsonb default null::jsonb)
+	returns TABLE
+					(
+						__user_id      bigint,
+						__code         text,
+						__uuid         text,
+						__username     text,
+						__email        text,
+						__display_name text
+					)
+	language plpgsql
+as
+$$
+declare
+	__last_id  bigint;
 	__username text;
 begin
 
@@ -158,6 +296,19 @@ begin
 end;
 $$;
 
+create or replace procedure internal.update_permissions_v1_6()
+	language plpgsql
+as
+$$
+	-- declare
+-- 	__update_username text = 'update_permissions_v1_6';
+begin
+	insert into const.token_state (code)
+	values ('validation_failed');
+end;
+$$;
+
+call internal.update_permissions_v1_6();
 
 
 select *
