@@ -6,7 +6,7 @@
  */
 
 select *
-from start_version_update('1.1', '', _component := 'keen_auth_permissions');
+from start_version_update('1.1', 'Fix of API user not being removed on deletion of API key', _component := 'keen_auth_permissions');
 
 
 create or replace function auth.delete_api_key(_deleted_by text, _user_id bigint, _api_key_id int,

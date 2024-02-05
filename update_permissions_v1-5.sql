@@ -11,6 +11,8 @@ from start_version_update('1.5',
 													'', _component := 'keen_auth_permissions');
 
 
+create schema if not exists triggers;
+
 alter table auth.user_data
 	add nrm_search_data text;
 
