@@ -7,9 +7,8 @@
 
 select *
 from start_version_update('1.10',
-													'Update of user_info table to have user_preferences instead of having them in user_data',
-													_component := 'keen_auth_permissions');
-
+                          'Update of user_info table to have user_preferences instead of having them in user_data',
+                          _component := 'keen_auth_permissions');
 
 
 /***
@@ -26,6 +25,53 @@ from start_version_update('1.10',
 alter table auth.user_info
 	add column user_preferences jsonb default '{}';
 
+
+/***
+ *    ███████╗██╗   ██╗███╗   ██╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗███████╗
+ *    ██╔════╝██║   ██║████╗  ██║██╔════╝╚══██╔══╝██║██╔═══██╗████╗  ██║██╔════╝
+ *    █████╗  ██║   ██║██╔██╗ ██║██║        ██║   ██║██║   ██║██╔██╗ ██║███████╗
+ *    ██╔══╝  ██║   ██║██║╚██╗██║██║        ██║   ██║██║   ██║██║╚██╗██║╚════██║
+ *    ██║     ╚██████╔╝██║ ╚████║╚██████╗   ██║   ██║╚██████╔╝██║ ╚████║███████║
+ *    ╚═╝      ╚═════╝ ╚═╝  ╚═══╝ ╚═════╝   ╚═╝   ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝
+ *
+ */
+
+
+-- drop function auth.update_user_preferences(
+-- 	_updated_by text
+-- , _user_id bigint
+-- , _target_user_id bigint
+-- , _update_data jsonb);
+create or replace function auth.update_user_preferences(
+	_updated_by text
+, _user_id bigint
+, _target_user_id bigint
+, _update_data jsonb)
+	returns table
+	        (
+		        __modified    timestamptz,
+		        __modified_by varchar(250)
+	        )
+	language plpgsql
+	rows 1
+as
+$$
+begin
+	if _user_id <> _target_user_id
+	then
+		perform auth.has_permission(_user_id, 'users.update_user_data');
+	end if;
+
+	return query
+		update auth.user_info
+			set modified = now()
+				, modified_by = _updated_by
+				, user_preferences = user_preferences || _update_data
+			where user_id = _target_user_id
+			returning modified
+				, modified_by;
+end;
+$$;
 
 
 /***
@@ -48,12 +94,12 @@ declare
 	__update_username text := 'auth_update_v1_10';
 begin
 	-- I could not find an evidence that would suggest there exists a column of such a similar name, or functionality, to this newly created `user_preferences` column
--- 	update auth.user_info ui
--- 	set modified = now()
--- 		, modified_by = __update_username
--- 		, user_preferences = ud.
--- 	from auth.user_data ud
--- 	where ud.user_id = ui.user_id;
+	-- 	update auth.user_info ui
+	-- 	set modified = now()
+	-- 		, modified_by = __update_username
+	-- 		, user_preferences = ud.
+	-- 	from auth.user_data ud
+	-- 	where ud.user_id = ui.user_id;
 
 end;
 $$;
