@@ -8,7 +8,7 @@ It's not a absolutely complete solution but we use it already in many real life 
 
 The database is able to keep records of users and groups, keep their memberships, have cascading permissions that can be combined to permission sets and those are assigned to groups or individuals.
 
-Most of our stored procedures call perform auth.has_permissions(\_user_id, '[permission full code, for example, orders.cancel_order', \_tenant_id \\\\ 1). This way function call is blocked right after tries to call it.
+Most of our stored procedures calls **perform auth.has_permissions(\_user_id, '[permission full code, for example, orders.cancel_order', \_tenant_id \\\\ 1)**. This way function call is blocked right after user with insufficient privileges tries to call it.
 
 
 ## Database event codes
