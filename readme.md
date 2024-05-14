@@ -1,12 +1,25 @@
-# Database event codes
+# postgresql-permission-model
 
-## Common
+This is our PostgreSQL database model for everything related to users/groups/permissions and permission sets.
+
+It's not a absolutely complete solution but we use it already in many real life projects, big and small.
+
+## Main features
+
+The database is able to keep records of users and groups, keep their memberships, have cascading permissions that can be combined to permission sets and those are assigned to groups or individuals.
+
+Most of our stored procedures call perform auth.has_permissions(\_user_id, '[permission full code, for example, orders.cancel_order', \_tenant_id \\\\ 1). This way function call is blocked right after tries to call it.
+
+
+## Database event codes
+
+### Common
 
 | Event code | Description       |
 |------------|-------------------|
 | 50003      | Permission denied |
 
-## Security
+### Security
 
 | Event code | Description                            |
 |------------|----------------------------------------|
@@ -68,7 +81,7 @@
 | 50505      | API key perm set/permission unassigned |
 | 50506      | API key secret updated                 |
 
-## Security Error codes
+### Security Error codes
 
 | Event code | Description                                                                           |
 |------------|---------------------------------------------------------------------------------------|
