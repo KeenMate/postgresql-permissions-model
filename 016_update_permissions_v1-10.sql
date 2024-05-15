@@ -73,6 +73,31 @@ begin
 end;
 $$;
 
+create or replace function auth.get_user_preferences(
+	_user_id bigint
+, _target_user_id bigint)
+	returns table
+	        (
+		        __value text
+	        )
+	stable
+	rows 1
+	language plpgsql
+as
+$$
+begin
+	if _user_id <> _target_user_id
+	then
+		perform auth.has_permission(_user_id, 'users.update_user_data');
+	end if;
+
+	return query
+		select user_preferences::text
+		from auth.user_info
+		where user_id = _target_user_id;
+end;
+$$;
+
 
 /***
  *    ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗    ██████╗  █████╗ ████████╗ █████╗
