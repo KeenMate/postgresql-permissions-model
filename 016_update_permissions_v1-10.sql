@@ -25,6 +25,11 @@ from start_version_update('1.10',
 alter table auth.user_info
 	add column user_preferences jsonb default '{}';
 
+alter table auth.perm_set
+	drop constraint perm_set_code_key;
+alter table auth.perm_set
+	add unique (code, tenant_id);
+
 
 /***
  *    ███████╗██╗   ██╗███╗   ██╗ ██████╗████████╗██╗ ██████╗ ███╗   ██╗███████╗
