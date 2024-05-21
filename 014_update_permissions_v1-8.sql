@@ -154,9 +154,11 @@ create function unsecure.create_user_group_member(_created_by text, _user_id big
 as
 $$
 declare
-	__is_assignable bool;
-	__is_external   bool;
-	__is_active     bool;
+	__is_assignable   bool;
+	__is_external     bool;
+	__is_active       bool;
+	__user_group_code text;
+	__user_upn        text;
 begin
 
 	select is_assignable, is_external, is_active
@@ -176,20 +178,70 @@ begin
 		perform error.raise_52173(_user_group_id);
 	end if;
 
+	select code
+	from auth.user_group
+	where user_group_id = _user_group_id
+	into __user_group_code;
+
+	select code
+	from auth.user_info
+	where user_id = _target_user_id
+	into __user_upn;
+
 	return query insert into auth.user_group_member (created_by, group_id, user_id, member_type_code)
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
 	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s added new user: %s to group: %s in tenant: %s'
-											, _created_by, _target_user_id, _user_group_id, _tenant_id)
+		add_journal_msg_jsonb(_created_by, _user_id
+			, format('User group: (code: %s) member: (upn: %s) in tenant: %s created by: %s'
+														, __user_group_code, __user_upn, _tenant_id, _created_by)
 			, 'group', _user_group_id
-			, array ['target_user_id', _target_user_id::text]
+			, jsonb_build_object('target_user_id', _target_user_id)
 			, 50131
 			, _tenant_id := _tenant_id);
 end;
 $$;
+
+create or replace function auth.delete_user_group_member(_deleted_by text, _user_id bigint, _user_group_id integer, _target_user_id bigint,
+																												 _tenant_id integer default 1) returns void
+	language plpgsql
+as
+$$
+declare
+	__user_group_code text;
+	__user_upn        text;
+begin
+	perform auth.can_manage_user_group(_user_id, _user_group_id, 'groups.delete_member', _tenant_id);
+
+	select code
+	from auth.user_group
+	where user_group_id = _user_group_id
+	into __user_group_code;
+
+	select code
+	from auth.user_info
+	where user_id = _target_user_id
+	into __user_upn;
+
+	delete
+	from auth.user_group_member
+	where group_id = _user_group_id
+		and user_id = _target_user_id;
+
+
+	perform
+		add_journal_msg(_deleted_by, _user_id
+			, format('User group: (code: %s) member: (upn: %s) in tenant: %s deleted by: %s'
+											, __user_group_code, __user_upn, _tenant_id, _deleted_by)
+			, 'group', _user_group_id
+			, array ['target_user_id', _target_user_id::text]
+			, 50133
+			, _tenant_id := _tenant_id);
+end;
+$$;
+
+
 
 drop function unsecure.get_user_group_members(_requested_by text, _user_id bigint, _user_group_id int, _tenant_id int);
 create function unsecure.get_user_group_members(_requested_by text, _user_id bigint,
@@ -241,14 +293,15 @@ begin
 					 inner join auth.user_info ui on ui.user_id = ugm.user_id
 		where ugm.group_id = _user_group_id;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested user group members: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
-			, null
-			, 50210
-			, _tenant_id := _tenant_id);
+-- OMITTING UNTIL JOURNAL MESSAGES HAVE LEVELS
+-- 	perform
+-- 		add_journal_msg(_requested_by, _user_id
+-- 			, format('User: %s requested user group members: %s in tenant: %s'
+-- 											, _requested_by, _user_group_id, _tenant_id)
+-- 			, 'group', _user_group_id
+-- 			, null
+-- 			, 50210
+-- 			, _tenant_id := _tenant_id);
 end;
 $$;
 
@@ -293,6 +346,8 @@ create function auth.set_user_group_as_external(_modified_by text, _user_id bigi
 	language plpgsql
 as
 $$
+declare
+	__user_group_code text;
 begin
 	perform
 		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
@@ -306,16 +361,19 @@ begin
 	set modified    = now()
 		, modified_by = _modified_by
 		, is_external = true
-	where user_group_id = _user_group_id;
+	where user_group_id = _user_group_id
+	returning code
+		into __user_group_code;
 
 
 	perform
 		add_journal_msg(_modified_by, _user_id
-			, format('User: %s set user group as external in tenant: %s'
-											, _modified_by, _user_group_id, _tenant_id)
+			, format('User group: (code: %s) set as external in tenant: %s by: %s'
+											, __user_group_code, _tenant_id, _modified_by)
 			, 'group', _user_group_id
-			, null
-			, 50208
+			, _data_object_code := __user_group_code
+			, _payload := null
+			, _event_id := 50208
 			, _tenant_id := _tenant_id);
 end;
 $$;
@@ -554,7 +612,7 @@ begin
 		__upn                   text
 	);
 
-	FOR __group_row IN
+	for __group_row in
 		select egm.user_group_id, array_agg(distinct egm.user_group_mapping_id) as mapping_ids
 		from stage.external_group_member egm
 					 inner join auth.user_group ug on egm.user_group_id = ug.user_group_id
@@ -562,10 +620,10 @@ begin
 			and ug.is_synced -- if the user group is not synced, it won't be processed
 		group by egm.user_group_id
 		order by egm.user_group_id
-		LOOP
+		loop
 			raise notice 'Processing external user group members for id: %', __group_row.user_group_id;
-			FOREACH __mapping_id IN ARRAY __group_row.mapping_ids
-				LOOP
+			foreach __mapping_id in array __group_row.mapping_ids
+				loop
 					raise notice 'Processing external user group members mapping for id: %', __mapping_id;
 					insert into __temp_external_group_sync
 					select *
@@ -594,7 +652,7 @@ begin
 					from deleted_users cr
 								 inner join auth.user_info ui on cr.user_id = ui.user_id;
 
-				END LOOP;
+				end loop;
 
 			-- 			create temporary table __temp_delete_members as
 -- 			select current_members.user_id
@@ -623,7 +681,7 @@ begin
 						 ui.username
 			from deleted_users_completely_missing cr
 						 inner join auth.user_info ui on cr.user_id = ui.user_id;
-		END LOOP;
+		end loop;
 
 
 	return query

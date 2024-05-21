@@ -105,8 +105,8 @@ begin
 
 	perform
 		add_journal_msg_jsonb(_created_by, _user_id
-			, format('User: %s created a token: (type: %s, uid: %s) for user: %s'
-														, _created_by, __last_item.token_type_code, __last_item.uid, __target_username)
+			, format('Token: (type: %s, uid: %s) for user: (upn: %s) created by: %s'
+														, __last_item.token_type_code, __last_item.uid, __target_username, _created_by)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username)
 			, 50401
@@ -128,7 +128,7 @@ drop function auth.validate_token(_modified_by text, _user_id bigint, _target_us
 create or replace function auth.validate_token(_modified_by text, _user_id bigint, _target_user_id bigint,
 																							 _token_uid text, _token text,
 																							 _token_type_code text, _ip_address text, _user_agent text, _origin text,
-																							 _set_as_used boolean DEFAULT false)
+																							 _set_as_used boolean default false)
 	returns TABLE
 					(
 						___token_id         bigint,
@@ -180,8 +180,8 @@ begin
 
 	perform
 		add_journal_msg_jsonb(_modified_by, _user_id
-			, format('User: %s validated a token: (type: %s, uid: %s) for user: %s'
-														, _modified_by, __last_item.token_type_code, __last_item.uid, __target_username)
+			, format('Token: (type: %s, uid: %s) for user: (upn: %s) validated by: %s'
+														, __last_item.token_type_code, __last_item.uid, __target_username, _modified_by)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username
 														, 'ip_address', _ip_address
@@ -279,7 +279,7 @@ begin
 
 	perform
 		add_journal_msg_jsonb(_modified_by, _user_id
-			, format('Token: (type: %s, uid: %s) set as used for user: %s'
+			, format('Token: (type: %s, uid: %s) for user: (upn: %s) set as used'
 														, __last_item.token_type_code, __last_item.uid, __target_username)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username
@@ -308,7 +308,7 @@ $$;
 alter table auth.user_info
 	add column last_selected_tenant_id integer references auth.tenant (tenant_id) on delete set null;
 
-create function auth.update_user_last_selected_tenant(_user_id bigint, _target_user_id bigint, _selected_tenant_id integer)
+create or replace function auth.update_user_last_selected_tenant(_user_id bigint, _target_user_id bigint, _selected_tenant_id integer)
 	returns table
 					(
 						__used_id   bigint,
@@ -319,11 +319,23 @@ as
 $$
 declare
 	__necessary_permission_code text := 'users.update_last_selected_tenant';
+	__user_upn                  text;
+	__target_user_upn           text;
 begin
 
 	if _user_id <> _target_user_id and not auth.has_permission(_user_id, __necessary_permission_code) then
 		perform auth.throw_no_permission(_user_id, __necessary_permission_code);
 	end if;
+
+	select username
+	from auth.user_info
+	where user_id = _user_id
+	into __user_upn;
+
+	select username
+	from auth.user_info
+	where user_id = _target_user_id
+	into __target_user_upn;
 
 	return query
 		update auth.user_info
@@ -335,10 +347,12 @@ begin
 	if _user_id <> _target_user_id and _user_id <> 1 then
 		perform
 			add_journal_msg_jsonb('system', _user_id
-				, format('User: (id: %s) updated last selected tenant for user: %s'
-															, _user_id, _target_user_id)
-				, 'user', _target_user_id
-				, jsonb_build_object('tenant_id', _selected_tenant_id)
+				, format('User''s (upn: %s) last selected tenant updated by: %s'
+															, __target_user_upn, __user_upn)
+				, 'user'
+				, _target_user_id
+				, _data_object_code := __target_user_upn
+				, _payload := jsonb_build_object('tenant_id', _selected_tenant_id)
 				, _event_id := 50138
 				, _tenant_id := 1);
 	end if;
@@ -415,7 +429,7 @@ where true;
 
 alter table auth.user_identity
 	alter column provider_oid set not null,
-	add constraint uq_user_identity_provider_oid UNIQUE (provider_oid);
+	add constraint uq_user_identity_provider_oid unique (provider_oid);
 
 
 -- added _provider_oid parameter and fixed journal message payload
@@ -424,14 +438,14 @@ drop function unsecure.create_user_identity(_created_by text, _user_id bigint, _
 																						_provider_uid text, _password_hash text,
 																						_user_data text, _password_salt text,
 																						_is_active boolean);
-create function unsecure.create_user_identity(_created_by text, _user_id bigint, _target_user_id bigint,
+create or replace function unsecure.create_user_identity(_created_by text, _user_id bigint, _target_user_id bigint,
 																							_provider_code text,
 																							_provider_uid text,
 																							_provider_oid text,
-																							_password_hash text DEFAULT NULL::text,
-																							_user_data text DEFAULT NULL::text,
-																							_password_salt text DEFAULT NULL::text,
-																							_is_active boolean DEFAULT false)
+																							_password_hash text default null::text,
+																							_user_data text default null::text,
+																							_password_salt text default null::text,
+																							_is_active boolean default false)
 	returns TABLE
 					(
 						__user_id       bigint,
@@ -442,7 +456,14 @@ create function unsecure.create_user_identity(_created_by text, _user_id bigint,
 	language plpgsql
 as
 $$
+declare
+	__user_info auth.user_info;
 begin
+
+	select *
+	from auth.user_info
+	where user_id = _target_user_id
+	into __user_info;
 
 	return query insert into auth.user_identity (created_by, modified_by, user_id, provider_code, uid, provider_oid,
 																							 user_data, password_hash, password_salt, is_active)
@@ -453,17 +474,19 @@ begin
 
 	perform
 		add_journal_msg_jsonb('system', _user_id
-			, format('User: (id: %s) added new user identity to user: %s'
-														, _user_id, _target_user_id)
-			, 'user', _target_user_id
-			, jsonb_build_object('provider_code', _provider_code, 'provider_uid', _provider_uid, 'provider_oid',
-													 _provider_oid, 'is_active', _is_active)
+			, format('User identity for user: (upn: %s) created by user: %s'
+														, __user_info.username, _target_user_id)
+			, 'user'
+			, _target_user_id
+			, _data_object_code := __user_info.username
+			, _payload := jsonb_build_object('provider_code', _provider_code, 'provider_uid', _provider_uid, 'provider_oid',
+																			 _provider_oid, 'is_active', _is_active)
 			, _event_id := 50134
 			, _tenant_id := 1);
 end;
 $$;
 
-create or replace function unsecure.update_user_identity_oid(_created_by text, _user_id bigint, _target_user_id bigint,
+create or replace function unsecure.update_user_identity_oid(_updated_by text, _user_id bigint, _target_user_id bigint,
 																														 _provider_oid text)
 	returns void
 	language plpgsql
@@ -471,12 +494,18 @@ as
 $$
 declare
 	__current_oid text;
+	__user_info   auth.user_info;
 begin
 
 	select provider_oid
 	from auth.user_identity uid
 	where uid.user_id = _target_user_id
 	into __current_oid;
+
+	select *
+	from auth.user_info
+	where user_id = _target_user_id
+	into __user_info;
 
 	if __current_oid <> _provider_oid then
 
@@ -485,9 +514,9 @@ begin
 		where user_id = _target_user_id;
 
 		perform
-			add_journal_msg_jsonb('system', _user_id
-				, format('User: (id: %s) updated user identity oid from: %s to: %s for user: %s'
-															, _user_id, __current_oid, _provider_oid, _target_user_id)
+			add_journal_msg_jsonb(_updated_by, _user_id
+				, format('User identity for user: (upn: %s) updated by user: %s'
+															, __user_info.username, _updated_by)
 				, 'user', _target_user_id
 				, jsonb_build_object('provider_oid', _provider_oid)
 				, _event_id := 50137
@@ -504,8 +533,8 @@ drop function auth.ensure_user_from_provider(_created_by text, _user_id bigint, 
 create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _provider_code text,
 																													_provider_uid text, _provider_oid text, _username text,
 																													_display_name text,
-																													_email text DEFAULT NULL::text,
-																													_user_data jsonb DEFAULT NULL::jsonb)
+																													_email text default null::text,
+																													_user_data jsonb default null::jsonb)
 	returns TABLE
 					(
 						__user_id      bigint,
@@ -620,16 +649,16 @@ create index if not exists ix_journal_message
 
 
 create or replace function public.search_journal_msgs(_user_id bigint, _search_text text,
-																											_from timestamp with time zone DEFAULT NULL::timestamp with time zone,
-																											_to timestamp with time zone DEFAULT NULL::timestamp with time zone,
-																											_target_user_id integer DEFAULT 1,
-																											_event_id integer DEFAULT NULL::integer,
-																											_data_group text DEFAULT NULL::text,
-																											_data_object_id bigint DEFAULT NULL::bigint,
-																											_data_object_code text DEFAULT NULL::text,
-																											_payload_criteria jsonb DEFAULT NULL::jsonb,
-																											_page integer DEFAULT 1, _page_size integer DEFAULT 10,
-																											_tenant_id integer DEFAULT 1)
+																											_from timestamp with time zone default null::timestamp with time zone,
+																											_to timestamp with time zone default null::timestamp with time zone,
+																											_target_user_id integer default 1,
+																											_event_id integer default null::integer,
+																											_data_group text default null::text,
+																											_data_object_id bigint default null::bigint,
+																											_data_object_code text default null::text,
+																											_payload_criteria jsonb default null::jsonb,
+																											_page integer default 1, _page_size integer default 10,
+																											_tenant_id integer default 1)
 	returns TABLE
 					(
 						__created          timestamp with time zone,
