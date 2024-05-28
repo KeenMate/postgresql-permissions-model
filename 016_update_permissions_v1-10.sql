@@ -269,7 +269,8 @@ begin
 																				 and expiration_date > now()) then
 
 		return query
-			select upc.groups
+			select _tenant_id
+					 , upc.groups
 					 , upc.permissions
 			from auth.user_permission_cache upc
 			where upc.tenant_id = _tenant_id
@@ -377,7 +378,9 @@ begin
 -- 		end if;
 
 		return query
-			select tenant_id, group_codes, permission_codes
+			select tenant_id
+			     , group_codes
+			     , permission_codes
 			from __temp_users_groups_permissions
 			order by tenant_id;
 	end if;
