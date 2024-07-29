@@ -5,10 +5,110 @@
 
  */
 
+
+select *
+from check_version('1.9', _component := 'keen_auth_permissions', _throw_err := true);
+
 select *
 from start_version_update('1.10',
-                          'Update of user_info table to have user_preferences instead of having them in user_data',
+                          'Update of user_info table to have user_preferences instead of having them in user_data. Also few minor fixes of unrelated stuff',
                           _component := 'keen_auth_permissions');
+
+
+/***
+ *    ███████╗██╗██╗  ██╗███████╗███████╗
+ *    ██╔════╝██║╚██╗██╔╝██╔════╝██╔════╝
+ *    █████╗  ██║ ╚███╔╝ █████╗  ███████╗
+ *    ██╔══╝  ██║ ██╔██╗ ██╔══╝  ╚════██║
+ *    ██║     ██║██╔╝ ██╗███████╗███████║
+ *    ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝
+ *
+ */
+
+drop function if exists public.search_journal_msgs(integer, text, timestamp with time zone, timestamp with time zone,
+                                                   integer, integer,
+                                                   text, bigint, text, jsonb, integer, integer, integer);
+
+drop function if exists public.search_journal_msgs(bigint, text, timestamp with time zone, timestamp with time zone,
+                                                   integer, integer,
+                                                   text, bigint, text, jsonb, integer, integer, integer);
+
+create or replace function public.search_journal_msgs(_user_id bigint, _search_text text,
+                                                      _from timestamp with time zone DEFAULT NULL::timestamp with time zone,
+                                                      _to timestamp with time zone DEFAULT NULL::timestamp with time zone,
+                                                      _target_user_id integer DEFAULT null,
+                                                      _event_id integer DEFAULT NULL::integer,
+                                                      _data_group text DEFAULT NULL::text,
+                                                      _data_object_id bigint DEFAULT NULL::bigint,
+                                                      _data_object_code text DEFAULT NULL::text,
+                                                      _payload_criteria jsonb DEFAULT NULL::jsonb,
+                                                      _page integer DEFAULT 1, _page_size integer DEFAULT 10,
+                                                      _tenant_id integer DEFAULT 1)
+    returns TABLE
+            (
+                __created          timestamp with time zone,
+                __created_by       text,
+                __journal_id       bigint,
+                __event_id         integer,
+                __data_group       text,
+                __data_object_id   bigint,
+                __data_object_code text,
+                __user_id          bigint,
+                __msg              text,
+                __total_items      bigint
+            )
+    stable
+    language plpgsql
+as
+$$
+declare
+    __can_read_global_journal bool;
+begin
+    __can_read_global_journal = auth.has_permission(_user_id, 'journal.read_global_journal', _throw_err := false);
+
+    if (_tenant_id = 1) then
+        if not __can_read_global_journal then
+            perform auth.throw_no_permission(_user_id, 'journal.read_global_journal');
+        end if;
+    else
+        perform
+            auth.has_permission(_user_id, 'journal.read_journal', _tenant_id);
+    end if;
+
+    _search_text := helpers.normalize_text(_search_text);
+
+    return query
+        with filtered_rows
+                 as (select journal_id
+                          , count(1) over () as total_items
+                     from journal
+                     where (helpers.is_empty_string(_search_text) or
+                            journal.nrm_search_data like '%' || _search_text || '%')
+                       and ((_tenant_id = 1 and __can_read_global_journal) or tenant_id = _tenant_id)
+                       and (_target_user_id is null or user_id = _target_user_id)
+                       and (_event_id is null or event_id = _event_id)
+                       and (_data_group is null or data_group = _data_group)
+                       and (_data_object_id is null or data_object_id = _data_object_id)
+                       and (_data_object_code is null or data_object_code = _data_object_code)
+                       and (_payload_criteria is null or data_payload @> _payload_criteria)
+                       and created between coalesce(_from, now() - interval '100 years') and coalesce(_to, now() + interval '100 years')
+                     order by created desc
+                     offset ((_page - 1) * _page_size) limit _page_size)
+        select created
+             , created_by
+             , fr.journal_id
+             , event_id
+             , data_group
+             , data_object_id
+             , data_object_code
+             , user_id
+             , message
+             , fr.total_items
+        from filtered_rows fr
+                 inner join journal j on fr.journal_id = j.journal_id
+        order by created desc;
+end;
+$$;
 
 
 /***
@@ -23,22 +123,22 @@ from start_version_update('1.10',
 
 
 alter table auth.user_info
-	add column user_preferences jsonb default '{}' not null;
+    add column user_preferences jsonb default '{}' not null;
 
 alter table auth.perm_set
-	drop constraint perm_set_code_key;
+    drop constraint perm_set_code_key;
 alter table auth.perm_set
-	add unique (code, tenant_id);
+    add unique (code, tenant_id);
 
 alter table auth.tenant
-	add column is_default bool default false not null;
+    add column is_default bool default false not null;
 
 create table auth.user_tenant_preference
 (
-	tenant_user_preference_id bigint generated always as identity not null primary key,
-	user_id                   bigint                              not null references auth.user_info (user_id) on delete cascade,
-	tenant_id                 bigint                              not null references auth.tenant (tenant_id) on delete cascade,
-	user_preferences          jsonb default '{}'                  not null
+    tenant_user_preference_id bigint generated always as identity not null primary key,
+    user_id                   bigint                              not null references auth.user_info (user_id) on delete cascade,
+    tenant_id                 bigint                              not null references auth.tenant (tenant_id) on delete cascade,
+    user_preferences          jsonb default '{}'                  not null
 ) inherits (_template_timestamps);
 
 create unique index uq_user_tenant_preference on auth.user_tenant_preference (user_id, tenant_id);
@@ -54,41 +154,335 @@ create index ix_user_tenant_preference on auth.user_tenant_preference (user_id, 
  *
  */
 
-drop function auth.get_user_available_tenants(bigint, bigint, text);
-
--- missing schema for `permission` table
-create or replace function auth.get_user_available_tenants(_user_id bigint, _target_user_id bigint)
-	returns table
-					(
-						__tenant_id         integer,
-						__tenant_uuid       text,
-						__tenant_code       text,
-						__tenant_title      text,
-						__tenant_is_default bool
-					)
-	language plpgsql
+drop function auth.create_tenant(
+    _created_by text
+, _user_id bigint
+, _title text
+, _code text
+, _is_removable bool
+, _is_assignable bool
+, _tenant_owner_id bigint);
+create or replace function auth.create_tenant(
+    _created_by text
+, _user_id bigint
+, _title text
+, _code text default null
+, _is_removable bool default true
+, _is_assignable bool default true
+, _tenant_owner_id bigint default null)
+    returns table
+            (
+                __tenant_id        integer,
+                __uuid             uuid,
+                __title            text,
+                __code             text,
+                __is_removable     boolean,
+                __is_assignable    boolean,
+                __access_type_code text,
+                __is_default       boolean
+            )
+    language plpgsql
+    rows 1
 as
 $$
 declare
-	__necessary_permission_code text := 'users.get_available_tenants';
+    __last_item              auth.tenant;
+    __tenant_owner_group_id  int;
+    __tenant_member_group_id int;
 begin
+    perform
+        auth.has_permission(_user_id, 'tenants.create_tenant');
 
-	if _user_id <> _target_user_id and not auth.has_permission(_user_id, __necessary_permission_code)
-	then
-		perform auth.throw_no_permission(_user_id, __necessary_permission_code);
-	end if;
+    insert into auth.tenant (created_by, modified_by, title, code, is_removable, is_assignable)
+    values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
+    returning * into __last_item;
 
-	return query
-		with member_of_tenants as (select tenant_id, group_id
-															 from auth.user_group_member ugm
-																			inner join auth.user_group ug on ug.user_group_id = ugm.group_id
-															 where ugm.user_id = _target_user_id)
-		select mt.tenant_id, t.uuid::text, t.code, t.title, t.is_default
-		from member_of_tenants mt
-					 inner join auth.tenant t on mt.tenant_id = t.tenant_id
-		order by t.title;
+    perform
+        add_journal_msg_jsonb(_created_by, _user_id
+            , format('Tenant: (code: %s, title: %s) created by: %s'
+                                  , __last_item.code, __last_item.title, _created_by)
+            , 'tenant'
+            , __last_item.tenant_id
+            , _data_object_code := __last_item.code
+            , _payload := jsonb_build_object(
+                'title', _title
+            , 'is_assignable', _is_assignable
+            , 'is_removable', _is_removable
+            )
+            , _event_id := 50001
+            , _tenant_id := 1);
+
+    select __user_group_id
+    from unsecure.create_user_group(_created_by, _user_id, 'Tenant Admins'
+        , true, true, false, true, _tenant_id := __last_item.tenant_id)
+    into __tenant_owner_group_id;
+
+    perform unsecure.assign_permission(_created_by, _user_id
+        , __tenant_owner_group_id, null, 'tenant_admin', _tenant_id := __last_item.tenant_id);
+
+    select __user_group_id
+    from unsecure.create_user_group(_created_by, _user_id, 'Tenant Members'
+        , true, true, false, true, _tenant_id := __last_item.tenant_id)
+    into __tenant_member_group_id;
+
+    perform unsecure.assign_permission(_created_by, _user_id
+        , __tenant_member_group_id, null, 'tenant_member', _tenant_id := __last_item.tenant_id);
+
+    if
+        (_tenant_owner_id is not null)
+    then
+        perform auth.create_owner(_created_by, _user_id, _tenant_owner_id, null, _tenant_id := __last_item.tenant_id);
+    end if;
+
+    return query
+        select tenant_id
+             , uuid
+             , title
+             , code
+             , is_removable
+             , is_assignable
+             , access_type_code
+             , is_default
+        from auth.tenant
+        where tenant_id = __last_item.tenant_id;
 end;
 $$;
+
+create or replace function auth.update_tenant(
+    _created_by text
+, _user_id bigint
+, _title text
+, _code text default null
+, _is_removable bool default true
+, _is_assignable bool default true
+, _tenant_owner_id bigint default null)
+    returns table
+            (
+                __tenant_id        integer,
+                __uuid             uuid,
+                __title            text,
+                __code             text,
+                __is_removable     boolean,
+                __is_assignable    boolean,
+                __access_type_code text,
+                __is_default       boolean
+            )
+    language plpgsql
+    rows 1
+as
+$$
+declare
+    __last_item              auth.tenant;
+    __tenant_owner_group_id  int;
+    __tenant_member_group_id int;
+begin
+    perform
+        auth.has_permission(_user_id, 'tenants.create_tenant');
+
+    insert into auth.tenant (created_by, modified_by, title, code, is_removable, is_assignable)
+    values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
+    returning * into __last_item;
+
+    perform
+        add_journal_msg_jsonb(_created_by, _user_id
+            , format('Tenant: (code: %s, title: %s) created by: %s'
+                                  , __last_item.code, __last_item.title, _created_by)
+            , 'tenant'
+            , __last_item.tenant_id
+            , _data_object_code := __last_item.code
+            , _payload := jsonb_build_object(
+                'title', _title
+            , 'is_assignable', _is_assignable
+            , 'is_removable', _is_removable
+            )
+            , _event_id := 50001
+            , _tenant_id := 1);
+
+    select __user_group_id
+    from unsecure.create_user_group(_created_by, _user_id, 'Tenant Admins'
+        , true, true, false, true, _tenant_id := __last_item.tenant_id)
+    into __tenant_owner_group_id;
+
+    perform unsecure.assign_permission(_created_by, _user_id
+        , __tenant_owner_group_id, null, 'tenant_admin', _tenant_id := __last_item.tenant_id);
+
+    select __user_group_id
+    from unsecure.create_user_group(_created_by, _user_id, 'Tenant Members'
+        , true, true, false, true, _tenant_id := __last_item.tenant_id)
+    into __tenant_member_group_id;
+
+    perform unsecure.assign_permission(_created_by, _user_id
+        , __tenant_member_group_id, null, 'tenant_member', _tenant_id := __last_item.tenant_id);
+
+    if
+        (_tenant_owner_id is not null)
+    then
+        perform auth.create_owner(_created_by, _user_id, _tenant_owner_id, null, _tenant_id := __last_item.tenant_id);
+    end if;
+
+    return query
+        select created
+             , created_by
+             , modified
+             , modified_by
+             , tenant_id
+             , uuid
+             , title
+             , code
+             , is_removable
+             , is_assignable
+             , access_type_code
+             , is_default
+        from auth.tenant
+        where tenant_id = __last_item.tenant_id;
+end;
+$$;
+
+
+create function unsecure.delete_tenant(
+    _deleted_by text
+, _user_id bigint
+, _tenant_id int)
+    returns table
+            (
+                __tenant_id integer,
+                __uuid      uuid,
+                __code      text
+            )
+    language plpgsql
+as
+$$
+declare
+    __last_item auth.tenant;
+begin
+
+    delete
+    from auth.tenant
+    where tenant_id = _tenant_id
+    returning * into __last_item;
+
+    perform
+        add_journal_msg_jsonb(_deleted_by, _user_id
+            , format('Tenant: (code: %s, title: %s) deleted by: %s'
+                                  , __last_item.code, __last_item.title, _deleted_by)
+            , 'tenant'
+            , __last_item.tenant_id
+            , _data_object_code := __last_item.code
+            , _event_id := 50003
+            , _tenant_id := 1);
+
+
+    return query
+        select __last_item.tenant_id
+             , __last_item.uuid
+             , __last_item.code;
+end;
+$$;
+
+create or replace function auth.delete_tenant(
+    _deleted_by text
+, _user_id bigint
+, _tenant_uuid uuid)
+    returns table
+            (
+                __tenant_id integer,
+                __uuid      uuid,
+                __code      text
+            )
+    language plpgsql
+    rows 1
+as
+$$
+begin
+    perform
+        auth.has_permission(_user_id, 'tenants.delete_tenant');
+
+    return query
+        select *
+        from auth.tenant t
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, t.tenant_id)
+        where t.uuid = _tenant_uuid;
+end;
+$$;
+
+create or replace function auth.delete_tenant_by_uuid(
+    _deleted_by text
+, _user_id bigint
+, _tenant_uuid uuid)
+    returns table
+            (
+                __tenant_id integer,
+                __uuid      uuid,
+                __code      text
+            )
+    language plpgsql
+    rows 1
+as
+$$
+begin
+    perform
+        auth.has_permission(_user_id, 'tenants.delete_tenant');
+
+    return query
+        select *
+        from auth.tenant t
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, t.tenant_id)
+        where t.uuid = _tenant_uuid;
+end;
+$$;
+
+drop function auth.get_user_available_tenants(
+    bigint
+, bigint
+, text);
+
+-- missing schema for `permission` table
+create or replace function auth.get_user_available_tenants(
+    _user_id bigint
+, _target_user_id bigint)
+    returns table
+            (
+                __tenant_id         integer,
+                __tenant_uuid       text,
+                __tenant_code       text,
+                __tenant_title      text,
+                __tenant_is_default bool
+            )
+    language plpgsql
+as
+$$
+declare
+    __necessary_permission_code text := 'users.get_available_tenants';
+begin
+
+    if _user_id <> _target_user_id and not auth.has_permission(_user_id, __necessary_permission_code)
+    then
+        perform auth.throw_no_permission(_user_id, __necessary_permission_code);
+    end if;
+
+    return query
+        with member_of_tenants as (
+            select tenant_id
+                 , group_id
+            from auth.user_group_member ugm
+                     inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+            where ugm.user_id = _target_user_id)
+        select distinct mt.tenant_id
+             , t.uuid::text
+             , t.code
+             , t.title
+             , t.is_default
+        from member_of_tenants mt
+                 inner join auth.tenant t on mt.tenant_id = t.tenant_id
+        order by t.title;
+end;
+$$;
+
+create unique index uq_tenant_uuid on auth.tenant (uuid);
+
+truncate table auth.user_permission_cache;
+alter table auth.user_permission_cache
+    add column tenant_uuid uuid references auth.tenant (uuid) not null;
 
 create unique index uq_user_permission_cache on auth.user_permission_cache (user_id, tenant_id);
 create index ix_user_permission_cache on auth.user_permission_cache (user_id, tenant_id);
@@ -136,329 +530,572 @@ create index ix_user_permission_cache on auth.user_permission_cache (user_id, te
 -- $$;
 
 drop function unsecure.recalculate_user_groups(
-	_created_by text
+    _created_by text
 , _target_user_id bigint
 , _provider_code text);
 
 create or replace function unsecure.recalculate_user_groups(
-	_created_by text
+    _created_by text
 , _target_user_id bigint
 , _provider_code text)
-	returns TABLE
-					(
-						__tenant_id       integer,
-						__user_group_id   integer,
-						__user_group_code text
-					)
-	language plpgsql
+    returns TABLE
+            (
+                __tenant_id       integer,
+                __user_group_id   integer,
+                __user_group_code text
+            )
+    language plpgsql
 as
 $$
 declare
-	__not_really_used int;
-	__provider_groups text[];
-	__provider_roles  text[];
+    __not_really_used int;
+    __provider_groups text[];
+    __provider_roles  text[];
 begin
 
-	select provider_groups
-			 , provider_roles
-	from auth.user_identity
-	where provider_code = _provider_code
-		and user_id = _target_user_id
-	into __provider_groups, __provider_roles;
+    select provider_groups
+         , provider_roles
+    from auth.user_identity
+    where provider_code = _provider_code
+      and user_id = _target_user_id
+    into __provider_groups, __provider_roles;
 
-	-- cleanup membership of groups user is no longer part of
-	with affected_deleted_group_tenants as (
-		delete
-			from auth.user_group_member
-				where user_id = _target_user_id
-					and mapping_id is not null
-					and group_id not in (select distinct ugm.group_id
-															 from unnest(__provider_groups) g
-																			inner join auth.user_group_mapping ugm
-																								 on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
-																			inner join auth.user_group u
-																								 on u.user_group_id = ugm.group_id
-															 union
-															 select distinct ugm.group_id
-															 from unnest(__provider_roles) r
-																			inner join auth.user_group_mapping ugm
-																								 on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
-																			inner join auth.user_group u
-																								 on u.user_group_id = ugm.group_id)
-				returning group_id)
-		 , affected_group_tenants as (
-		insert
-			into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
-				select distinct _created_by
-											, _target_user_id
-											, ugm.group_id
-											, ugm.ug_mapping_id
-											, 'adhoc'
-				from unnest(__provider_groups) g
-							 inner join auth.user_group_mapping ugm
-													on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
-				where ugm.group_id not in (select group_id
-																	 from auth.user_group_member
-																	 where user_id = _target_user_id)
-				returning group_id)
-		 , affected_role_tenants as (
-		insert
-			into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
-				select distinct _created_by
-											, _target_user_id
-											, ugm.group_id
-											, ugm.ug_mapping_id
-											, 'adhoc'
-				from unnest(__provider_roles) r
-							 inner join auth.user_group_mapping ugm
-													on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
-				where ugm.group_id not in (select group_id
-																	 from auth.user_group_member
-																	 where user_id = _target_user_id)
-				returning group_id)
-		 , all_group_ids as (select group_id
-												 from affected_deleted_group_tenants
-												 union
-												 select group_id
-												 from affected_group_tenants
-												 union
-												 select group_id
-												 from affected_role_tenants)
-		 , all_tenants as (select tenant_id
-											 from all_group_ids ids
-															inner join auth.user_group ug
-																				 on ids.group_id = ug.user_group_id
-											 group by tenant_id)
-	-- variable not really used, it's there just to avoid 'query has no destination for result data'
-	select at.tenant_id
-	from all_tenants at
-		 , lateral unsecure.clear_permission_cache(_created_by, _target_user_id, at.tenant_id) r
-	into __not_really_used;
+    -- cleanup membership of groups user is no longer part of
+    with affected_deleted_group_tenants as (
+        delete
+            from auth.user_group_member
+                where user_id = _target_user_id
+                    and mapping_id is not null
+                    and group_id not in (
+                        select distinct ugm.group_id
+                        from unnest(__provider_groups) g
+                                 inner join auth.user_group_mapping ugm
+                                            on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
+                                 inner join auth.user_group u
+                                            on u.user_group_id = ugm.group_id
+                        union
+                        select distinct ugm.group_id
+                        from unnest(__provider_roles) r
+                                 inner join auth.user_group_mapping ugm
+                                            on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
+                                 inner join auth.user_group u
+                                            on u.user_group_id = ugm.group_id)
+                returning group_id)
+       , affected_group_tenants as (
+        insert
+            into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
+                select distinct _created_by
+                              , _target_user_id
+                              , ugm.group_id
+                              , ugm.ug_mapping_id
+                              , 'adhoc'
+                from unnest(__provider_groups) g
+                         inner join auth.user_group_mapping ugm
+                                    on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
+                where ugm.group_id not in (
+                    select group_id
+                    from auth.user_group_member
+                    where user_id = _target_user_id)
+                returning group_id)
+       , affected_role_tenants as (
+        insert
+            into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
+                select distinct _created_by
+                              , _target_user_id
+                              , ugm.group_id
+                              , ugm.ug_mapping_id
+                              , 'adhoc'
+                from unnest(__provider_roles) r
+                         inner join auth.user_group_mapping ugm
+                                    on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
+                where ugm.group_id not in (
+                    select group_id
+                    from auth.user_group_member
+                    where user_id = _target_user_id)
+                returning group_id)
+       , all_group_ids as (
+        select group_id
+        from affected_deleted_group_tenants
+        union
+        select group_id
+        from affected_group_tenants
+        union
+        select group_id
+        from affected_role_tenants)
+       , all_tenants as (
+        select tenant_id
+        from all_group_ids ids
+                 inner join auth.user_group ug
+                            on ids.group_id = ug.user_group_id
+        group by tenant_id)
+       -- variable not really used, it's there just to avoid 'query has no destination for result data'
+    select at.tenant_id
+    from all_tenants at
+       , lateral unsecure.clear_permission_cache(_created_by, _target_user_id, at.tenant_id) r
+    into __not_really_used;
 
-	return query
-		select distinct ug.tenant_id
-									, ug.user_group_id
-									, ug.code
-		from auth.user_group_member ugm
-					 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
-		where ugm.user_id = _target_user_id;
+    return query
+        select distinct ug.tenant_id
+                      , ug.user_group_id
+                      , ug.code
+        from auth.user_group_member ugm
+                 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+        where ugm.user_id = _target_user_id;
 end;
 $$;
 
-drop function unsecure.recalculate_user_permissions(_created_by text, _target_user_id bigint, _tenant_id int);
 
-create or replace function unsecure.recalculate_user_permissions(_created_by text, _target_user_id bigint, _tenant_id int default null)
-	returns table
-					(
-						__tenant_id   integer,
-						__groups      text[],
-						__permissions text[]
-					)
-	language plpgsql
+-- from now on, user always have to have permissions for given tenant, and no permission sharing is possible
+create or replace function auth.has_permissions(
+    _target_user_id bigint
+, _perm_codes text[]
+, _tenant_id integer default 1
+, _throw_err boolean default true) returns boolean
+    stable
+    language plpgsql
 as
 $$
 declare
-	__perm_cache_timeout_in_s bigint;
-	__expiration_date         timestamptz;
+    __perms                   text[];
+    __expiration_date         timestamptz;
+    __last_used_provider_code text;
 begin
 
-	if _tenant_id is not null and exists(select
-																			 from auth.user_permission_cache
-																			 where tenant_id = _tenant_id
-																				 and user_id = _target_user_id
-																				 and expiration_date > now()) then
+    if (_target_user_id = 1)
+    then
+        return true;
+    end if;
 
-		return query
-			select _tenant_id
-					 , upc.groups
-					 , upc.permissions
-			from auth.user_permission_cache upc
-			where upc.tenant_id = _tenant_id
-				and upc.user_id = _target_user_id;
-	else
-		select number_value
-		from const.sys_param sp
-		where sp.group_code = 'auth'
-			and sp.code = 'perm_cache_timeout_in_s'
-		into __perm_cache_timeout_in_s;
+    -- NOT REALLY SAFE FOR SOME INTERNAL/SYSTEM PERMISSIONS
+    if (auth.is_owner(_target_user_id, null, _tenant_id))
+    then
+        return true;
+    end if;
 
-		if
-			(__perm_cache_timeout_in_s is null) then
-			__perm_cache_timeout_in_s := 300;
-		end if;
+    select permissions
+         , expiration_date
+    from auth.user_permission_cache upc
+    where upc.tenant_id = _tenant_id -- this was originally, either _tenant_id or 1, but from now on it's just _tenant_id
+      and user_id = _target_user_id
+    into __perms, __expiration_date;
 
-		create temporary table __temp_users_groups_permissions
-		(
-			tenant_id        integer,
-			group_codes      text[],
-			permission_codes text[]
-		) on commit drop;
 
-		with ugs as (select tenant_id, user_group_id, group_code
-								 from auth.user_group_members ugm
-								 where user_id = _target_user_id)
-			 , group_assignments as (select distinct pa.tenant_id, ep.permission_code as full_code
-															 from ugs ug
-																			inner join auth.permission_assignment pa
-																								 on ug.user_group_id = pa.group_id
-																			inner join auth.effective_permissions ep on pa.perm_set_id = ep.perm_set_id
-															 where ep.perm_set_is_assignable = true
-																 and ep.permission_is_assignable = true
-															 union
-															 select distinct pa.tenant_id, sp.full_code
-															 from ugs ug
-																			inner join auth.permission_assignment pa
-																								 on ug.user_group_id = pa.group_id
-																			inner join auth.permission p on pa.permission_id = p.permission_id
-																			inner join auth.permission sp
-																								 on sp.node_path <@ p.node_path and sp.is_assignable = true)
-			 , user_assignments as (select distinct pa.tenant_id, ep.permission_code as full_code
-															from auth.permission_assignment pa
-																		 inner join auth.effective_permissions ep
-																								on pa.perm_set_id = ep.perm_set_id
-															where pa.user_id = _target_user_id
-																and ep.perm_set_is_assignable = true
-																and ep.permission_is_assignable = true
-															union
-															select distinct pa.tenant_id, sp.full_code
-															from auth.permission_assignment pa
-																		 inner join auth.permission p
-																								on pa.permission_id = p.permission_id
-																		 inner join auth.permission sp
-																								on sp.node_path <@ p.node_path and sp.is_assignable = true
-															where pa.user_id = _target_user_id)
-			 , user_permissions as (select distinct tenant_id, full_code
-															from group_assignments
-															union
-															select tenant_id, full_code
-															from user_assignments
-															order by full_code)
-		insert
-		into __temp_users_groups_permissions(tenant_id, group_codes, permission_codes)
-		select tenant_id,
-					 coalesce(array_agg(distinct groups) filter ( where groups is not null ), array []::text[]),
-					 coalesce(array_agg(distinct perms) filter ( where perms is not null ), array []::text[])
-		from (select tenant_id
-							 , ugs.group_code as groups
-							 , null           as perms
-					from ugs
-					union
-					select tenant_id
-							 , null
-							 , user_permissions.full_code::text
-					from user_permissions) data
-		group by tenant_id;
+    if __expiration_date is null or __expiration_date <= now()
+    then
+        if not exists(
+                select
+                from auth.user_info ui
+                where ui.user_id = _target_user_id)
+        then
+            perform error.raise_52103(_target_user_id);
+        end if;
 
-		__expiration_date := now() + interval '1 second' * __perm_cache_timeout_in_s;
+        select last_used_provider_code
+        from auth.user_info
+        where user_id = _target_user_id
+        into __last_used_provider_code;
 
-		insert into auth.user_permission_cache (created_by, user_id, tenant_id, groups, permissions, expiration_date)
-		select _created_by, _target_user_id, tenant_id, group_codes, permission_codes, __expiration_date
-		from __temp_users_groups_permissions
-		on conflict (user_id, tenant_id )
-			do update
-			set modified        = now()
-				, modified_by     = _created_by
-				, groups          = excluded.groups
-				, permissions     = excluded.permissions
-				, expiration_date = __expiration_date;
+        perform unsecure.recalculate_user_groups('permission_check'
+            , _target_user_id
+            , __last_used_provider_code
+            );
 
-		-- 		if
--- 			not exists(select from auth.user_permission_cache upc where upc.user_id = _target_user_id and upc.tenant_id = ) then
--- 			insert into auth.user_permission_cache (created_by, user_id, tenant_id, groups, permissions, expiration_date)
--- 			values (_created_by, _target_user_id, _tenant_id, __gs, __ps, __expiration_date);
--- 		else
--- 			update auth.user_permission_cache upc
--- 			set modified        = now()
--- 				, modified_by     = _created_by
--- 				, groups          = __gs
--- 				, permissions     = __ps
--- 				, expiration_date = __expiration_date
--- 			where tenant_id = _tenant_id
--- 				and user_id = _target_user_id;
--- 		end if;
+        select __permissions
+        from unsecure.recalculate_user_permissions('permission_check', _target_user_id, _tenant_id)
+        into __perms;
 
-		return query
-			select tenant_id
-			     , group_codes
-			     , permission_codes
-			from __temp_users_groups_permissions
-			order by tenant_id;
-	end if;
+    end if;
+
+    if exists(
+            select
+            from unnest(__perms) p
+                     inner join unnest(_perm_codes) rp on p = rp)
+    then
+        return true;
+    end if;
+
+    if (_throw_err)
+    then
+        perform add_journal_msg('system', _target_user_id
+            , format('User: (id: %s) has no permission: %s'
+                                    , _target_user_id, array_to_string(_perm_codes, '; '))
+            , 'perm', _target_user_id
+            , _event_id := 50003
+            , _tenant_id := _tenant_id);
+
+        perform
+            auth.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
+    end if;
+
+    return false;
+end ;
+$$;
+
+
+-- recalculate permissions now returns permissions
+-- - for specific tenant if _tenant_id is not null
+-- - all tenants if it is null
+
+drop function unsecure.recalculate_user_permissions(
+    _created_by text
+, _target_user_id bigint
+, _tenant_id int);
+
+create or replace function unsecure.recalculate_user_permissions(
+    _created_by text
+, _target_user_id bigint
+, _tenant_id int default null)
+    returns table
+            (
+                __tenant_id   integer,
+                __tenant_uuid uuid,
+                __groups      text[],
+                __permissions text[]
+            )
+    language plpgsql
+as
+$$
+declare
+    __perm_cache_timeout_in_s bigint;
+    __expiration_date         timestamptz;
+begin
+
+    if _tenant_id is not null and exists(
+            select
+            from auth.user_permission_cache
+            where tenant_id = _tenant_id
+              and user_id = _target_user_id
+              and expiration_date > now())
+    then
+
+        return query
+            select _tenant_id
+                 , upc.tenant_uuid
+                 , upc.groups
+                 , upc.permissions
+            from auth.user_permission_cache upc
+            where upc.tenant_id = _tenant_id
+              and upc.user_id = _target_user_id;
+    else
+        select number_value
+        from const.sys_param sp
+        where sp.group_code = 'auth'
+          and sp.code = 'perm_cache_timeout_in_s'
+        into __perm_cache_timeout_in_s;
+
+        if
+            (__perm_cache_timeout_in_s is null)
+        then
+            __perm_cache_timeout_in_s := 300;
+        end if;
+
+        create temporary table __temp_users_groups_permissions
+        (
+            tenant_id        integer,
+            tenant_uuid      uuid,
+            group_codes      text[],
+            permission_codes text[]
+        ) on commit drop;
+
+        with ugs as (
+            select ugm.tenant_id
+                 , t.uuid as tenant_uuid
+                 , user_group_id
+                 , group_code
+            from auth.user_group_members ugm
+                     inner join auth.tenant t on t.tenant_id = ugm.tenant_id
+            where ugm.user_id = _target_user_id)
+           , group_assignments as (
+            select distinct pa.tenant_id
+                          , ug.tenant_uuid
+                          , ep.permission_code as full_code
+            from ugs ug
+                     inner join auth.permission_assignment pa
+                                on ug.user_group_id = pa.group_id
+                     inner join auth.effective_permissions ep on pa.perm_set_id = ep.perm_set_id
+            where ep.perm_set_is_assignable = true
+              and ep.permission_is_assignable = true
+            union
+            select distinct pa.tenant_id
+                          , ug.tenant_uuid
+                          , sp.full_code
+            from ugs ug
+                     inner join auth.permission_assignment pa
+                                on ug.user_group_id = pa.group_id
+                     inner join auth.permission p on pa.permission_id = p.permission_id
+                     inner join auth.permission sp
+                                on sp.node_path <@ p.node_path and sp.is_assignable = true)
+           , user_assignments as (
+            select distinct pa.tenant_id
+                          , t.uuid             as tenant_uuid
+                          , ep.permission_code as full_code
+            from auth.permission_assignment pa
+                     inner join auth.tenant t on pa.tenant_id = t.tenant_id
+                     inner join auth.effective_permissions ep
+                                on pa.perm_set_id = ep.perm_set_id
+            where pa.user_id = _target_user_id
+              and ep.perm_set_is_assignable = true
+              and ep.permission_is_assignable = true
+            union
+            select distinct pa.tenant_id
+                          , t.uuid as tenant_uuid
+                          , sp.full_code
+            from auth.permission_assignment pa
+                     inner join auth.tenant t on pa.tenant_id = t.tenant_id
+                     inner join auth.permission p
+                                on pa.permission_id = p.permission_id
+                     inner join auth.permission sp
+                                on sp.node_path <@ p.node_path and sp.is_assignable = true
+            where pa.user_id = _target_user_id)
+           , user_permissions as (
+            select distinct ga.tenant_id
+                          , ga.tenant_uuid
+                          , ga.full_code
+            from group_assignments ga
+            union
+            select ua.tenant_id
+                 , ua.tenant_uuid
+                 , ua.full_code
+            from user_assignments ua
+            order by full_code)
+        insert
+        into __temp_users_groups_permissions(tenant_id, tenant_uuid, group_codes, permission_codes)
+        select data.tenant_id
+             , data.tenant_uuid
+             , coalesce(array_agg(distinct data.groups) filter ( where data.groups is not null ), array []::text[])
+             , coalesce(array_agg(distinct data.perms) filter ( where data.perms is not null ), array []::text[])
+        from (
+                 select ug.tenant_id
+                      , ug.tenant_uuid
+                      , ug.group_code as groups
+                      , null          as perms
+                 from ugs ug
+                 union
+                 select up.tenant_id
+                      , up.tenant_uuid
+                      , null
+                      , up.full_code::text
+                 from user_permissions up) data
+        group by data.tenant_id, data.tenant_uuid;
+
+        __expiration_date := now() + interval '1 second' * __perm_cache_timeout_in_s;
+
+        insert into auth.user_permission_cache (created_by, user_id, tenant_id, tenant_uuid, groups, permissions,
+                                                expiration_date)
+        select _created_by
+             , _target_user_id
+             , tugp.tenant_id
+             , tugp.tenant_uuid
+             , tugp.group_codes
+             , tugp.permission_codes
+             , __expiration_date
+        from __temp_users_groups_permissions tugp
+        on conflict (user_id, tenant_id )
+            do update
+            set modified        = now()
+              , modified_by     = _created_by
+              , groups          = excluded.groups
+              , permissions     = excluded.permissions
+              , expiration_date = __expiration_date;
+
+        return query
+            select ugp.tenant_id
+                 , ugp.tenant_uuid
+                 , ugp.group_codes
+                 , ugp.permission_codes
+            from __temp_users_groups_permissions ugp
+            where _tenant_id is null
+               or ugp.tenant_id = _tenant_id
+            order by ugp.tenant_id;
+    end if;
 end;
 $$;
 
-drop function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _target_user_id bigint,
-																								 _provider_code text,
-																								 _provider_groups text[],
-																								 _provider_roles text[],
-																								 _tenant_id integer);
-create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _target_user_id bigint,
-																															_provider_code text,
-																															_provider_groups text[] DEFAULT NULL::text[],
-																															_provider_roles text[] DEFAULT NULL::text[])
-	returns TABLE
-					(
-						__tenant_id   integer,
-						__groups      text[],
-						__permissions text[]
-					)
-	rows 1
-	language plpgsql
+drop function auth.ensure_groups_and_permissions(
+    _created_by text
+, _user_id bigint
+, _target_user_id bigint
+, _provider_code text
+, _provider_groups text[]
+, _provider_roles text[]
+, _tenant_id integer);
+create or replace function auth.ensure_groups_and_permissions(
+    _created_by text
+, _user_id bigint
+, _target_user_id bigint
+, _provider_code text
+, _provider_groups text[] default null::text[]
+, _provider_roles text[] default null::text[])
+    returns TABLE
+            (
+                __tenant_id   integer,
+                __tenant_uuid uuid,
+                __groups      text[],
+                __permissions text[]
+            )
+    rows 1
+    language plpgsql
 as
 $$
 begin
-	perform
-		auth.has_permission(_user_id, 'authentication.ensure_permissions');
+    perform
+        auth.has_permission(_user_id, 'authentication.ensure_permissions');
 
-	update auth.user_identity
-	set modified_by     = _created_by
-		, modified        = now()
-		, provider_groups = _provider_groups
-		, provider_roles  = _provider_roles
-	where provider_code = _provider_code
-		and user_id = _target_user_id;
+    update auth.user_identity
+    set modified_by     = _created_by
+      , modified        = now()
+      , provider_groups = _provider_groups
+      , provider_roles  = _provider_roles
+    where provider_code = _provider_code
+      and user_id = _target_user_id;
 
-	create temporary table __temp_users_groups on commit drop as
-	select ug.__tenant_id       as tenant_id
-			 , ug.__user_group_id   as user_group_id
-			 , ug.__user_group_code as user_group_code
-	from unsecure.recalculate_user_groups(_created_by
-				 , _target_user_id
-				 , _provider_code
-			 ) ug;
+    create temporary table __temp_users_groups on commit drop as
+    select ug.__tenant_id       as tenant_id
+         , ug.__user_group_id   as user_group_id
+         , ug.__user_group_code as user_group_code
+    from unsecure.recalculate_user_groups(_created_by
+             , _target_user_id
+             , _provider_code
+             ) ug;
 
-	return query
-		select up.__tenant_id, up.__groups, up.__permissions
-		from unsecure.recalculate_user_permissions(_created_by
-					 , _target_user_id, null) up;
+    -- 	return query
+-- 	select null::integer,
+-- null::uuid,
+-- array []::text[],
+-- array []::text[];
+
+    return query
+        select up.__tenant_id
+             , up.__tenant_uuid
+             , up.__groups
+             , up.__permissions
+        from unsecure.recalculate_user_permissions(_created_by
+                 , _target_user_id, null) up;
 end;
 $$;
 
 
-create function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _target_user_id bigint)
-	returns TABLE
-					(
-						__tenant_id   integer,
-						__groups      text[],
-						__permissions text[]
-					)
-	rows 1
-	language plpgsql
+-- drop function auth.get_users_groups_and_permissions(
+-- 	_requested_by text
+-- , _user_id bigint
+-- , _target_user_id bigint);
+create function auth.get_users_groups_and_permissions(
+    _requested_by text
+, _user_id bigint
+, _target_user_id bigint)
+    returns TABLE
+            (
+                __tenant_id   integer,
+                __tenant_uuid uuid,
+                __groups      text[],
+                __permissions text[]
+            )
+    rows 1
+    language plpgsql
 as
 $$
 begin
-	perform
-		auth.has_permission(_user_id, 'authentication.get_users_groups_and_permissions');
+    perform
+        auth.has_permission(_user_id, 'authentication.get_users_groups_and_permissions');
 
-	return query
-		select up.__tenant_id, up.__groups, up.__permissions
-		from unsecure.recalculate_user_permissions(_requested_by
-					 , _target_user_id, null) up;
+    return query
+        select up.__tenant_id
+             , up.__tenant_uuid
+             , up.__groups
+             , up.__permissions
+        from unsecure.recalculate_user_permissions(_requested_by
+                 , _target_user_id, null) up;
 end;
 $$;
 
-alter function ensure_groups_and_permissions(text, bigint, bigint, text, text[], text[]) owner to postgres;
+drop function unsecure.get_assigned_user_permissions(
+    _requested_by text
+, _user_id bigint
+, _target_user_id integer
+, _tenant_id integer);
+create or replace function unsecure.get_user_assigned_permissions(
+    _requested_by text
+, _user_id bigint
+, _target_user_id integer
+, _tenant_id integer default 1)
+    returns TABLE
+            (
+                __permissions    jsonb,
+                __perm_set_title text,
+                __perm_set_id    integer,
+                __perm_set_code  text,
+                __assignment_id  bigint,
+                __group_id       integer
+            )
+    language plpgsql
+as
+$$
+begin
+    return query with assigments as (
+        select pa.*
+        from auth.permission_assignment pa
+                 left join auth.user_group_member ugm on pa.group_id = ugm.group_id
+        where (ugm.user_id = _target_user_id
+            or pa.user_id = _target_user_id)
+          and tenant_id = _tenant_id)
+                 select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
+                                                     p.permission_id))
+                                as permissions
+                      , ps.title
+                      , ps.perm_set_id
+                      , ps.code as perm_set_code
+                      , a.assignment_id
+                      , a.group_id
+                 from assigments a
+                          left join auth.perm_set ps on a.perm_set_id = ps.perm_set_id
+                          left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
+                          left join auth.permission p
+                                    on (coalesce(a.permission_id, psp.permission_id) = p.permission_id)
+                 group by ps.title, ps.perm_set_id, a.assignment_id, a.group_id
+                 order by ps.title nulls last;
 
+
+    perform
+        add_journal_msg(_requested_by, _user_id
+            , format('User: %s requested assigned permissions of user: %s in tenant: %s'
+                            , _requested_by, _target_user_id, _tenant_id)
+            , 'user', _target_user_id
+            , null
+            , 50211
+            , _tenant_id := _tenant_id);
+end;
+$$;
+
+drop function auth.get_assigned_user_permissions(
+    _requested_by text
+, _user_id bigint
+, _target_user_id integer
+, _tenant_id integer);
+create or replace function auth.get_user_assigned_permissions(
+    _requested_by text
+, _user_id bigint
+, _target_user_id integer
+, _tenant_id integer default 1)
+    returns TABLE
+            (
+                __permissions    jsonb,
+                __perm_set_title text,
+                __perm_set_id    integer,
+                __perm_set_code  text,
+                __assignment_id  bigint,
+                __group_id       integer
+            )
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'users.get_permissions', _tenant_id);
+
+    return query select *
+                 from unsecure.get_assigned_user_permissions(_requested_by, _user_id, _target_user_id, _tenant_id);
+
+end;
+$$;
 
 
 -- drop function auth.update_user_preferences(
@@ -467,58 +1104,58 @@ alter function ensure_groups_and_permissions(text, bigint, bigint, text, text[],
 -- , _target_user_id bigint
 -- , _update_data text);
 create or replace function auth.update_user_preferences(
-	_updated_by text
+    _updated_by text
 , _user_id bigint
 , _target_user_id bigint
 , _update_data text)
-	returns table
-	        (
-		        __modified    timestamptz,
-		        __modified_by varchar(250)
-	        )
-	language plpgsql
-	rows 1
+    returns table
+            (
+                __modified    timestamptz,
+                __modified_by varchar(250)
+            )
+    language plpgsql
+    rows 1
 as
 $$
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.update_user_data');
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.update_user_data');
+    end if;
 
-	return query
-		update auth.user_info
-			set modified = now()
-				, modified_by = _updated_by
-				, user_preferences = user_preferences || _update_data::jsonb
-			where user_id = _target_user_id
-			returning modified
-				, modified_by;
+    return query
+        update auth.user_info
+            set modified = now()
+                , modified_by = _updated_by
+                , user_preferences = user_preferences || _update_data::jsonb
+            where user_id = _target_user_id
+            returning modified
+                , modified_by;
 end;
 $$;
 
 create or replace function auth.get_user_preferences(
-	_user_id bigint
+    _user_id bigint
 , _target_user_id bigint)
-	returns table
-	        (
-		        __value text
-	        )
-	stable
-	rows 1
-	language plpgsql
+    returns table
+            (
+                __value text
+            )
+    stable
+    rows 1
+    language plpgsql
 as
 $$
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.get_data');
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.get_data');
+    end if;
 
-	return query
-		select user_preferences::text
-		from auth.user_info
-		where user_id = _target_user_id;
+    return query
+        select user_preferences::text
+        from auth.user_info
+        where user_id = _target_user_id;
 end;
 $$;
 
@@ -534,203 +1171,212 @@ $$;
  */
 
 create or replace function auth.create_user_tenant_preferences(
-	_created_by text
+    _created_by text
 , _user_id bigint
 , _target_user_id bigint
 , _update_data text
 , _tenant_id integer default 1)
-	returns table
-					(
-						__created    timestamptz,
-						__created_by varchar(250)
-					)
-	language plpgsql
-	rows 1
+    returns table
+            (
+                __created    timestamptz,
+                __created_by varchar(250)
+            )
+    language plpgsql
+    rows 1
 as
 $$
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.create_user_tenant_preferences', _tenant_id);
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.create_user_tenant_preferences', _tenant_id);
+    end if;
 
-	return query
-		insert into auth.user_tenant_preference (created_by, modified_by, user_id, tenant_id, user_preferences)
-			values (_created_by, _created_by, _user_id, _tenant_id, _update_data::jsonb)
-			returning modified
-				, modified_by;
+    return query
+        insert into auth.user_tenant_preference (created_by, modified_by, user_id, tenant_id, user_preferences)
+            values (_created_by, _created_by, _user_id, _tenant_id, _update_data::jsonb)
+            returning modified
+                , modified_by;
 end;
 $$;
 
 create or replace function auth.update_user_tenant_preferences(
-	_updated_by text
+    _updated_by text
 , _user_id bigint
 , _target_user_id bigint
 , _update_data text
 , _should_overwrite_data bool default false
 , _tenant_id integer default 1)
-	returns table
-					(
-						__modified    timestamptz,
-						__modified_by varchar(250)
-					)
-	language plpgsql
-	rows 1
+    returns table
+            (
+                __modified    timestamptz,
+                __modified_by varchar(250)
+            )
+    language plpgsql
+    rows 1
 as
 $$
 declare
-	__update_data jsonb := _update_data::jsonb;
+    __update_data jsonb := _update_data::jsonb;
 begin
 
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.update_user_tenant_preferences', _tenant_id);
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.update_user_tenant_preferences', _tenant_id);
+    end if;
 
-	return query
-		update auth.user_tenant_preference
-			set modified = now()
-				, modified_by = _updated_by
-				, user_preferences =
-							case when _should_overwrite_data then __update_data else user_preferences || __update_data end
-			where user_id = _target_user_id and tenant_id = _tenant_id
-			returning modified
-				, modified_by;
+    return query
+        update auth.user_tenant_preference
+            set modified = now()
+                , modified_by = _updated_by
+                , user_preferences =
+                    case when _should_overwrite_data then __update_data else user_preferences || __update_data end
+            where user_id = _target_user_id and tenant_id = _tenant_id
+            returning modified
+                , modified_by;
 end;
 $$;
 
 create or replace function auth.get_user_preferences(
-	_user_id bigint
+    _user_id bigint
 , _target_user_id bigint)
-	returns table
-					(
-						__value text
-					)
-	stable
-	rows 1
-	language plpgsql
+    returns table
+            (
+                __value text
+            )
+    stable
+    rows 1
+    language plpgsql
 as
 $$
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.get_data');
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.get_data');
+    end if;
 
-	return query
-		select user_preferences::text
-		from auth.user_info
-		where user_id = _target_user_id;
+    return query
+        select user_preferences::text
+        from auth.user_info
+        where user_id = _target_user_id;
 end;
 $$;
 
 
 
 create or replace function auth.get_user_last_selected_tenant(
-	_user_id bigint
+    _user_id bigint
 , _target_user_id bigint)
-	returns table
-					(
-						__tenant_id    int,
-						__tenant_uuid  text,
-						__tenant_code  text,
-						__tenant_title text
-					)
-	stable
-	rows 1
-	language plpgsql
+    returns table
+            (
+                __tenant_id    int,
+                __tenant_uuid  text,
+                __tenant_code  text,
+                __tenant_title text
+            )
+    stable
+    rows 1
+    language plpgsql
 as
 $$
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.get_data');
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.get_data');
+    end if;
 
-	return query
-		select t.tenant_id
-				 , t.uuid::text
-				 , t.code
-				 , t.title
-		from auth.user_info ui
-					 inner join auth.tenant t on ui.last_selected_tenant_id = t.tenant_id
-		where ui.user_id = _target_user_id
-			and ui.last_selected_tenant_id is not null;
+    return query
+        select t.tenant_id
+             , t.uuid::text
+             , t.code
+             , t.title
+        from auth.user_info ui
+                 inner join auth.tenant t on ui.last_selected_tenant_id = t.tenant_id
+        where ui.user_id = _target_user_id
+          and ui.last_selected_tenant_id is not null;
 end;
 $$;
 
-drop function auth.update_user_last_selected_tenant(_user_id bigint, _target_user_id bigint, _selected_tenant_id integer);
-create or replace function auth.update_user_last_selected_tenant(_updated_by text, _user_id bigint, _target_user_id bigint,
-																											_tenant_uuid text)
-	returns table
-					(
-						__used_id   bigint,
-						__tenant_id integer
-					)
-	language plpgsql
-	rows 1
+drop function auth.update_user_last_selected_tenant(
+    _user_id bigint
+, _target_user_id bigint
+, _selected_tenant_id integer);
+create or replace function auth.update_user_last_selected_tenant(
+    _updated_by text
+, _user_id bigint
+, _target_user_id bigint
+, _tenant_uuid text)
+    returns table
+            (
+                __used_id   bigint,
+                __tenant_id integer
+            )
+    language plpgsql
+    rows 1
 as
 $$
 declare
-	__tenant_id int;
+    __tenant_id int;
 begin
-	if _user_id <> _target_user_id
-	then
-		perform auth.has_permission(_user_id, 'users.update_last_selected_tenant');
-	end if;
+    if _user_id <> _target_user_id
+    then
+        perform auth.has_permission(_user_id, 'users.update_last_selected_tenant');
+    end if;
 
-	select t.tenant_id
-	from auth.tenant t
-				 inner join auth.user_group_members ugms on t.tenant_id = ugms.tenant_id
-	where t.uuid = _tenant_uuid::uuid
-		and ugms.user_id = _user_id
-	into __tenant_id;
+    select t.tenant_id
+    from auth.tenant t
+             inner join auth.user_group_members ugms on t.tenant_id = ugms.tenant_id
+    where t.uuid = _tenant_uuid::uuid
+      and ugms.user_id = _user_id
+    into __tenant_id;
 
-	if __tenant_id is null then
-		perform error.raise_52108(_tenant_uuid, _updated_by);
-	end if;
+    if __tenant_id is null
+    then
+        perform error.raise_52108(_tenant_uuid, _updated_by);
+    end if;
 
-	return query
-		update auth.user_info
-			set modified = now()
-				, modified_by = _updated_by
-				, last_selected_tenant_id = __tenant_id
-			where user_id = _target_user_id
-			returning user_id, last_selected_tenant_id;
+    return query
+        update auth.user_info
+            set modified = now()
+                , modified_by = _updated_by
+                , last_selected_tenant_id = __tenant_id
+            where user_id = _target_user_id
+            returning user_id, last_selected_tenant_id;
 
 
-	if _user_id <> _target_user_id and _user_id <> 1 then
-		perform
-			add_journal_msg_jsonb('system', _user_id
-				, format('User: (id: %s) updated last selected tenant for user: %s'
-															, _user_id, _target_user_id)
-				, 'user', _target_user_id
-				, jsonb_build_object('tenant_id', __tenant_id)
-				, _event_id := 50138
-				, _tenant_id := 1);
-	end if;
+    if _user_id <> _target_user_id and _user_id <> 1
+    then
+        perform
+            add_journal_msg_jsonb('system', _user_id
+                , format('User: (id: %s) updated last selected tenant for user: %s'
+                                      , _user_id, _target_user_id)
+                , 'user', _target_user_id
+                , jsonb_build_object('tenant_id', __tenant_id)
+                , _event_id := 50138
+                , _tenant_id := 1);
+    end if;
 end;
 $$;
 
 create or replace function auth.get_all_tenants()
-	returns table
-	        (
-		        __tenant_id    int,
-		        __tenant_uuid  text,
-		        __tenant_code  text,
-		        __tenant_title text
-	        )
-	stable
-	language sql
+    returns table
+            (
+                __tenant_id    int,
+                __tenant_uuid  text,
+                __tenant_code  text,
+                __tenant_title text
+            )
+    stable
+    language sql
 as
 $$
 select tenant_id
-		 , uuid::text
-		 , code
-		 , title
+     , uuid::text
+     , code
+     , title
 from auth.tenant
 order by title
 $$;
+
 
 /***
  *    ██╗   ██╗██████╗ ██████╗  █████╗ ████████╗███████╗    ██████╗  █████╗ ████████╗ █████╗
@@ -743,31 +1389,31 @@ $$;
  */
 
 create
-	or replace function auth.update_permission_data_v1_10()
-	returns setof int
-	language plpgsql
+    or replace function auth.update_permission_data_v1_10()
+    returns setof int
+    language plpgsql
 as
 $$
 declare
-	__update_username text := 'auth_update_v1_10';
+    __update_username text := 'auth_update_v1_10';
 begin
 
-	perform unsecure.create_permission_as_system('Get users groups and permissions', 'users');
-	perform unsecure.create_permission_as_system('Create user tenant preferences', 'users');
-	perform unsecure.create_permission_as_system('Update user tenant preferences', 'users');
+    perform unsecure.create_permission_as_system('Get users groups and permissions', 'users');
+    perform unsecure.create_permission_as_system('Create user tenant preferences', 'users');
+    perform unsecure.create_permission_as_system('Update user tenant preferences', 'users');
 
 
-	update auth.tenant
-	set is_default = true
-	where tenant_id = 1;
+    update auth.tenant
+    set is_default = true
+    where tenant_id = 1;
 
-	-- I could not find an evidence that would suggest there exists a column of such a similar name, or functionality, to this newly created `user_preferences` column
-	-- 	update auth.user_info ui
-	-- 	set modified = now()
-	-- 		, modified_by = __update_username
-	-- 		, user_preferences = ud.
-	-- 	from auth.user_data ud
-	-- 	where ud.user_id = ui.user_id;
+    -- I could not find an evidence that would suggest there exists a column of such a similar name, or functionality, to this newly created `user_preferences` column
+    -- 	update auth.user_info ui
+    -- 	set modified = now()
+    -- 		, modified_by = __update_username
+    -- 		, user_preferences = ud.
+    -- 	from auth.user_data ud
+    -- 	where ud.user_id = ui.user_id;
 
 end;
 $$;
