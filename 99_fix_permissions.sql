@@ -9,4 +9,4 @@
  */
 
 grant usage on schema
-    const, unsecure, error, ext, auth, helpers to km_permissions;
+    const, unsecure, error, ext, auth, helpers to postgresql_permissionmodel;

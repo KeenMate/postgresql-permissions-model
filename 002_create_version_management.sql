@@ -7,6 +7,7 @@
  *    ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝╚══════╝      ╚═══╝  ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
  *
  */
+set search_path = public, const, ext, stage, helpers, internal, unsecure;
 
 create table __version
 (

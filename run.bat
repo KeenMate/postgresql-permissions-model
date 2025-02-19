@@ -6,7 +6,7 @@ set CREATE_HELPERS=30_create_helpers.sql
 set CREATE_PERSMISSIONS=40_create_permissions.sql
 set CREATE_FIX_PERMISSIONS=99_fix_permissions.sql
 set SCRIPT_DIR=./
-set DB_NAME=km_permissions
+set DB_NAME=postgresql_permissionmodel
 set PGPASSWORD=Password3000!!
 SET PGCLIENTENCODING=utf-8
 chcp 65001
