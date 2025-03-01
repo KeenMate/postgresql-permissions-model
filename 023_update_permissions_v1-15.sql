@@ -27,8 +27,8 @@ $$
 declare
 	__created_perm_set   auth.perm_set;
 	__source_perm_set    auth.perm_set;
-	__source_tenant_code auth.tenant;
-	__target_tenant_code auth.tenant;
+	__source_tenant_code text;
+	__target_tenant_code text;
 begin
 
 	select t.code
@@ -107,8 +107,10 @@ as
 $$
 declare
 	__last_item auth.tenant;
-	__tenant_owner_group_id  int;
-	__tenant_member_group_id int;
+	__tenant_owner_group_id
+							int;
+	__tenant_member_group_id
+							int;
 begin
 	perform
 		auth.has_permission(_user_id, 'tenants.create_tenant');
