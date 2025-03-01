@@ -70,7 +70,7 @@ privileges tries to call it.
 | 50304      | Permission assigned                    |
 | 50305      | Permission unassigned                  |
 | 50306      | Permission assignability changed       |
-| 50307      | Permission set duplicated              |
+| 50307      | Permission set copied                  |
 | 50311      | Permissions added to perm set          |
 | 50313      | Permissions removed from perm set      |
 | 50331      | Permission created                     |
