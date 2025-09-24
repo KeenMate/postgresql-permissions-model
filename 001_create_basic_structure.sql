@@ -16,3 +16,6 @@ create schema if not exists unsecure; -- functions without any permission valida
 create schema if not exists helpers;
 create schema if not exists ext;
 create schema if not exists auth;
+
+
+create extension if not exists pg_trgm schema ext;

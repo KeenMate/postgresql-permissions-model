@@ -5,9 +5,9 @@ param (
 	[string]$Environment,
 	[Parameter(Mandatory = $true)]
 	[ValidateSet("restoreDatabase", "recreateDatabase", "updateDatabase", "preUpdateScripts", "postUpdateScripts", "fullService")]
-	[string]$Operation = "fullService",
+	[string[]]$Operations = @("fullService"),
 	[int]$UpdateStartNumber = -1,
-	[int]$UpdateEndNumber = -1	
+	[int]$UpdateEndNumber = -1
 )
 
 function Prompt-User {
@@ -18,7 +18,14 @@ function Prompt-User {
 
 	if (-not [string]::IsNullOrEmpty($Default)) {
 		if ($Default -is [bool]) {
-			$Prompt += " [$(if ($Default) {'True'} else {'False'})]"
+			$Prompt += " [$( if ($Default)
+      {
+        'True'
+      }
+      else
+      {
+        'False'
+      } )]"
 		}
 		else {
 			$Prompt += " [$Default]"
@@ -27,7 +34,7 @@ function Prompt-User {
 
 	$input = Read-Host -Prompt $Prompt
 
-	if ([string]::IsNullOrEmpty($input)) {
+	if ( [string]::IsNullOrEmpty($input)) {
 		$input = $Default
 	}
 	else {
@@ -41,7 +48,7 @@ function Prompt-User {
 			# No conversion needed for string
 		}
 		else {
-			throw "Unsupported default value type: $($Default.GetType().FullName)"
+			throw "Unsupported default value type: $( $Default.GetType().FullName )"
 		}
 
 		if ($input.GetType() -ne $Default.GetType()) {
@@ -64,7 +71,7 @@ function Set-EnvVar {
 
 function Prepare-Environment {
 	param (
-		# Parameter help description
+  # Parameter help description
 		[Parameter(Mandatory)]
 		[string]$envFilePath
 	)
@@ -73,7 +80,7 @@ function Prepare-Environment {
 	if (Test-Path $envFilePath) {
 		# Read the file line by line
 		$lines = Get-Content $envFilePath
-	
+
 		foreach ($line in $lines) {
 			# Skip empty lines and lines that are comments
 			if (-not [string]::IsNullOrWhiteSpace($line) -and -not $line.Trim().StartsWith("#")) {
@@ -82,7 +89,7 @@ function Prepare-Environment {
 				if ($pair.Length -eq 2) {
 					$key = $pair[0].Trim()
 					$value = $pair[1].Trim()
-							
+
 					# Set the environment variable
 					Set-EnvVar -key $key -value $value
 				}
@@ -91,10 +98,10 @@ function Prepare-Environment {
 				}
 			}
 		}
-	
+
 		Write-Host "Environment variables set successfully from $envFilePath"
 	}
- else {
+	else {
 		Write-Host "File not found: $envFilePath"
 	}
 }
@@ -116,7 +123,7 @@ function Get-FilesByNumericPrefix {
 		[int]$EndNumber
 	)
 
-	if ($StartNumber -eq -1 -and [int]$Env:DBUPDATESTARTNUMBER -gt 0 ) {
+	if ($StartNumber -eq -1 -and [int]$Env:DBUPDATESTARTNUMBER -gt 0) {
 		$StartNumber = [int]$Env:DBUPDATESTARTNUMBER
 	}
 
@@ -139,54 +146,54 @@ function Get-FilesByNumericPrefix {
 	foreach ($file in $files) {
 		# Extract the numeric prefix and convert it to an integer
 		$prefix = [int]($file.Name -replace '^(\d{3})_.*$', '$1')
-	
+
 		if (($prefix -ge $StartNumber -or $StartNumber -eq -1) -and ($prefix -le $EndNumber -or $EndNumber -eq -1)) {
-			Write-Host "File: $($file.Name) is within the update range."
+			Write-Host "File: $( $file.Name ) is within the update range."
 			# Add the matching file to the $matchingFiles array
 			$matchingFiles += $file
 		}
 	}
-	
-	Write-Host "Number of matching files: $($matchingFiles.Count)"
+
+	Write-Host "Number of matching files: $( $matchingFiles.Count )"
 
 	return $matchingFiles
 }
 
 function Recreate-Database {
 	Set-CurrentDatabase -databaseName $Env:DBCONNECTDB
-	
+
 	Write-Host "Recreating database on host: "$Env:PGHOST", connected to: "$Env:PGDATABASE
-	& $Env:DBPSQLFILE -f $Env:DBRECREATESCRIPT	
+	& $Env:DBPSQLFILE -f $Env:DBRECREATESCRIPT
 }
 
 function Restore-Database {
 	param (
-		# Parameter help description
+  # Parameter help description
 		[string]$backupFilepath,
 		[string]$backupType
 	)
 
 	Write-Host "Calculating backup type and path"
-	
-	if ([string]::IsNullOrEmpty($backupFilepath)) {
+
+	if ( [string]::IsNullOrEmpty($backupFilepath)) {
 		$backupFilepath = $Env:DBBACKUPFILE
 	}
 
-	if ([string]::IsNullOrEmpty($backupFilepath)) {
-		Write-Warning "No backup file path defined, skipping database restoration"
+	if ( [string]::IsNullOrEmpty($backupFilepath)) {
+		Write-Warning "No restore file defined, skipping"
 		return
 	}
 
-	if ([string]::IsNullOrEmpty($backupType)) {
+	if ( [string]::IsNullOrEmpty($backupType)) {
 		$backupType = $Env:DBBACKUPTYPE
 	}
-	
+
 	$jobCount = 1
-	
+
 	if ([int]$Env:DBRESTOREJOBCOUNT -gt 0) {
 		$jobCount = [int]$Env:DBRESTOREJOBCOUNT
 	}
-	
+
 	Write-Warning "Restoring database with $jobCount jobs"
 
 	switch ($backupType) {
@@ -194,10 +201,10 @@ function Restore-Database {
 			Write-Host "Restoring from file: "$backupFilepath
 
 			Set-CurrentDatabase -databaseName $Env:DBDESTDB
-			
+
 			& $Env:DBPSQLFILE -f "$backupFilepath"
 		}
-		"dir" { 
+		"dir" {
 			Write-Host "Restoring from directory: "$backupFilepath
 
 			Set-CurrentDatabase -databaseName $Env:DBDESTDB
@@ -209,7 +216,7 @@ function Restore-Database {
 				& $Env:DBPGRESTOREFILE -v -F d -d $Env:DBDESTDB "$backupFilepath"
 			}
 		}
-		"custom" { 
+		"custom" {
 			Write-Host "Restoring from custom archive: "$backupFilepath
 
 			Set-CurrentDatabase -databaseName $Env:DBDESTDB
@@ -223,15 +230,16 @@ function Restore-Database {
 		}
 		Default {
 			Write-Host "Unknown backup type: "$backupType
+
 		}
 	}
 }
 
 function Update-Database {
-	$files = Get-FilesByNumericPrefix -StartNumber $UpdateStartNumber -EndNumber $UpdateEndNumber 
-		
-	Write-Host "Number of returned files: $($files.Count)"
-		
+	$files = Get-FilesByNumericPrefix -StartNumber $UpdateStartNumber -EndNumber $UpdateEndNumber
+
+	Write-Host "Number of returned files: $( $files.Count )"
+
 	Update-DatabaseWithFiles -Files $files
 }
 
@@ -254,7 +262,7 @@ function Run-PreUpdateScripts {
 		# Check if the file exists
 		if (Test-Path -Path $scriptPath -PathType Leaf) {
 			$scriptsToRun += $scriptPath
-			Write-Host "Pre update script file: $($scriptPath) to be run."
+			Write-Host "Pre update script file: $( $scriptPath ) to be run."
 		}
 		else {
 			Write-Warning "File does not exist: $scriptPath"
@@ -280,10 +288,15 @@ function Run-PostUpdateScripts {
 		# Trim any leading or trailing whitespace characters
 		$scriptPath = $script.Trim()
 
+		if ([string]::IsNullOrEmpty($scriptPath)) {
+			Write-Warning "Post update script path empty, skipping"
+			continue
+		}
+
 		# Check if the file exists
 		if (Test-Path -Path $scriptPath -PathType Leaf) {
 			$scriptsToRun += $scriptPath
-			Write-Host "Post update script file: $($scriptPath) to be run."
+			Write-Host "Post update script file: $( $scriptPath ) to be run."
 		}
 		else {
 			Write-Warning "File does not exist: $scriptPath"
@@ -301,23 +314,23 @@ function Update-DatabaseWithFiles {
 
 	Write-Host "Updating database .."
 	Set-CurrentDatabase -databaseName $Env:DBDESTDB
-	
-	Write-Host "Number of update files: $($Files.Count)"
+
+	Write-Host "Number of update files: $( $Files.Count )"
 
 	$Files | Sort-Object -Property FullName |
 	Where-Object { $_.Length -gt 0 -and $_.Name.Length -gt 0 } |
 	ForEach-Object {
-		Write-Host ".. with file: $($_.Name)"
-		
+		Write-Host ".. with file: $( $_.Name )"
+
 		# -v ON_ERROR_STOP=1
 		& $Env:DBPSQLFILE -q -b -n --csv -f "$_"
-	}	
-	
+	}
+
 	$Filepaths |
 	Where-Object { $_.Length -gt 0 } |
 	ForEach-Object {
-		Write-Host ".. with file: $($_)"
-		
+		Write-Host ".. with file: $( $_ )"
+
 		# -v ON_ERROR_STOP=1
 		& $Env:DBPSQLFILE -q -b -n --csv -f "$_"
 	}
@@ -348,37 +361,44 @@ if (-not [string]::IsNullOrWhiteSpace($localEnvFilePath)) {
 	Prepare-Environment -envFilePath $localEnvFilePath
 }
 
-switch ($Operation) {
-	"recreateDatabase" {
-		Write-Host "Performing recreate operation..."
-		Recreate-Database
-	}
-	"restoreDatabase" {
-		Write-Host "Performing restore operation..."
-		Restore-Database
-	}	
-	"updateDatabase" {
-		Write-Host "Performing update operation..."
-		Update-Database
-	}
-	"preUpdateScripts" {
-		Write-Host "Performing pre update operation..."
-		Run-PreUpdateScripts
-	}
-	"postUpdateScripts" {
-		Write-Host "Performing post update operation..."
-		Run-PostUpdateScripts
-	}
-	"fullService" {
-		Write-Host "Performing full service operation for us, lazy boys..."
-		Recreate-Database
-		Restore-Database
-		Run-PreUpdateScripts
-		Update-Database
-		Run-PostUpdateScripts
-	}
-	Default {
-		Write-Error "Invalid Operation specified: $Operation. Valid values are 'restore', 'recreate', or 'update'."
-		Exit 1
+# Split the operation parameter for multiple operations in one go
+# Iterate through each script path
+foreach ($o in $Operations) {
+	Write-Host "processing: "$o
+	switch ($o) {
+  "recreateDatabase" {
+			Write-Host "Performing recreate operation..."
+			Recreate-Database
+  }
+  "restoreDatabase" {
+			Write-Host "Performing restore operation..."
+			Restore-Database
+  }
+  "updateDatabase" {
+			Write-Host "Performing update operation..."
+			Update-Database
+  }
+  "preUpdateScripts" {
+			Write-Host "Performing pre update operation..."
+			Run-PreUpdateScripts
+  }
+  "postUpdateScripts" {
+			Write-Host "Performing post update operation..."
+			Run-PostUpdateScripts
+  }
+  "fullService" {
+			Write-Host "Performing full service operation for us, lazy boys..."
+			Recreate-Database
+			Restore-Database
+			Run-PreUpdateScripts
+			Update-Database
+			Run-PostUpdateScripts
+  }
+  Default {
+			Write-Error "Invalid Operation specified: $o. Valid values are 'restore', 'recreate', or 'update'."
+			Exit 1
+  }
 	}
 }
+
+

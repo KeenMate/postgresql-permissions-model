@@ -1,17 +1,127 @@
-# postgresql-permission-model
+# PostgreSQL Permissions Model
 
-This is our PostgreSQL database model for everything related to users/groups/permissions and permission sets.
+A comprehensive PostgreSQL database model for multi-tenant user/group/permissions management with hierarchical permissions, permission sets, and flexible identity provider integration.
 
-It's not a absolutely complete solution but we use it already in many real life projects, big and small.
+## Overview
 
-## Main features
+This is a standalone PostgreSQL framework that provides complete tenant/user/group/permissions management for any PostgreSQL project. It's production-ready and used in many real-world projects, both big and small.
 
-The database is able to keep records of users and groups, keep their memberships, have cascading permissions that can be
-combined to permission sets and those are assigned to groups or individuals.
+## Key Features
 
-Most of our stored procedures calls **perform auth.has_permissions(\_user_id, '[permission full code, for example,
-orders.cancel_order', \_tenant_id \\\\ 1)**. This way function call is blocked right after user with insufficient
-privileges tries to call it.
+- **Multi-tenancy** with isolated permissions and data
+- **Hierarchical permissions** using PostgreSQL ltree (e.g., `users.create_user.admin_level`)
+- **Flexible group types**: Internal, External (mapped to identity providers), and Hybrid
+- **Identity provider integration**: Works with any provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
+- **Permission sets** for role-based access control
+- **API key management** with technical user pattern
+- **Comprehensive audit logging** for all security events
+- **Permission caching** for performance
+
+## Quick Start
+
+### Setup
+```powershell
+# Full database setup (recreate, restore, and update)
+./debee.ps1 -Operations fullService
+
+# Or individual operations
+./debee.ps1 -Operations recreateDatabase
+./debee.ps1 -Operations updateDatabase
+```
+
+### Configuration
+Configure connection in `debee.env`:
+```
+PGHOST=localhost
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=your_password
+DBDESTDB=your_database_name
+```
+
+### Basic Usage
+```sql
+-- Check user permission (throws exception if denied)
+perform auth.has_permission(_tenant_id, _user_id, 'orders.cancel_order');
+
+-- Silent permission check
+if auth.has_permission(_tenant_id, _user_id, 'orders.view', _throw_err := false) then
+    -- user has permission
+end if;
+
+-- Create permission
+select auth.create_permission_by_path('orders.cancel_order', 'Cancel Order');
+
+-- Assign permission to user
+select auth.assign_permission(_created_by, _user_id, _tenant_id, _target_user_id, null, 'orders.cancel_order');
+```
+
+## Architecture
+
+### Core Components
+- **`auth.user_info`** - Core user data
+- **`auth.user_identity`** - Multiple identity provider support per user
+- **`auth.user_data`** - Extensible custom user fields
+- **`auth.tenant`** - Multi-tenancy management
+- **`auth.user_group`** - Three group types (internal/external/hybrid)
+- **`auth.permission`** - Global hierarchical permissions
+- **`auth.perm_set`** - Tenant-specific permission collections
+- **`auth.api_key`** - Service authentication with technical users
+
+### Schema Security Model
+- **`public`** & **`auth`** - Always validate permissions
+- **`internal`** - For trusted contexts (no permission checks)
+- **`unsecure`** - Security system internals only
+
+## Group Mapping Strategy
+
+Supports three group types for flexible identity provider integration:
+
+- **Internal Groups**: Traditional membership stored in database
+- **External Groups**: Membership determined by identity provider mappings (no local storage)
+- **Hybrid Groups**: Combination of both approaches
+
+Example: User logs in with AzureAD groups → System maps external groups to internal permissions → User gets permissions without being explicitly added as member.
+
+## Documentation
+
+- **[CLAUDE.md](./CLAUDE.md)** - Developer guide for Claude Code
+- **Complete Documentation** - [postgresql-permissions-model-docs](../postgresql-permissions-model-docs) (comprehensive documentation project)
+- **[functions.md](./functions.md)** - Function reference
+- **[features.md](./features.md)** - Feature list
+
+## Integration
+
+### With Application Libraries
+The separate `keen-auth-permissions` library provides application-level wrappers around these SQL functions.
+
+### Direct SQL Integration
+Always use fully qualified schema names to avoid search_path issues:
+```sql
+-- Good
+select auth.has_permission(_tenant_id, _user_id, 'permission.code');
+
+-- Avoid (can cause "cannot find function" errors)
+select has_permission(_tenant_id, _user_id, 'permission.code');
+```
+
+## Version Management
+
+Simple version tracking with `public.__version` table:
+```sql
+select * from public.start_version_update('1.0', 'Initial version');
+-- migration content
+select * from public.stop_version_update('1.0');
+```
+
+## Requirements
+
+- PostgreSQL with extensions: `ltree`, `uuid-ossp`, `unaccent`, `pg_trgm`
+- PowerShell (for setup scripts)
+
+## License
+
+[MIT License](./LICENSE)
 
 ## Database event codes
 
