@@ -1,291 +1,291 @@
 # Database Objects Tracking
 
-| Schema | Object Name | Type | Last File | Line | Updates | All Updates |
-|--------|-------------|------|-----------|------|---------|-------------|
-| auth | active_user_groups | view | 004_create_permissions.sql | 930 | 1 | 004_create_permissions.sql:930 |
-| auth | add_perm_set_permissions | function | 004_create_permissions.sql | 4498 | 1 | 004_create_permissions.sql:4498 |
-| auth | add_user_to_default_groups | function | 004_create_permissions.sql | 5267 | 1 | 004_create_permissions.sql:5267 |
-| auth | api_key | table | 004_create_permissions.sql | 881 | 1 | 004_create_permissions.sql:881 |
-| auth | assign_api_key_permissions | function | 004_create_permissions.sql | 6183 | 1 | 004_create_permissions.sql:6183 |
-| auth | assign_permission | function | 004_create_permissions.sql | 3949 | 1 | 004_create_permissions.sql:3949 |
-| auth | can_manage_user_group | function | 004_create_permissions.sql | 1455 | 1 | 004_create_permissions.sql:1455 |
-| auth | create_api_key | function | 024_update_permissions_v1-16.sql | 21 | 2 | 004_create_permissions.sql:5972<br>024_update_permissions_v1-16.sql:21 |
-| auth | create_external_user_group | function | 004_create_permissions.sql | 3038 | 1 | 004_create_permissions.sql:3038 |
-| auth | create_owner | function | 004_create_permissions.sql | 3631 | 1 | 004_create_permissions.sql:3631 |
-| auth | create_perm_set | function | 004_create_permissions.sql | 4347 | 1 | 004_create_permissions.sql:4347 |
-| auth | create_provider | function | 004_create_permissions.sql | 1679 | 1 | 004_create_permissions.sql:1679 |
-| auth | create_service_user_info | function | 004_create_permissions.sql | 5022 | 1 | 004_create_permissions.sql:5022 |
-| auth | create_tenant | function | 023_update_permissions_v1-15.sql | 83 | 4 | 004_create_permissions.sql:3364<br>018_update_permissions_v1-10.sql:157<br>018_update_permissions_v1-10.sql:165<br>023_update_permissions_v1-15.sql:83 |
-| auth | create_token | function | 015_update_permissions_v1-9.sql | 27 | 2 | 004_create_permissions.sql:1997<br>015_update_permissions_v1-9.sql:27 |
-| auth | create_user_event | function | 004_create_permissions.sql | 1953 | 1 | 004_create_permissions.sql:1953 |
-| auth | create_user_group | function | 004_create_permissions.sql | 2390 | 1 | 004_create_permissions.sql:2390 |
-| auth | create_user_group_mapping | function | 004_create_permissions.sql | 2920 | 1 | 004_create_permissions.sql:2920 |
-| auth | create_user_group_member | function | 009_update_permissions_v1-3.sql | 62 | 3 | 004_create_permissions.sql:2754<br>009_update_permissions_v1-3.sql:60<br>009_update_permissions_v1-3.sql:62 |
-| auth | create_user_tenant_preferences | function | 018_update_permissions_v1-10.sql | 1173 | 1 | 018_update_permissions_v1-10.sql:1173 |
-| auth | delete_api_key | function | 007_update_permissions_v1-1.sql | 13 | 2 | 004_create_permissions.sql:6337<br>007_update_permissions_v1-1.sql:13 |
-| auth | delete_owner | function | 004_create_permissions.sql | 3671 | 1 | 004_create_permissions.sql:3671 |
-| auth | delete_perm_set_permissions | function | 004_create_permissions.sql | 4578 | 1 | 004_create_permissions.sql:4578 |
-| auth | delete_provider | function | 004_create_permissions.sql | 1750 | 1 | 004_create_permissions.sql:1750 |
-| auth | delete_tenant | function | 018_update_permissions_v1-10.sql | 382 | 1 | 018_update_permissions_v1-10.sql:382 |
-| auth | delete_tenant_by_uuid | function | 018_update_permissions_v1-10.sql | 408 | 1 | 018_update_permissions_v1-10.sql:408 |
-| auth | delete_user_group | function | 004_create_permissions.sql | 2625 | 1 | 004_create_permissions.sql:2625 |
-| auth | delete_user_group_mapping | function | 004_create_permissions.sql | 2991 | 1 | 004_create_permissions.sql:2991 |
-| auth | delete_user_group_member | function | 014_update_permissions_v1-8.sql | 207 | 2 | 004_create_permissions.sql:2776<br>014_update_permissions_v1-8.sql:207 |
-| auth | delete_user_info | function | 010_update_permissions_v1-4.sql | 36 | 2 | 010_update_permissions_v1-4.sql:22<br>010_update_permissions_v1-4.sql:36 |
-| auth | disable_provider | function | 004_create_permissions.sql | 1858 | 1 | 004_create_permissions.sql:1858 |
-| auth | disable_user | function | 004_create_permissions.sql | 4651 | 1 | 004_create_permissions.sql:4651 |
-| auth | disable_user_group | function | 004_create_permissions.sql | 2501 | 1 | 004_create_permissions.sql:2501 |
-| auth | disable_user_identity | function | 004_create_permissions.sql | 4812 | 1 | 004_create_permissions.sql:4812 |
-| auth | effective_permissions | view | 004_create_permissions.sql | 948 | 1 | 004_create_permissions.sql:948 |
-| auth | enable_provider | function | 004_create_permissions.sql | 1825 | 1 | 004_create_permissions.sql:1825 |
-| auth | enable_user | function | 004_create_permissions.sql | 4614 | 1 | 004_create_permissions.sql:4614 |
-| auth | enable_user_group | function | 004_create_permissions.sql | 2460 | 1 | 004_create_permissions.sql:2460 |
-| auth | enable_user_identity | function | 004_create_permissions.sql | 4762 | 1 | 004_create_permissions.sql:4762 |
-| auth | ensure_groups_and_permissions | function | 018_update_permissions_v1-10.sql | 922 | 2 | 018_update_permissions_v1-10.sql:914<br>018_update_permissions_v1-10.sql:922 |
-| auth | ensure_user_from_provider | function | 015_update_permissions_v1-9.sql | 534 | 4 | 009_update_permissions_v1-3.sql:85<br>011_update_permissions_v1-5.sql:130<br>015_update_permissions_v1-9.sql:530<br>015_update_permissions_v1-9.sql:534 |
-| auth | ensure_user_info | function | 012_update_permissions_v1-6.sql | 254 | 2 | 009_update_permissions_v1-3.sql:15<br>012_update_permissions_v1-6.sql:254 |
-| auth | generate_api_key | function | 004_create_permissions.sql | 5908 | 1 | 004_create_permissions.sql:5908 |
-| auth | generate_api_key_username | function | 004_create_permissions.sql | 5898 | 1 | 004_create_permissions.sql:5898 |
-| auth | generate_api_secret | function | 004_create_permissions.sql | 5918 | 1 | 004_create_permissions.sql:5918 |
-| auth | generate_api_secret_hash | function | 004_create_permissions.sql | 5928 | 1 | 004_create_permissions.sql:5928 |
-| auth | get_all_permissions | function | 004_create_permissions.sql | 4185 | 1 | 004_create_permissions.sql:4185 |
-| auth | get_all_tenants | function | 018_update_permissions_v1-10.sql | 1360 | 1 | 018_update_permissions_v1-10.sql:1360 |
-| auth | get_api_key_permissions | function | 004_create_permissions.sql | 6108 | 1 | 004_create_permissions.sql:6108 |
-| auth | get_assigned_group_permissions | function | 004_create_permissions.sql | 3332 | 1 | 004_create_permissions.sql:3332 |
-| auth | get_assigned_user_permissions | function | 018_update_permissions_v1-10.sql | 1069 | 2 | 004_create_permissions.sql:5864<br>018_update_permissions_v1-10.sql:1069 |
-| auth | get_effective_group_permissions | function | 004_create_permissions.sql | 3260 | 1 | 004_create_permissions.sql:3260 |
-| auth | get_perm_sets | function | 004_create_permissions.sql | 4252 | 1 | 004_create_permissions.sql:4252 |
-| auth | get_provider_users | function | 004_create_permissions.sql | 1785 | 1 | 004_create_permissions.sql:1785 |
-| auth | get_tenant_by_id | function | 004_create_permissions.sql | 3459 | 1 | 004_create_permissions.sql:3459 |
-| auth | get_tenants | function | 004_create_permissions.sql | 3422 | 1 | 004_create_permissions.sql:3422 |
-| auth | get_user_assigned_groups | function | 014_update_permissions_v1-8.sql | 383 | 3 | 013_update_permissions_v1-7.sql:13<br>014_update_permissions_v1-8.sql:382<br>014_update_permissions_v1-8.sql:383 |
-| auth | get_user_assigned_permissions | function | 027_update_permissions_v1-17.sql | 67 | 3 | 018_update_permissions_v1-10.sql:1074<br>027_update_permissions_v1-17.sql:20<br>027_update_permissions_v1-17.sql:67 |
-| auth | get_user_available_tenants | function | 018_update_permissions_v1-10.sql | 440 | 3 | 015_update_permissions_v1-9.sql:363<br>018_update_permissions_v1-10.sql:434<br>018_update_permissions_v1-10.sql:440 |
-| auth | get_user_by_email_for_authentication | function | 004_create_permissions.sql | 5395 | 1 | 004_create_permissions.sql:5395 |
-| auth | get_user_by_id | function | 004_create_permissions.sql | 5291 | 1 | 004_create_permissions.sql:5291 |
-| auth | get_user_by_provider_oid | function | 020_update_permissions_v1-12.sql | 221 | 1 | 020_update_permissions_v1-12.sql:221 |
-| auth | get_user_data | function | 004_create_permissions.sql | 5703 | 1 | 004_create_permissions.sql:5703 |
-| auth | get_user_group_by_id | function | 004_create_permissions.sql | 3177 | 1 | 004_create_permissions.sql:3177 |
-| auth | get_user_group_mappings | function | 004_create_permissions.sql | 2894 | 1 | 004_create_permissions.sql:2894 |
-| auth | get_user_group_members | function | 014_update_permissions_v1-8.sql | 310 | 3 | 004_create_permissions.sql:2862<br>014_update_permissions_v1-8.sql:309<br>014_update_permissions_v1-8.sql:310 |
-| auth | get_user_groups_to_sync | function | 014_update_permissions_v1-8.sql | 442 | 1 | 014_update_permissions_v1-8.sql:442 |
-| auth | get_user_identity | function | 004_create_permissions.sql | 5326 | 1 | 004_create_permissions.sql:5326 |
-| auth | get_user_identity_by_email | function | 004_create_permissions.sql | 5359 | 1 | 004_create_permissions.sql:5359 |
-| auth | get_user_last_selected_tenant | function | 018_update_permissions_v1-10.sql | 1266 | 1 | 018_update_permissions_v1-10.sql:1266 |
-| auth | get_user_permissions | function | 004_create_permissions.sql | 5655 | 1 | 004_create_permissions.sql:5655 |
-| auth | get_user_preferences | function | 018_update_permissions_v1-10.sql | 1239 | 2 | 018_update_permissions_v1-10.sql:1137<br>018_update_permissions_v1-10.sql:1239 |
-| auth | get_user_random_code | function | 004_create_permissions.sql | 523 | 1 | 004_create_permissions.sql:523 |
-| auth | get_users_groups_and_permissions | function | 018_update_permissions_v1-10.sql | 982 | 1 | 018_update_permissions_v1-10.sql:982 |
-| auth | has_owner | function | 004_create_permissions.sql | 1402 | 1 | 004_create_permissions.sql:1402 |
-| auth | has_permission | function | 004_create_permissions.sql | 1588 | 1 | 004_create_permissions.sql:1588 |
-| auth | has_permissions | function | 018_update_permissions_v1-10.sql | 649 | 2 | 004_create_permissions.sql:1494<br>018_update_permissions_v1-10.sql:649 |
-| auth | is_group_member | function | 004_create_permissions.sql | 1436 | 1 | 004_create_permissions.sql:1436 |
-| auth | is_owner | function | 004_create_permissions.sql | 1417 | 1 | 004_create_permissions.sql:1417 |
-| auth | lock_user | function | 004_create_permissions.sql | 4725 | 1 | 004_create_permissions.sql:4725 |
-| auth | lock_user_group | function | 004_create_permissions.sql | 2543 | 1 | 004_create_permissions.sql:2543 |
-| auth | owner | table | 004_create_permissions.sql | 799 | 1 | 004_create_permissions.sql:799 |
-| auth | perm_set | table | 018_update_permissions_v1-10.sql | 130 | 3 | 004_create_permissions.sql:730<br>018_update_permissions_v1-10.sql:128<br>018_update_permissions_v1-10.sql:130 |
-| auth | perm_set_perm | table | 004_create_permissions.sql | 746 | 1 | 004_create_permissions.sql:746 |
-| auth | permission | table | 004_create_permissions.sql | 715 | 1 | 004_create_permissions.sql:715 |
-| auth | permission_assignment | table | 004_create_permissions.sql | 809 | 1 | 004_create_permissions.sql:809 |
-| auth | process_external_group_member_sync | function | 014_update_permissions_v1-8.sql | 588 | 1 | 014_update_permissions_v1-8.sql:588 |
-| auth | process_external_group_member_sync_by_mapping | function | 014_update_permissions_v1-8.sql | 474 | 1 | 014_update_permissions_v1-8.sql:474 |
-| auth | provider | table | 004_create_permissions.sql | 631 | 1 | 004_create_permissions.sql:631 |
-| auth | search_api_keys | function | 004_create_permissions.sql | 6047 | 1 | 004_create_permissions.sql:6047 |
-| auth | set_permission_as_assignable | function | 004_create_permissions.sql | 3913 | 1 | 004_create_permissions.sql:3913 |
-| auth | set_token_as_failed | function | 012_update_permissions_v1-6.sql | 139 | 1 | 012_update_permissions_v1-6.sql:139 |
-| auth | set_token_as_failed_by_token | function | 012_update_permissions_v1-6.sql | 209 | 1 | 012_update_permissions_v1-6.sql:209 |
-| auth | set_token_as_used | function | 015_update_permissions_v1-9.sql | 223 | 4 | 004_create_permissions.sql:2175<br>008_update_permissions_v1-2.sql:13<br>008_update_permissions_v1-2.sql:22<br>015_update_permissions_v1-9.sql:223 |
-| auth | set_token_as_used_by_token | function | 012_update_permissions_v1-6.sql | 15 | 3 | 004_create_permissions.sql:2243<br>012_update_permissions_v1-6.sql:13<br>012_update_permissions_v1-6.sql:15 |
-| auth | set_user_group_as_external | function | 014_update_permissions_v1-8.sql | 344 | 3 | 004_create_permissions.sql:3076<br>014_update_permissions_v1-8.sql:343<br>014_update_permissions_v1-8.sql:344 |
-| auth | set_user_group_as_hybrid | function | 004_create_permissions.sql | 3109 | 1 | 004_create_permissions.sql:3109 |
-| auth | tenant | table | 018_update_permissions_v1-10.sql | 133 | 2 | 004_create_permissions.sql:639<br>018_update_permissions_v1-10.sql:133 |
-| auth | tenant_user | table | 004_create_permissions.sql | 670 | 1 | 004_create_permissions.sql:670 |
-| auth | throw_no_access | function | 004_create_permissions.sql | 1134 | 1 | 004_create_permissions.sql:1134 |
-| auth | throw_no_permission | function | 004_create_permissions.sql | 1178 | 4 | 004_create_permissions.sql:1145<br>004_create_permissions.sql:1156<br>004_create_permissions.sql:1167<br>004_create_permissions.sql:1178 |
-| auth | token | table | 004_create_permissions.sql | 842 | 1 | 004_create_permissions.sql:842 |
-| auth | unassign_api_key_permissions | function | 004_create_permissions.sql | 6256 | 1 | 004_create_permissions.sql:6256 |
-| auth | unassign_permission | function | 004_create_permissions.sql | 3973 | 1 | 004_create_permissions.sql:3973 |
-| auth | unlock_user | function | 004_create_permissions.sql | 4688 | 1 | 004_create_permissions.sql:4688 |
-| auth | unlock_user_group | function | 004_create_permissions.sql | 2584 | 1 | 004_create_permissions.sql:2584 |
-| auth | update_api_key | function | 004_create_permissions.sql | 6135 | 1 | 004_create_permissions.sql:6135 |
-| auth | update_api_key_secret | function | 004_create_permissions.sql | 6378 | 1 | 004_create_permissions.sql:6378 |
-| auth | update_perm_set | function | 004_create_permissions.sql | 4415 | 1 | 004_create_permissions.sql:4415 |
-| auth | update_provider | function | 004_create_permissions.sql | 1715 | 1 | 004_create_permissions.sql:1715 |
-| auth | update_tenant | function | 023_update_permissions_v1-15.sql | 184 | 2 | 018_update_permissions_v1-10.sql:251<br>023_update_permissions_v1-15.sql:184 |
-| auth | update_user_data | function | 004_create_permissions.sql | 5633 | 1 | 004_create_permissions.sql:5633 |
-| auth | update_user_group | function | 004_create_permissions.sql | 2415 | 1 | 004_create_permissions.sql:2415 |
-| auth | update_user_last_selected_tenant | function | 018_update_permissions_v1-10.sql | 1303 | 3 | 015_update_permissions_v1-9.sql:312<br>018_update_permissions_v1-10.sql:1299<br>018_update_permissions_v1-10.sql:1303 |
-| auth | update_user_password | function | 004_create_permissions.sql | 5119 | 1 | 004_create_permissions.sql:5119 |
-| auth | update_user_preferences | function | 018_update_permissions_v1-10.sql | 1106 | 1 | 018_update_permissions_v1-10.sql:1106 |
-| auth | update_user_tenant_preferences | function | 018_update_permissions_v1-10.sql | 1202 | 1 | 018_update_permissions_v1-10.sql:1202 |
-| auth | user_data | table | 011_update_permissions_v1-5.sql | 17 | 2 | 004_create_permissions.sql:689<br>011_update_permissions_v1-5.sql:17 |
-| auth | user_event | table | 004_create_permissions.sql | 825 | 1 | 004_create_permissions.sql:825 |
-| auth | user_group | table | 014_update_permissions_v1-8.sql | 436 | 3 | 004_create_permissions.sql:753<br>014_update_permissions_v1-8.sql:432<br>014_update_permissions_v1-8.sql:436 |
-| auth | user_group_mapping | table | 004_create_permissions.sql | 774 | 1 | 004_create_permissions.sql:774 |
-| auth | user_group_member | table | 014_update_permissions_v1-8.sql | 417 | 3 | 004_create_permissions.sql:788<br>014_update_permissions_v1-8.sql:25<br>014_update_permissions_v1-8.sql:417 |
-| auth | user_group_members | view | 014_update_permissions_v1-8.sql | 29 | 3 | 004_create_permissions.sql:903<br>014_update_permissions_v1-8.sql:28<br>014_update_permissions_v1-8.sql:29 |
-| auth | user_identity | table | 015_update_permissions_v1-9.sql | 431 | 3 | 004_create_permissions.sql:699<br>015_update_permissions_v1-9.sql:424<br>015_update_permissions_v1-9.sql:431 |
-| auth | user_info | table | 018_update_permissions_v1-10.sql | 125 | 4 | 004_create_permissions.sql:650<br>011_update_permissions_v1-5.sql:53<br>015_update_permissions_v1-9.sql:309<br>018_update_permissions_v1-10.sql:125 |
-| auth | user_permission_cache | table | 018_update_permissions_v1-10.sql | 484 | 4 | 004_create_permissions.sql:677<br>010_update_permissions_v1-4.sql:14<br>010_update_permissions_v1-4.sql:17<br>018_update_permissions_v1-10.sql:484 |
-| auth | user_tenant_preference | table | 018_update_permissions_v1-10.sql | 136 | 1 | 018_update_permissions_v1-10.sql:136 |
-| auth | validate_api_key | function | 004_create_permissions.sql | 6421 | 1 | 004_create_permissions.sql:6421 |
-| auth | validate_provider_is_active | function | 004_create_permissions.sql | 1653 | 1 | 004_create_permissions.sql:1653 |
-| auth | validate_token | function | 015_update_permissions_v1-9.sql | 129 | 5 | 004_create_permissions.sql:2087<br>008_update_permissions_v1-2.sql:92<br>008_update_permissions_v1-2.sql:101<br>015_update_permissions_v1-9.sql:123<br>015_update_permissions_v1-9.sql:129 |
-| const | sys_param | table | 004_create_permissions.sql | 588 | 1 | 004_create_permissions.sql:588 |
-| const | tenant_access_type | table | 004_create_permissions.sql | 600 | 1 | 004_create_permissions.sql:600 |
-| const | token_channel | table | 004_create_permissions.sql | 611 | 1 | 004_create_permissions.sql:611 |
-| const | token_state | table | 004_create_permissions.sql | 616 | 1 | 004_create_permissions.sql:616 |
-| const | token_type | table | 004_create_permissions.sql | 605 | 1 | 004_create_permissions.sql:605 |
-| const | user_event_type | table | 004_create_permissions.sql | 626 | 1 | 004_create_permissions.sql:626 |
-| const | user_group_member_type | table | 014_update_permissions_v1-8.sql | 15 | 1 | 014_update_permissions_v1-8.sql:15 |
-| const | user_type | table | 004_create_permissions.sql | 621 | 1 | 004_create_permissions.sql:621 |
-| error | raise_52101 | function | 004_create_permissions.sql | 41 | 1 | 004_create_permissions.sql:41 |
-| error | raise_52102 | function | 004_create_permissions.sql | 54 | 1 | 004_create_permissions.sql:54 |
-| error | raise_52103 | function | 004_create_permissions.sql | 67 | 1 | 004_create_permissions.sql:67 |
-| error | raise_52104 | function | 004_create_permissions.sql | 81 | 1 | 004_create_permissions.sql:81 |
-| error | raise_52105 | function | 004_create_permissions.sql | 95 | 1 | 004_create_permissions.sql:95 |
-| error | raise_52106 | function | 004_create_permissions.sql | 108 | 1 | 004_create_permissions.sql:108 |
-| error | raise_52107 | function | 004_create_permissions.sql | 121 | 1 | 004_create_permissions.sql:121 |
-| error | raise_52108 | function | 004_create_permissions.sql | 134 | 1 | 004_create_permissions.sql:134 |
-| error | raise_52109 | function | 004_create_permissions.sql | 147 | 1 | 004_create_permissions.sql:147 |
-| error | raise_52110 | function | 004_create_permissions.sql | 160 | 1 | 004_create_permissions.sql:160 |
-| error | raise_52111 | function | 004_create_permissions.sql | 173 | 1 | 004_create_permissions.sql:173 |
-| error | raise_52112 | function | 004_create_permissions.sql | 186 | 1 | 004_create_permissions.sql:186 |
-| error | raise_52171 | function | 004_create_permissions.sql | 199 | 1 | 004_create_permissions.sql:199 |
-| error | raise_52172 | function | 004_create_permissions.sql | 213 | 1 | 004_create_permissions.sql:213 |
-| error | raise_52173 | function | 004_create_permissions.sql | 227 | 1 | 004_create_permissions.sql:227 |
-| error | raise_52174 | function | 004_create_permissions.sql | 241 | 1 | 004_create_permissions.sql:241 |
-| error | raise_52175 | function | 004_create_permissions.sql | 253 | 1 | 004_create_permissions.sql:253 |
-| error | raise_52176 | function | 004_create_permissions.sql | 264 | 1 | 004_create_permissions.sql:264 |
-| error | raise_52177 | function | 004_create_permissions.sql | 276 | 1 | 004_create_permissions.sql:276 |
-| error | raise_52178 | function | 004_create_permissions.sql | 289 | 1 | 004_create_permissions.sql:289 |
-| error | raise_52179 | function | 004_create_permissions.sql | 302 | 1 | 004_create_permissions.sql:302 |
-| error | raise_52180 | function | 004_create_permissions.sql | 435 | 1 | 004_create_permissions.sql:435 |
-| error | raise_52181 | function | 004_create_permissions.sql | 448 | 1 | 004_create_permissions.sql:448 |
-| error | raise_52271 | function | 004_create_permissions.sql | 316 | 1 | 004_create_permissions.sql:316 |
-| error | raise_52272 | function | 004_create_permissions.sql | 330 | 1 | 004_create_permissions.sql:330 |
-| error | raise_52273 | function | 004_create_permissions.sql | 343 | 1 | 004_create_permissions.sql:343 |
-| error | raise_52274 | function | 004_create_permissions.sql | 356 | 1 | 004_create_permissions.sql:356 |
-| error | raise_52275 | function | 004_create_permissions.sql | 369 | 1 | 004_create_permissions.sql:369 |
-| error | raise_52276 | function | 004_create_permissions.sql | 383 | 1 | 004_create_permissions.sql:383 |
-| error | raise_52277 | function | 004_create_permissions.sql | 396 | 1 | 004_create_permissions.sql:396 |
-| error | raise_52278 | function | 004_create_permissions.sql | 409 | 1 | 004_create_permissions.sql:409 |
-| error | raise_52279 | function | 004_create_permissions.sql | 422 | 1 | 004_create_permissions.sql:422 |
-| error | raise_52282 | function | 004_create_permissions.sql | 461 | 1 | 004_create_permissions.sql:461 |
-| error | raise_52283 | function | 004_create_permissions.sql | 475 | 1 | 004_create_permissions.sql:475 |
-| error | raise_52301 | function | 004_create_permissions.sql | 489 | 1 | 004_create_permissions.sql:489 |
-| error | raise_52401 | function | 004_create_permissions.sql | 502 | 1 | 004_create_permissions.sql:502 |
-| helpers | compare_jsonb_objects | function | 003_create_helpers.sql | 137 | 1 | 003_create_helpers.sql:137 |
-| helpers | get_code | function | 003_create_helpers.sql | 82 | 1 | 003_create_helpers.sql:82 |
-| helpers | get_slug | function | 003_create_helpers.sql | 106 | 1 | 003_create_helpers.sql:106 |
-| helpers | is_empty_string | function | 003_create_helpers.sql | 51 | 1 | 003_create_helpers.sql:51 |
-| helpers | is_not_empty_string | function | 003_create_helpers.sql | 62 | 1 | 003_create_helpers.sql:62 |
-| helpers | ltree_parent | function | 003_create_helpers.sql | 162 | 1 | 003_create_helpers.sql:162 |
-| helpers | random_string | function | 003_create_helpers.sql | 73 | 1 | 003_create_helpers.sql:73 |
-| helpers | trg_generate_code_from_title | function | 004_create_permissions.sql | 566 | 1 | 004_create_permissions.sql:566 |
-| helpers | unaccent_text | function | 003_create_helpers.sql | 117 | 1 | 003_create_helpers.sql:117 |
-| internal | update_permissions_v1_6 | procedure | 012_update_permissions_v1-6.sql | 300 | 1 | 012_update_permissions_v1-6.sql:300 |
-| public | __temp_current_members | table | 014_update_permissions_v1-8.sql | 583 | 2 | 014_update_permissions_v1-8.sql:501<br>014_update_permissions_v1-8.sql:583 |
-| public | __temp_delete_members | table | 014_update_permissions_v1-8.sql | 692 | 1 | 014_update_permissions_v1-8.sql:692 |
-| public | __temp_ensure_users | table | 014_update_permissions_v1-8.sql | 581 | 2 | 014_update_permissions_v1-8.sql:507<br>014_update_permissions_v1-8.sql:581 |
-| public | __temp_ensured_users | table | 014_update_permissions_v1-8.sql | 582 | 2 | 014_update_permissions_v1-8.sql:535<br>014_update_permissions_v1-8.sql:582 |
-| public | __temp_external_group_sync | table | 014_update_permissions_v1-8.sql | 693 | 2 | 014_update_permissions_v1-8.sql:607<br>014_update_permissions_v1-8.sql:693 |
-| public | __temp_members_comparison | table | 014_update_permissions_v1-8.sql | 584 | 2 | 014_update_permissions_v1-8.sql:518<br>014_update_permissions_v1-8.sql:584 |
-| public | __temp_users_groups | table | 018_update_permissions_v1-10.sql | 952 | 1 | 018_update_permissions_v1-10.sql:952 |
-| public | __temp_users_groups_permissions | table | 018_update_permissions_v1-10.sql | 792 | 1 | 018_update_permissions_v1-10.sql:792 |
-| public | __version | table | 002_create_version_management.sql | 12 | 1 | 002_create_version_management.sql:12 |
-| public | _template_created | table | 004_create_permissions.sql | 544 | 1 | 004_create_permissions.sql:544 |
-| public | _template_timestamps | table | 004_create_permissions.sql | 550 | 1 | 004_create_permissions.sql:550 |
-| public | add_journal_msg | function | 004_create_permissions.sql | 995 | 1 | 004_create_permissions.sql:995 |
-| public | add_journal_msg_jsonb | function | 004_create_permissions.sql | 973 | 1 | 004_create_permissions.sql:973 |
-| public | auth | schema | 001_create_basic_structure.sql | 18 | 1 | 001_create_basic_structure.sql:18 |
-| public | c_perm_set_code | trigger | 004_create_permissions.sql | 740 | 1 | 004_create_permissions.sql:740 |
-| public | c_user_group_code | trigger | 004_create_permissions.sql | 768 | 1 | 004_create_permissions.sql:768 |
-| public | check_version | function | 016_update_versions-management_v1-1.sql | 14 | 3 | 002_create_version_management.sql:52<br>016_update_versions-management_v1-1.sql:12<br>016_update_versions-management_v1-1.sql:14 |
-| public | const | schema | 001_create_basic_structure.sql | 13 | 1 | 001_create_basic_structure.sql:13 |
-| public | error | schema | 001_create_basic_structure.sql | 12 | 1 | 001_create_basic_structure.sql:12 |
-| public | ext | schema | 001_create_basic_structure.sql | 17 | 1 | 001_create_basic_structure.sql:17 |
-| public | get_version | function | 017_update_versions-management_v1-2.sql | 12 | 1 | 017_update_versions-management_v1-2.sql:12 |
-| public | helpers | schema | 001_create_basic_structure.sql | 16 | 1 | 001_create_basic_structure.sql:16 |
-| public | internal | schema | 001_create_basic_structure.sql | 14 | 1 | 001_create_basic_structure.sql:14 |
-| public | ix_journal | index | 004_create_permissions.sql | 878 | 1 | 004_create_permissions.sql:878 |
-| public | ix_owner | index | 004_create_permissions.sql | 807 | 1 | 004_create_permissions.sql:807 |
-| public | ix_permission_node_path | index | 004_create_permissions.sql | 728 | 1 | 004_create_permissions.sql:728 |
-| public | ix_token_expires_at | index | 004_create_permissions.sql | 862 | 1 | 004_create_permissions.sql:862 |
-| public | ix_token_token | index | 004_create_permissions.sql | 861 | 1 | 004_create_permissions.sql:861 |
-| public | ix_token_token_data | index | 004_create_permissions.sql | 863 | 1 | 004_create_permissions.sql:863 |
-| public | ix_user_event_data | index | 004_create_permissions.sql | 840 | 1 | 004_create_permissions.sql:840 |
-| public | ix_user_permission_cache | index | 018_update_permissions_v1-10.sql | 488 | 1 | 018_update_permissions_v1-10.sql:488 |
-| public | ix_user_tenant_preference | index | 018_update_permissions_v1-10.sql | 145 | 1 | 018_update_permissions_v1-10.sql:145 |
-| public | journal | table | 015_update_permissions_v1-9.sql | 645 | 2 | 004_create_permissions.sql:865<br>015_update_permissions_v1-9.sql:645 |
-| public | search_journal_msgs | function | 018_update_permissions_v1-10.sql | 36 | 5 | 004_create_permissions.sql:1021<br>015_update_permissions_v1-9.sql:652<br>018_update_permissions_v1-10.sql:28<br>018_update_permissions_v1-10.sql:32<br>018_update_permissions_v1-10.sql:36 |
-| public | start_version_update | function | 002_create_version_management.sql | 25 | 1 | 002_create_version_management.sql:25 |
-| public | stop_version_update | function | 002_create_version_management.sql | 38 | 1 | 002_create_version_management.sql:38 |
-| public | tmp_default_groups | table | 021_update_permissions_v1-13.sql | 69 | 4 | 004_create_permissions.sql:5232<br>004_create_permissions.sql:5263<br>021_update_permissions_v1-13.sql:38<br>021_update_permissions_v1-13.sql:69 |
-| public | trg_auth_calculate_user_data | trigger | 011_update_permissions_v1-5.sql | 47 | 1 | 011_update_permissions_v1-5.sql:47 |
-| public | trg_auth_calculate_user_info | trigger | 011_update_permissions_v1-5.sql | 86 | 1 | 011_update_permissions_v1-5.sql:86 |
-| public | triggers | schema | 011_update_permissions_v1-5.sql | 15 | 1 | 011_update_permissions_v1-5.sql:15 |
-| public | unsecure | schema | 001_create_basic_structure.sql | 15 | 1 | 001_create_basic_structure.sql:15 |
-| public | uq_auth_permission_assignment_tenant_group | index | 019_update_permissions_v1-11.sql | 31 | 1 | 019_update_permissions_v1-11.sql:31 |
-| public | uq_auth_permission_assignment_tenant_user | index | 019_update_permissions_v1-11.sql | 28 | 1 | 019_update_permissions_v1-11.sql:28 |
-| public | uq_auth_user_info | index | 004_create_permissions.sql | 668 | 1 | 004_create_permissions.sql:668 |
-| public | uq_external_group_member | index | 014_update_permissions_v1-8.sql | 430 | 1 | 014_update_permissions_v1-8.sql:430 |
-| public | uq_permission_assignment | index | 004_create_permissions.sql | 821 | 1 | 004_create_permissions.sql:821 |
-| public | uq_permission_full_code | index | 004_create_permissions.sql | 727 | 1 | 004_create_permissions.sql:727 |
-| public | uq_sys_params | index | 004_create_permissions.sql | 598 | 1 | 004_create_permissions.sql:598 |
-| public | uq_tenant_uuid | index | 018_update_permissions_v1-10.sql | 481 | 1 | 018_update_permissions_v1-10.sql:481 |
-| public | uq_user_group_mapping | index | 004_create_permissions.sql | 784 | 1 | 004_create_permissions.sql:784 |
-| public | uq_user_group_member | index | 004_create_permissions.sql | 797 | 1 | 004_create_permissions.sql:797 |
-| public | uq_user_identity | index | 004_create_permissions.sql | 713 | 1 | 004_create_permissions.sql:713 |
-| public | uq_user_permission_cache | index | 018_update_permissions_v1-10.sql | 487 | 1 | 018_update_permissions_v1-10.sql:487 |
-| public | uq_user_tenant_preference | index | 018_update_permissions_v1-10.sql | 144 | 1 | 018_update_permissions_v1-10.sql:144 |
-| public | uq_version | index | 002_create_version_management.sql | 23 | 1 | 002_create_version_management.sql:23 |
-| public | validate_token | function | 012_update_permissions_v1-6.sql | 56 | 1 | 012_update_permissions_v1-6.sql:56 |
-| stage | external_group_member | table | 014_update_permissions_v1-8.sql | 420 | 1 | 014_update_permissions_v1-8.sql:420 |
-| triggers | calculate_user_data | function | 011_update_permissions_v1-5.sql | 33 | 1 | 011_update_permissions_v1-5.sql:33 |
-| triggers | calculate_user_data_search_values | function | 011_update_permissions_v1-5.sql | 23 | 1 | 011_update_permissions_v1-5.sql:23 |
-| triggers | calculate_user_info | function | 011_update_permissions_v1-5.sql | 72 | 1 | 011_update_permissions_v1-5.sql:72 |
-| triggers | calculate_user_info_search_values | function | 011_update_permissions_v1-5.sql | 59 | 1 | 011_update_permissions_v1-5.sql:59 |
-| unsecure | add_user_to_default_groups | function | 021_update_permissions_v1-13.sql | 17 | 2 | 004_create_permissions.sql:5211<br>021_update_permissions_v1-13.sql:17 |
-| unsecure | assign_permission | function | 022_update_permissions_v1-14.sql | 133 | 2 | 004_create_permissions.sql:3718<br>022_update_permissions_v1-14.sql:133 |
-| unsecure | assign_permission_as_system | function | 004_create_permissions.sql | 3933 | 1 | 004_create_permissions.sql:3933 |
-| unsecure | create_api_user | function | 004_create_permissions.sql | 5938 | 1 | 004_create_permissions.sql:5938 |
-| unsecure | create_perm_set | function | 004_create_permissions.sql | 4276 | 1 | 004_create_permissions.sql:4276 |
-| unsecure | create_perm_set_as_system | function | 004_create_permissions.sql | 4330 | 1 | 004_create_permissions.sql:4330 |
-| unsecure | create_primary_tenant | function | 004_create_permissions.sql | 1600 | 1 | 004_create_permissions.sql:1600 |
-| unsecure | create_service_user_info | function | 004_create_permissions.sql | 4960 | 1 | 004_create_permissions.sql:4960 |
-| unsecure | create_user_event | function | 004_create_permissions.sql | 1902 | 1 | 004_create_permissions.sql:1902 |
-| unsecure | create_user_group | function | 004_create_permissions.sql | 2334 | 1 | 004_create_permissions.sql:2334 |
-| unsecure | create_user_group_as_system | function | 004_create_permissions.sql | 2376 | 1 | 004_create_permissions.sql:2376 |
-| unsecure | create_user_group_member | function | 014_update_permissions_v1-8.sql | 146 | 3 | 004_create_permissions.sql:2675<br>014_update_permissions_v1-8.sql:143<br>014_update_permissions_v1-8.sql:146 |
-| unsecure | create_user_group_member_as_system | function | 004_create_permissions.sql | 2727 | 1 | 004_create_permissions.sql:2727 |
-| unsecure | create_user_identity | function | 015_update_permissions_v1-9.sql | 442 | 3 | 004_create_permissions.sql:5048<br>015_update_permissions_v1-9.sql:437<br>015_update_permissions_v1-9.sql:442 |
-| unsecure | create_user_info | function | 004_create_permissions.sql | 4914 | 1 | 004_create_permissions.sql:4914 |
-| unsecure | create_user_system | function | 004_create_permissions.sql | 1612 | 1 | 004_create_permissions.sql:1612 |
-| unsecure | delete_tenant | function | 018_update_permissions_v1-10.sql | 342 | 1 | 018_update_permissions_v1-10.sql:342 |
-| unsecure | delete_user_by_id | function | 004_create_permissions.sql | 1636 | 1 | 004_create_permissions.sql:1636 |
-| unsecure | delete_user_by_username_as_system | function | 004_create_permissions.sql | 1625 | 1 | 004_create_permissions.sql:1625 |
-| unsecure | expire_tokens | function | 004_create_permissions.sql | 1984 | 1 | 004_create_permissions.sql:1984 |
-| unsecure | get_all_permissions | function | 004_create_permissions.sql | 4157 | 1 | 004_create_permissions.sql:4157 |
-| unsecure | get_assigned_group_permissions | function | 004_create_permissions.sql | 3284 | 1 | 004_create_permissions.sql:3284 |
-| unsecure | get_assigned_user_permissions | function | 018_update_permissions_v1-10.sql | 1011 | 2 | 004_create_permissions.sql:5812<br>018_update_permissions_v1-10.sql:1011 |
-| unsecure | get_effective_group_permissions | function | 004_create_permissions.sql | 3207 | 1 | 004_create_permissions.sql:3207 |
-| unsecure | get_perm_sets | function | 004_create_permissions.sql | 4209 | 1 | 004_create_permissions.sql:4209 |
-| unsecure | get_user_assigned_permissions | function | 027_update_permissions_v1-17.sql | 24 | 3 | 018_update_permissions_v1-10.sql:1016<br>027_update_permissions_v1-17.sql:21<br>027_update_permissions_v1-17.sql:24 |
-| unsecure | get_user_group_by_id | function | 004_create_permissions.sql | 3136 | 1 | 004_create_permissions.sql:3136 |
-| unsecure | get_user_group_members | function | 014_update_permissions_v1-8.sql | 248 | 3 | 004_create_permissions.sql:2802<br>014_update_permissions_v1-8.sql:247<br>014_update_permissions_v1-8.sql:248 |
-| unsecure | recalculate_user_groups | function | 022_update_permissions_v1-14.sql | 17 | 4 | 018_update_permissions_v1-10.sql:532<br>018_update_permissions_v1-10.sql:537<br>021_update_permissions_v1-13.sql:75<br>022_update_permissions_v1-14.sql:17 |
-| unsecure | recalculate_user_permissions | function | 018_update_permissions_v1-10.sql | 744 | 3 | 004_create_permissions.sql:1289<br>018_update_permissions_v1-10.sql:739<br>018_update_permissions_v1-10.sql:744 |
-| unsecure | set_permission_as_assignable | function | 004_create_permissions.sql | 3861 | 1 | 004_create_permissions.sql:3861 |
-| unsecure | unassign_permission | function | 004_create_permissions.sql | 3817 | 1 | 004_create_permissions.sql:3817 |
-| unsecure | update_perm_set | function | 004_create_permissions.sql | 4372 | 1 | 004_create_permissions.sql:4372 |
-| unsecure | update_permission_full_code | function | 004_create_permissions.sql | 4013 | 1 | 004_create_permissions.sql:4013 |
-| unsecure | update_permission_full_title | function | 004_create_permissions.sql | 3989 | 1 | 004_create_permissions.sql:3989 |
-| unsecure | update_user_identity_oid | function | 020_update_permissions_v1-12.sql | 40 | 2 | 015_update_permissions_v1-9.sql:490<br>020_update_permissions_v1-12.sql:40 |
-| unsecure | update_user_identity_uid_oid | function | 020_update_permissions_v1-12.sql | 43 | 1 | 020_update_permissions_v1-12.sql:43 |
-| unsecure | update_user_info_basic_data | function | 011_update_permissions_v1-5.sql | 95 | 1 | 011_update_permissions_v1-5.sql:95 |
-| unsecure | update_user_password | function | 004_create_permissions.sql | 5084 | 1 | 004_create_permissions.sql:5084 |
+| Schema | Object Name | Type | Last File | Line | Updates | Migration Updates | Ad-hoc Updates |
+|--------|-------------|------|-----------|------|---------|------------------|----------------|
+| auth | active\_user\_groups | view | 004\_create\_permissions.sql | 930 | 1 | 004\_create\_permissions.sql:930 | - |
+| auth | add\_perm\_set\_permissions | function | 004\_create\_permissions.sql | 4498 | 1 | 004\_create\_permissions.sql:4498 | - |
+| auth | add\_user\_to\_default\_groups | function | 004\_create\_permissions.sql | 5267 | 1 | 004\_create\_permissions.sql:5267 | - |
+| auth | api\_key | table | 004\_create\_permissions.sql | 881 | 1 | 004\_create\_permissions.sql:881 | - |
+| auth | assign\_api\_key\_permissions | function | 004\_create\_permissions.sql | 6183 | 1 | 004\_create\_permissions.sql:6183 | - |
+| auth | assign\_permission | function | 004\_create\_permissions.sql | 3949 | 1 | 004\_create\_permissions.sql:3949 | - |
+| auth | can\_manage\_user\_group | function | 004\_create\_permissions.sql | 1455 | 1 | 004\_create\_permissions.sql:1455 | - |
+| auth | create\_api\_key | function | 024\_update\_permissions\_v1-16.sql | 21 | 2 | 024\_update\_permissions\_v1-16.sql:21<br>004\_create\_permissions.sql:5972 | - |
+| auth | create\_external\_user\_group | function | 004\_create\_permissions.sql | 3038 | 1 | 004\_create\_permissions.sql:3038 | - |
+| auth | create\_owner | function | 004\_create\_permissions.sql | 3631 | 1 | 004\_create\_permissions.sql:3631 | - |
+| auth | create\_perm\_set | function | 004\_create\_permissions.sql | 4347 | 1 | 004\_create\_permissions.sql:4347 | - |
+| auth | create\_provider | function | 004\_create\_permissions.sql | 1679 | 1 | 004\_create\_permissions.sql:1679 | - |
+| auth | create\_service\_user\_info | function | 004\_create\_permissions.sql | 5022 | 1 | 004\_create\_permissions.sql:5022 | - |
+| auth | create\_tenant | function | 023\_update\_permissions\_v1-15.sql | 83 | 4 | 023\_update\_permissions\_v1-15.sql:83<br>018\_update\_permissions\_v1-10.sql:165<br>018\_update\_permissions\_v1-10.sql:157<br>004\_create\_permissions.sql:3364 | - |
+| auth | create\_token | function | 015\_update\_permissions\_v1-9.sql | 27 | 2 | 015\_update\_permissions\_v1-9.sql:27<br>004\_create\_permissions.sql:1997 | - |
+| auth | create\_user\_event | function | 004\_create\_permissions.sql | 1953 | 1 | 004\_create\_permissions.sql:1953 | - |
+| auth | create\_user\_group | function | 004\_create\_permissions.sql | 2390 | 1 | 004\_create\_permissions.sql:2390 | - |
+| auth | create\_user\_group\_mapping | function | 004\_create\_permissions.sql | 2920 | 1 | 004\_create\_permissions.sql:2920 | - |
+| auth | create\_user\_group\_member | function | 009\_update\_permissions\_v1-3.sql | 62 | 3 | 009\_update\_permissions\_v1-3.sql:62<br>009\_update\_permissions\_v1-3.sql:60<br>004\_create\_permissions.sql:2754 | - |
+| auth | create\_user\_tenant\_preferences | function | 018\_update\_permissions\_v1-10.sql | 1173 | 1 | 018\_update\_permissions\_v1-10.sql:1173 | - |
+| auth | delete\_api\_key | function | 007\_update\_permissions\_v1-1.sql | 13 | 2 | 007\_update\_permissions\_v1-1.sql:13<br>004\_create\_permissions.sql:6337 | - |
+| auth | delete\_owner | function | 004\_create\_permissions.sql | 3671 | 1 | 004\_create\_permissions.sql:3671 | - |
+| auth | delete\_perm\_set\_permissions | function | 004\_create\_permissions.sql | 4578 | 1 | 004\_create\_permissions.sql:4578 | - |
+| auth | delete\_provider | function | 004\_create\_permissions.sql | 1750 | 1 | 004\_create\_permissions.sql:1750 | - |
+| auth | delete\_tenant | function | 018\_update\_permissions\_v1-10.sql | 382 | 1 | 018\_update\_permissions\_v1-10.sql:382 | - |
+| auth | delete\_tenant\_by\_uuid | function | 018\_update\_permissions\_v1-10.sql | 408 | 1 | 018\_update\_permissions\_v1-10.sql:408 | - |
+| auth | delete\_user\_group | function | 004\_create\_permissions.sql | 2625 | 1 | 004\_create\_permissions.sql:2625 | - |
+| auth | delete\_user\_group\_mapping | function | 004\_create\_permissions.sql | 2991 | 1 | 004\_create\_permissions.sql:2991 | - |
+| auth | delete\_user\_group\_member | function | 014\_update\_permissions\_v1-8.sql | 207 | 2 | 014\_update\_permissions\_v1-8.sql:207<br>004\_create\_permissions.sql:2776 | - |
+| auth | delete\_user\_info | function | 010\_update\_permissions\_v1-4.sql | 36 | 2 | 010\_update\_permissions\_v1-4.sql:36<br>010\_update\_permissions\_v1-4.sql:22 | - |
+| auth | disable\_provider | function | 004\_create\_permissions.sql | 1858 | 1 | 004\_create\_permissions.sql:1858 | - |
+| auth | disable\_user | function | 004\_create\_permissions.sql | 4651 | 1 | 004\_create\_permissions.sql:4651 | - |
+| auth | disable\_user\_group | function | 004\_create\_permissions.sql | 2501 | 1 | 004\_create\_permissions.sql:2501 | - |
+| auth | disable\_user\_identity | function | 004\_create\_permissions.sql | 4812 | 1 | 004\_create\_permissions.sql:4812 | - |
+| auth | effective\_permissions | view | 004\_create\_permissions.sql | 948 | 1 | 004\_create\_permissions.sql:948 | - |
+| auth | enable\_provider | function | 004\_create\_permissions.sql | 1825 | 1 | 004\_create\_permissions.sql:1825 | - |
+| auth | enable\_user | function | 004\_create\_permissions.sql | 4614 | 1 | 004\_create\_permissions.sql:4614 | - |
+| auth | enable\_user\_group | function | 004\_create\_permissions.sql | 2460 | 1 | 004\_create\_permissions.sql:2460 | - |
+| auth | enable\_user\_identity | function | 004\_create\_permissions.sql | 4762 | 1 | 004\_create\_permissions.sql:4762 | - |
+| auth | ensure\_groups\_and\_permissions | function | 018\_update\_permissions\_v1-10.sql | 922 | 2 | 018\_update\_permissions\_v1-10.sql:922<br>018\_update\_permissions\_v1-10.sql:914 | - |
+| auth | ensure\_user\_from\_provider | function | 015\_update\_permissions\_v1-9.sql | 534 | 4 | 015\_update\_permissions\_v1-9.sql:534<br>015\_update\_permissions\_v1-9.sql:530<br>011\_update\_permissions\_v1-5.sql:130<br>009\_update\_permissions\_v1-3.sql:85 | - |
+| auth | ensure\_user\_info | function | 012\_update\_permissions\_v1-6.sql | 254 | 2 | 012\_update\_permissions\_v1-6.sql:254<br>009\_update\_permissions\_v1-3.sql:15 | - |
+| auth | generate\_api\_key | function | 004\_create\_permissions.sql | 5908 | 1 | 004\_create\_permissions.sql:5908 | - |
+| auth | generate\_api\_key\_username | function | 004\_create\_permissions.sql | 5898 | 1 | 004\_create\_permissions.sql:5898 | - |
+| auth | generate\_api\_secret | function | 004\_create\_permissions.sql | 5918 | 1 | 004\_create\_permissions.sql:5918 | - |
+| auth | generate\_api\_secret\_hash | function | 004\_create\_permissions.sql | 5928 | 1 | 004\_create\_permissions.sql:5928 | - |
+| auth | get\_all\_permissions | function | 004\_create\_permissions.sql | 4185 | 1 | 004\_create\_permissions.sql:4185 | - |
+| auth | get\_all\_tenants | function | 018\_update\_permissions\_v1-10.sql | 1360 | 1 | 018\_update\_permissions\_v1-10.sql:1360 | - |
+| auth | get\_api\_key\_permissions | function | 004\_create\_permissions.sql | 6108 | 1 | 004\_create\_permissions.sql:6108 | - |
+| auth | get\_assigned\_group\_permissions | function | 004\_create\_permissions.sql | 3332 | 1 | 004\_create\_permissions.sql:3332 | - |
+| auth | get\_assigned\_user\_permissions | function | 018\_update\_permissions\_v1-10.sql | 1069 | 2 | 018\_update\_permissions\_v1-10.sql:1069<br>004\_create\_permissions.sql:5864 | - |
+| auth | get\_effective\_group\_permissions | function | 004\_create\_permissions.sql | 3260 | 1 | 004\_create\_permissions.sql:3260 | - |
+| auth | get\_perm\_sets | function | 004\_create\_permissions.sql | 4252 | 1 | 004\_create\_permissions.sql:4252 | - |
+| auth | get\_provider\_users | function | 004\_create\_permissions.sql | 1785 | 1 | 004\_create\_permissions.sql:1785 | - |
+| auth | get\_tenant\_by\_id | function | 004\_create\_permissions.sql | 3459 | 1 | 004\_create\_permissions.sql:3459 | - |
+| auth | get\_tenants | function | 004\_create\_permissions.sql | 3422 | 1 | 004\_create\_permissions.sql:3422 | - |
+| auth | get\_user\_assigned\_groups | function | 014\_update\_permissions\_v1-8.sql | 383 | 3 | 014\_update\_permissions\_v1-8.sql:383<br>014\_update\_permissions\_v1-8.sql:382<br>013\_update\_permissions\_v1-7.sql:13 | - |
+| auth | get\_user\_assigned\_permissions | function | 027\_update\_permissions\_v1-17.sql | 67 | 3 | 027\_update\_permissions\_v1-17.sql:67<br>027\_update\_permissions\_v1-17.sql:20<br>018\_update\_permissions\_v1-10.sql:1074 | - |
+| auth | get\_user\_available\_tenants | function | 018\_update\_permissions\_v1-10.sql | 440 | 3 | 018\_update\_permissions\_v1-10.sql:440<br>018\_update\_permissions\_v1-10.sql:434<br>015\_update\_permissions\_v1-9.sql:363 | - |
+| auth | get\_user\_by\_email\_for\_authentication | function | 004\_create\_permissions.sql | 5395 | 1 | 004\_create\_permissions.sql:5395 | - |
+| auth | get\_user\_by\_id | function | 004\_create\_permissions.sql | 5291 | 1 | 004\_create\_permissions.sql:5291 | - |
+| auth | get\_user\_by\_provider\_oid | function | 020\_update\_permissions\_v1-12.sql | 221 | 1 | 020\_update\_permissions\_v1-12.sql:221 | - |
+| auth | get\_user\_data | function | 004\_create\_permissions.sql | 5703 | 1 | 004\_create\_permissions.sql:5703 | - |
+| auth | get\_user\_group\_by\_id | function | 004\_create\_permissions.sql | 3177 | 1 | 004\_create\_permissions.sql:3177 | - |
+| auth | get\_user\_group\_mappings | function | 004\_create\_permissions.sql | 2894 | 1 | 004\_create\_permissions.sql:2894 | - |
+| auth | get\_user\_group\_members | function | 014\_update\_permissions\_v1-8.sql | 310 | 3 | 014\_update\_permissions\_v1-8.sql:310<br>014\_update\_permissions\_v1-8.sql:309<br>004\_create\_permissions.sql:2862 | - |
+| auth | get\_user\_groups\_to\_sync | function | 014\_update\_permissions\_v1-8.sql | 442 | 1 | 014\_update\_permissions\_v1-8.sql:442 | - |
+| auth | get\_user\_identity | function | 004\_create\_permissions.sql | 5326 | 1 | 004\_create\_permissions.sql:5326 | - |
+| auth | get\_user\_identity\_by\_email | function | 004\_create\_permissions.sql | 5359 | 1 | 004\_create\_permissions.sql:5359 | - |
+| auth | get\_user\_last\_selected\_tenant | function | 018\_update\_permissions\_v1-10.sql | 1266 | 1 | 018\_update\_permissions\_v1-10.sql:1266 | - |
+| auth | get\_user\_permissions | function | 004\_create\_permissions.sql | 5655 | 1 | 004\_create\_permissions.sql:5655 | - |
+| auth | get\_user\_preferences | function | 018\_update\_permissions\_v1-10.sql | 1239 | 2 | 018\_update\_permissions\_v1-10.sql:1239<br>018\_update\_permissions\_v1-10.sql:1137 | - |
+| auth | get\_user\_random\_code | function | 004\_create\_permissions.sql | 523 | 1 | 004\_create\_permissions.sql:523 | - |
+| auth | get\_users\_groups\_and\_permissions | function | 018\_update\_permissions\_v1-10.sql | 982 | 1 | 018\_update\_permissions\_v1-10.sql:982 | - |
+| auth | has\_owner | function | 004\_create\_permissions.sql | 1402 | 1 | 004\_create\_permissions.sql:1402 | - |
+| auth | has\_permission | function | 004\_create\_permissions.sql | 1588 | 1 | 004\_create\_permissions.sql:1588 | - |
+| auth | has\_permissions | function | 018\_update\_permissions\_v1-10.sql | 649 | 2 | 018\_update\_permissions\_v1-10.sql:649<br>004\_create\_permissions.sql:1494 | - |
+| auth | is\_group\_member | function | 004\_create\_permissions.sql | 1436 | 1 | 004\_create\_permissions.sql:1436 | - |
+| auth | is\_owner | function | 004\_create\_permissions.sql | 1417 | 1 | 004\_create\_permissions.sql:1417 | - |
+| auth | lock\_user | function | 004\_create\_permissions.sql | 4725 | 1 | 004\_create\_permissions.sql:4725 | - |
+| auth | lock\_user\_group | function | 004\_create\_permissions.sql | 2543 | 1 | 004\_create\_permissions.sql:2543 | - |
+| auth | owner | table | 004\_create\_permissions.sql | 799 | 1 | 004\_create\_permissions.sql:799 | - |
+| auth | perm\_set | table | 018\_update\_permissions\_v1-10.sql | 130 | 3 | 018\_update\_permissions\_v1-10.sql:130<br>018\_update\_permissions\_v1-10.sql:128<br>004\_create\_permissions.sql:730 | - |
+| auth | perm\_set\_perm | table | 004\_create\_permissions.sql | 746 | 1 | 004\_create\_permissions.sql:746 | - |
+| auth | permission | table | 004\_create\_permissions.sql | 715 | 1 | 004\_create\_permissions.sql:715 | - |
+| auth | permission\_assignment | table | 004\_create\_permissions.sql | 809 | 1 | 004\_create\_permissions.sql:809 | - |
+| auth | process\_external\_group\_member\_sync | function | 014\_update\_permissions\_v1-8.sql | 588 | 1 | 014\_update\_permissions\_v1-8.sql:588 | - |
+| auth | process\_external\_group\_member\_sync\_by\_mapping | function | 014\_update\_permissions\_v1-8.sql | 474 | 1 | 014\_update\_permissions\_v1-8.sql:474 | - |
+| auth | provider | table | 004\_create\_permissions.sql | 631 | 1 | 004\_create\_permissions.sql:631 | - |
+| auth | search\_api\_keys | function | 004\_create\_permissions.sql | 6047 | 1 | 004\_create\_permissions.sql:6047 | - |
+| auth | set\_permission\_as\_assignable | function | 004\_create\_permissions.sql | 3913 | 1 | 004\_create\_permissions.sql:3913 | - |
+| auth | set\_token\_as\_failed | function | 012\_update\_permissions\_v1-6.sql | 139 | 1 | 012\_update\_permissions\_v1-6.sql:139 | - |
+| auth | set\_token\_as\_failed\_by\_token | function | 012\_update\_permissions\_v1-6.sql | 209 | 1 | 012\_update\_permissions\_v1-6.sql:209 | - |
+| auth | set\_token\_as\_used | function | 015\_update\_permissions\_v1-9.sql | 223 | 4 | 015\_update\_permissions\_v1-9.sql:223<br>008\_update\_permissions\_v1-2.sql:22<br>008\_update\_permissions\_v1-2.sql:13<br>004\_create\_permissions.sql:2175 | - |
+| auth | set\_token\_as\_used\_by\_token | function | 012\_update\_permissions\_v1-6.sql | 15 | 3 | 012\_update\_permissions\_v1-6.sql:15<br>012\_update\_permissions\_v1-6.sql:13<br>004\_create\_permissions.sql:2243 | - |
+| auth | set\_user\_group\_as\_external | function | 014\_update\_permissions\_v1-8.sql | 344 | 3 | 014\_update\_permissions\_v1-8.sql:344<br>014\_update\_permissions\_v1-8.sql:343<br>004\_create\_permissions.sql:3076 | - |
+| auth | set\_user\_group\_as\_hybrid | function | 004\_create\_permissions.sql | 3109 | 1 | 004\_create\_permissions.sql:3109 | - |
+| auth | tenant | table | 018\_update\_permissions\_v1-10.sql | 133 | 2 | 018\_update\_permissions\_v1-10.sql:133<br>004\_create\_permissions.sql:639 | - |
+| auth | tenant\_user | table | 004\_create\_permissions.sql | 670 | 1 | 004\_create\_permissions.sql:670 | - |
+| auth | throw\_no\_access | function | 004\_create\_permissions.sql | 1134 | 1 | 004\_create\_permissions.sql:1134 | - |
+| auth | throw\_no\_permission | function | 004\_create\_permissions.sql | 1178 | 4 | 004\_create\_permissions.sql:1178<br>004\_create\_permissions.sql:1167<br>004\_create\_permissions.sql:1156<br>004\_create\_permissions.sql:1145 | - |
+| auth | token | table | 004\_create\_permissions.sql | 842 | 1 | 004\_create\_permissions.sql:842 | - |
+| auth | unassign\_api\_key\_permissions | function | 004\_create\_permissions.sql | 6256 | 1 | 004\_create\_permissions.sql:6256 | - |
+| auth | unassign\_permission | function | 004\_create\_permissions.sql | 3973 | 1 | 004\_create\_permissions.sql:3973 | - |
+| auth | unlock\_user | function | 004\_create\_permissions.sql | 4688 | 1 | 004\_create\_permissions.sql:4688 | - |
+| auth | unlock\_user\_group | function | 004\_create\_permissions.sql | 2584 | 1 | 004\_create\_permissions.sql:2584 | - |
+| auth | update\_api\_key | function | 004\_create\_permissions.sql | 6135 | 1 | 004\_create\_permissions.sql:6135 | - |
+| auth | update\_api\_key\_secret | function | 004\_create\_permissions.sql | 6378 | 1 | 004\_create\_permissions.sql:6378 | - |
+| auth | update\_perm\_set | function | 004\_create\_permissions.sql | 4415 | 1 | 004\_create\_permissions.sql:4415 | - |
+| auth | update\_provider | function | 004\_create\_permissions.sql | 1715 | 1 | 004\_create\_permissions.sql:1715 | - |
+| auth | update\_tenant | function | 023\_update\_permissions\_v1-15.sql | 184 | 2 | 023\_update\_permissions\_v1-15.sql:184<br>018\_update\_permissions\_v1-10.sql:251 | - |
+| auth | update\_user\_data | function | 004\_create\_permissions.sql | 5633 | 1 | 004\_create\_permissions.sql:5633 | - |
+| auth | update\_user\_group | function | 004\_create\_permissions.sql | 2415 | 1 | 004\_create\_permissions.sql:2415 | - |
+| auth | update\_user\_last\_selected\_tenant | function | 018\_update\_permissions\_v1-10.sql | 1303 | 3 | 018\_update\_permissions\_v1-10.sql:1303<br>018\_update\_permissions\_v1-10.sql:1299<br>015\_update\_permissions\_v1-9.sql:312 | - |
+| auth | update\_user\_password | function | 004\_create\_permissions.sql | 5119 | 1 | 004\_create\_permissions.sql:5119 | - |
+| auth | update\_user\_preferences | function | 018\_update\_permissions\_v1-10.sql | 1106 | 1 | 018\_update\_permissions\_v1-10.sql:1106 | - |
+| auth | update\_user\_tenant\_preferences | function | 018\_update\_permissions\_v1-10.sql | 1202 | 1 | 018\_update\_permissions\_v1-10.sql:1202 | - |
+| auth | user\_data | table | 011\_update\_permissions\_v1-5.sql | 17 | 2 | 011\_update\_permissions\_v1-5.sql:17<br>004\_create\_permissions.sql:689 | - |
+| auth | user\_event | table | 004\_create\_permissions.sql | 825 | 1 | 004\_create\_permissions.sql:825 | - |
+| auth | user\_group | table | 014\_update\_permissions\_v1-8.sql | 436 | 3 | 014\_update\_permissions\_v1-8.sql:436<br>014\_update\_permissions\_v1-8.sql:432<br>004\_create\_permissions.sql:753 | - |
+| auth | user\_group\_mapping | table | 004\_create\_permissions.sql | 774 | 1 | 004\_create\_permissions.sql:774 | - |
+| auth | user\_group\_member | table | 014\_update\_permissions\_v1-8.sql | 417 | 3 | 014\_update\_permissions\_v1-8.sql:417<br>014\_update\_permissions\_v1-8.sql:25<br>004\_create\_permissions.sql:788 | - |
+| auth | user\_group\_members | view | 014\_update\_permissions\_v1-8.sql | 29 | 3 | 014\_update\_permissions\_v1-8.sql:29<br>014\_update\_permissions\_v1-8.sql:28<br>004\_create\_permissions.sql:903 | - |
+| auth | user\_identity | table | 015\_update\_permissions\_v1-9.sql | 431 | 3 | 015\_update\_permissions\_v1-9.sql:431<br>015\_update\_permissions\_v1-9.sql:424<br>004\_create\_permissions.sql:699 | - |
+| auth | user\_info | table | 018\_update\_permissions\_v1-10.sql | 125 | 4 | 018\_update\_permissions\_v1-10.sql:125<br>015\_update\_permissions\_v1-9.sql:309<br>011\_update\_permissions\_v1-5.sql:53<br>004\_create\_permissions.sql:650 | - |
+| auth | user\_permission\_cache | table | 018\_update\_permissions\_v1-10.sql | 484 | 4 | 018\_update\_permissions\_v1-10.sql:484<br>010\_update\_permissions\_v1-4.sql:17<br>010\_update\_permissions\_v1-4.sql:14<br>004\_create\_permissions.sql:677 | - |
+| auth | user\_tenant\_preference | table | 018\_update\_permissions\_v1-10.sql | 136 | 1 | 018\_update\_permissions\_v1-10.sql:136 | - |
+| auth | validate\_api\_key | function | 004\_create\_permissions.sql | 6421 | 1 | 004\_create\_permissions.sql:6421 | - |
+| auth | validate\_provider\_is\_active | function | 004\_create\_permissions.sql | 1653 | 1 | 004\_create\_permissions.sql:1653 | - |
+| auth | validate\_token | function | 015\_update\_permissions\_v1-9.sql | 129 | 5 | 015\_update\_permissions\_v1-9.sql:129<br>015\_update\_permissions\_v1-9.sql:123<br>008\_update\_permissions\_v1-2.sql:101<br>008\_update\_permissions\_v1-2.sql:92<br>004\_create\_permissions.sql:2087 | - |
+| const | sys\_param | table | 004\_create\_permissions.sql | 588 | 1 | 004\_create\_permissions.sql:588 | - |
+| const | tenant\_access\_type | table | 004\_create\_permissions.sql | 600 | 1 | 004\_create\_permissions.sql:600 | - |
+| const | token\_channel | table | 004\_create\_permissions.sql | 611 | 1 | 004\_create\_permissions.sql:611 | - |
+| const | token\_state | table | 004\_create\_permissions.sql | 616 | 1 | 004\_create\_permissions.sql:616 | - |
+| const | token\_type | table | 004\_create\_permissions.sql | 605 | 1 | 004\_create\_permissions.sql:605 | - |
+| const | user\_event\_type | table | 004\_create\_permissions.sql | 626 | 1 | 004\_create\_permissions.sql:626 | - |
+| const | user\_group\_member\_type | table | 014\_update\_permissions\_v1-8.sql | 15 | 1 | 014\_update\_permissions\_v1-8.sql:15 | - |
+| const | user\_type | table | 004\_create\_permissions.sql | 621 | 1 | 004\_create\_permissions.sql:621 | - |
+| error | raise\_52101 | function | 004\_create\_permissions.sql | 41 | 1 | 004\_create\_permissions.sql:41 | - |
+| error | raise\_52102 | function | 004\_create\_permissions.sql | 54 | 1 | 004\_create\_permissions.sql:54 | - |
+| error | raise\_52103 | function | 004\_create\_permissions.sql | 67 | 1 | 004\_create\_permissions.sql:67 | - |
+| error | raise\_52104 | function | 004\_create\_permissions.sql | 81 | 1 | 004\_create\_permissions.sql:81 | - |
+| error | raise\_52105 | function | 004\_create\_permissions.sql | 95 | 1 | 004\_create\_permissions.sql:95 | - |
+| error | raise\_52106 | function | 004\_create\_permissions.sql | 108 | 1 | 004\_create\_permissions.sql:108 | - |
+| error | raise\_52107 | function | 004\_create\_permissions.sql | 121 | 1 | 004\_create\_permissions.sql:121 | - |
+| error | raise\_52108 | function | 004\_create\_permissions.sql | 134 | 1 | 004\_create\_permissions.sql:134 | - |
+| error | raise\_52109 | function | 004\_create\_permissions.sql | 147 | 1 | 004\_create\_permissions.sql:147 | - |
+| error | raise\_52110 | function | 004\_create\_permissions.sql | 160 | 1 | 004\_create\_permissions.sql:160 | - |
+| error | raise\_52111 | function | 004\_create\_permissions.sql | 173 | 1 | 004\_create\_permissions.sql:173 | - |
+| error | raise\_52112 | function | 004\_create\_permissions.sql | 186 | 1 | 004\_create\_permissions.sql:186 | - |
+| error | raise\_52171 | function | 004\_create\_permissions.sql | 199 | 1 | 004\_create\_permissions.sql:199 | - |
+| error | raise\_52172 | function | 004\_create\_permissions.sql | 213 | 1 | 004\_create\_permissions.sql:213 | - |
+| error | raise\_52173 | function | 004\_create\_permissions.sql | 227 | 1 | 004\_create\_permissions.sql:227 | - |
+| error | raise\_52174 | function | 004\_create\_permissions.sql | 241 | 1 | 004\_create\_permissions.sql:241 | - |
+| error | raise\_52175 | function | 004\_create\_permissions.sql | 253 | 1 | 004\_create\_permissions.sql:253 | - |
+| error | raise\_52176 | function | 004\_create\_permissions.sql | 264 | 1 | 004\_create\_permissions.sql:264 | - |
+| error | raise\_52177 | function | 004\_create\_permissions.sql | 276 | 1 | 004\_create\_permissions.sql:276 | - |
+| error | raise\_52178 | function | 004\_create\_permissions.sql | 289 | 1 | 004\_create\_permissions.sql:289 | - |
+| error | raise\_52179 | function | 004\_create\_permissions.sql | 302 | 1 | 004\_create\_permissions.sql:302 | - |
+| error | raise\_52180 | function | 004\_create\_permissions.sql | 435 | 1 | 004\_create\_permissions.sql:435 | - |
+| error | raise\_52181 | function | 004\_create\_permissions.sql | 448 | 1 | 004\_create\_permissions.sql:448 | - |
+| error | raise\_52271 | function | 004\_create\_permissions.sql | 316 | 1 | 004\_create\_permissions.sql:316 | - |
+| error | raise\_52272 | function | 004\_create\_permissions.sql | 330 | 1 | 004\_create\_permissions.sql:330 | - |
+| error | raise\_52273 | function | 004\_create\_permissions.sql | 343 | 1 | 004\_create\_permissions.sql:343 | - |
+| error | raise\_52274 | function | 004\_create\_permissions.sql | 356 | 1 | 004\_create\_permissions.sql:356 | - |
+| error | raise\_52275 | function | 004\_create\_permissions.sql | 369 | 1 | 004\_create\_permissions.sql:369 | - |
+| error | raise\_52276 | function | 004\_create\_permissions.sql | 383 | 1 | 004\_create\_permissions.sql:383 | - |
+| error | raise\_52277 | function | 004\_create\_permissions.sql | 396 | 1 | 004\_create\_permissions.sql:396 | - |
+| error | raise\_52278 | function | 004\_create\_permissions.sql | 409 | 1 | 004\_create\_permissions.sql:409 | - |
+| error | raise\_52279 | function | 004\_create\_permissions.sql | 422 | 1 | 004\_create\_permissions.sql:422 | - |
+| error | raise\_52282 | function | 004\_create\_permissions.sql | 461 | 1 | 004\_create\_permissions.sql:461 | - |
+| error | raise\_52283 | function | 004\_create\_permissions.sql | 475 | 1 | 004\_create\_permissions.sql:475 | - |
+| error | raise\_52301 | function | 004\_create\_permissions.sql | 489 | 1 | 004\_create\_permissions.sql:489 | - |
+| error | raise\_52401 | function | 004\_create\_permissions.sql | 502 | 1 | 004\_create\_permissions.sql:502 | - |
+| helpers | compare\_jsonb\_objects | function | 003\_create\_helpers.sql | 137 | 1 | 003\_create\_helpers.sql:137 | - |
+| helpers | get\_code | function | 003\_create\_helpers.sql | 82 | 1 | 003\_create\_helpers.sql:82 | - |
+| helpers | get\_slug | function | 003\_create\_helpers.sql | 106 | 1 | 003\_create\_helpers.sql:106 | - |
+| helpers | is\_empty\_string | function | 003\_create\_helpers.sql | 51 | 1 | 003\_create\_helpers.sql:51 | - |
+| helpers | is\_not\_empty\_string | function | 003\_create\_helpers.sql | 62 | 1 | 003\_create\_helpers.sql:62 | - |
+| helpers | ltree\_parent | function | 003\_create\_helpers.sql | 162 | 1 | 003\_create\_helpers.sql:162 | - |
+| helpers | random\_string | function | 003\_create\_helpers.sql | 73 | 1 | 003\_create\_helpers.sql:73 | - |
+| helpers | trg\_generate\_code\_from\_title | function | 004\_create\_permissions.sql | 566 | 1 | 004\_create\_permissions.sql:566 | - |
+| helpers | unaccent\_text | function | 003\_create\_helpers.sql | 117 | 1 | 003\_create\_helpers.sql:117 | - |
+| internal | update\_permissions\_v1\_6 | procedure | 012\_update\_permissions\_v1-6.sql | 300 | 1 | 012\_update\_permissions\_v1-6.sql:300 | - |
+| public | \_\_temp\_current\_members | table | 014\_update\_permissions\_v1-8.sql | 583 | 2 | 014\_update\_permissions\_v1-8.sql:583<br>014\_update\_permissions\_v1-8.sql:501 | - |
+| public | \_\_temp\_delete\_members | table | 014\_update\_permissions\_v1-8.sql | 692 | 1 | 014\_update\_permissions\_v1-8.sql:692 | - |
+| public | \_\_temp\_ensure\_users | table | 014\_update\_permissions\_v1-8.sql | 581 | 2 | 014\_update\_permissions\_v1-8.sql:581<br>014\_update\_permissions\_v1-8.sql:507 | - |
+| public | \_\_temp\_ensured\_users | table | 014\_update\_permissions\_v1-8.sql | 582 | 2 | 014\_update\_permissions\_v1-8.sql:582<br>014\_update\_permissions\_v1-8.sql:535 | - |
+| public | \_\_temp\_external\_group\_sync | table | 014\_update\_permissions\_v1-8.sql | 693 | 2 | 014\_update\_permissions\_v1-8.sql:693<br>014\_update\_permissions\_v1-8.sql:607 | - |
+| public | \_\_temp\_members\_comparison | table | 014\_update\_permissions\_v1-8.sql | 584 | 2 | 014\_update\_permissions\_v1-8.sql:584<br>014\_update\_permissions\_v1-8.sql:518 | - |
+| public | \_\_temp\_users\_groups | table | 018\_update\_permissions\_v1-10.sql | 952 | 1 | 018\_update\_permissions\_v1-10.sql:952 | - |
+| public | \_\_temp\_users\_groups\_permissions | table | 018\_update\_permissions\_v1-10.sql | 792 | 1 | 018\_update\_permissions\_v1-10.sql:792 | - |
+| public | \_\_version | table | 002\_create\_version\_management.sql | 12 | 1 | 002\_create\_version\_management.sql:12 | - |
+| public | \_template\_created | table | 004\_create\_permissions.sql | 544 | 1 | 004\_create\_permissions.sql:544 | - |
+| public | \_template\_timestamps | table | 004\_create\_permissions.sql | 550 | 1 | 004\_create\_permissions.sql:550 | - |
+| public | add\_journal\_msg | function | 004\_create\_permissions.sql | 995 | 1 | 004\_create\_permissions.sql:995 | - |
+| public | add\_journal\_msg\_jsonb | function | 004\_create\_permissions.sql | 973 | 1 | 004\_create\_permissions.sql:973 | - |
+| public | auth | schema | 001\_create\_basic\_structure.sql | 18 | 1 | 001\_create\_basic\_structure.sql:18 | - |
+| public | c\_perm\_set\_code | trigger | 004\_create\_permissions.sql | 740 | 1 | 004\_create\_permissions.sql:740 | - |
+| public | c\_user\_group\_code | trigger | 004\_create\_permissions.sql | 768 | 1 | 004\_create\_permissions.sql:768 | - |
+| public | check\_version | function | 016\_update\_versions-management\_v1-1.sql | 14 | 3 | 016\_update\_versions-management\_v1-1.sql:14<br>016\_update\_versions-management\_v1-1.sql:12<br>002\_create\_version\_management.sql:52 | - |
+| public | const | schema | 001\_create\_basic\_structure.sql | 13 | 1 | 001\_create\_basic\_structure.sql:13 | - |
+| public | error | schema | 001\_create\_basic\_structure.sql | 12 | 1 | 001\_create\_basic\_structure.sql:12 | - |
+| public | ext | schema | 001\_create\_basic\_structure.sql | 17 | 1 | 001\_create\_basic\_structure.sql:17 | - |
+| public | get\_version | function | 017\_update\_versions-management\_v1-2.sql | 12 | 1 | 017\_update\_versions-management\_v1-2.sql:12 | - |
+| public | helpers | schema | 001\_create\_basic\_structure.sql | 16 | 1 | 001\_create\_basic\_structure.sql:16 | - |
+| public | internal | schema | 001\_create\_basic\_structure.sql | 14 | 1 | 001\_create\_basic\_structure.sql:14 | - |
+| public | ix\_journal | index | 004\_create\_permissions.sql | 878 | 1 | 004\_create\_permissions.sql:878 | - |
+| public | ix\_owner | index | 004\_create\_permissions.sql | 807 | 1 | 004\_create\_permissions.sql:807 | - |
+| public | ix\_permission\_node\_path | index | 004\_create\_permissions.sql | 728 | 1 | 004\_create\_permissions.sql:728 | - |
+| public | ix\_token\_expires\_at | index | 004\_create\_permissions.sql | 862 | 1 | 004\_create\_permissions.sql:862 | - |
+| public | ix\_token\_token | index | 004\_create\_permissions.sql | 861 | 1 | 004\_create\_permissions.sql:861 | - |
+| public | ix\_token\_token\_data | index | 004\_create\_permissions.sql | 863 | 1 | 004\_create\_permissions.sql:863 | - |
+| public | ix\_user\_event\_data | index | 004\_create\_permissions.sql | 840 | 1 | 004\_create\_permissions.sql:840 | - |
+| public | ix\_user\_permission\_cache | index | 018\_update\_permissions\_v1-10.sql | 488 | 1 | 018\_update\_permissions\_v1-10.sql:488 | - |
+| public | ix\_user\_tenant\_preference | index | 018\_update\_permissions\_v1-10.sql | 145 | 1 | 018\_update\_permissions\_v1-10.sql:145 | - |
+| public | journal | table | 015\_update\_permissions\_v1-9.sql | 645 | 2 | 015\_update\_permissions\_v1-9.sql:645<br>004\_create\_permissions.sql:865 | - |
+| public | search\_journal\_msgs | function | 018\_update\_permissions\_v1-10.sql | 36 | 5 | 018\_update\_permissions\_v1-10.sql:36<br>018\_update\_permissions\_v1-10.sql:32<br>018\_update\_permissions\_v1-10.sql:28<br>015\_update\_permissions\_v1-9.sql:652<br>004\_create\_permissions.sql:1021 | - |
+| public | start\_version\_update | function | 002\_create\_version\_management.sql | 25 | 1 | 002\_create\_version\_management.sql:25 | - |
+| public | stop\_version\_update | function | 002\_create\_version\_management.sql | 38 | 1 | 002\_create\_version\_management.sql:38 | - |
+| public | tmp\_default\_groups | table | 021\_update\_permissions\_v1-13.sql | 69 | 4 | 021\_update\_permissions\_v1-13.sql:69<br>021\_update\_permissions\_v1-13.sql:38<br>004\_create\_permissions.sql:5263<br>004\_create\_permissions.sql:5232 | - |
+| public | trg\_auth\_calculate\_user\_data | trigger | 011\_update\_permissions\_v1-5.sql | 47 | 1 | 011\_update\_permissions\_v1-5.sql:47 | - |
+| public | trg\_auth\_calculate\_user\_info | trigger | 011\_update\_permissions\_v1-5.sql | 86 | 1 | 011\_update\_permissions\_v1-5.sql:86 | - |
+| public | triggers | schema | 011\_update\_permissions\_v1-5.sql | 15 | 1 | 011\_update\_permissions\_v1-5.sql:15 | - |
+| public | unsecure | schema | 001\_create\_basic\_structure.sql | 15 | 1 | 001\_create\_basic\_structure.sql:15 | - |
+| public | uq\_auth\_permission\_assignment\_tenant\_group | index | 019\_update\_permissions\_v1-11.sql | 31 | 1 | 019\_update\_permissions\_v1-11.sql:31 | - |
+| public | uq\_auth\_permission\_assignment\_tenant\_user | index | 019\_update\_permissions\_v1-11.sql | 28 | 1 | 019\_update\_permissions\_v1-11.sql:28 | - |
+| public | uq\_auth\_user\_info | index | 004\_create\_permissions.sql | 668 | 1 | 004\_create\_permissions.sql:668 | - |
+| public | uq\_external\_group\_member | index | 014\_update\_permissions\_v1-8.sql | 430 | 1 | 014\_update\_permissions\_v1-8.sql:430 | - |
+| public | uq\_permission\_assignment | index | 004\_create\_permissions.sql | 821 | 1 | 004\_create\_permissions.sql:821 | - |
+| public | uq\_permission\_full\_code | index | 004\_create\_permissions.sql | 727 | 1 | 004\_create\_permissions.sql:727 | - |
+| public | uq\_sys\_params | index | 004\_create\_permissions.sql | 598 | 1 | 004\_create\_permissions.sql:598 | - |
+| public | uq\_tenant\_uuid | index | 018\_update\_permissions\_v1-10.sql | 481 | 1 | 018\_update\_permissions\_v1-10.sql:481 | - |
+| public | uq\_user\_group\_mapping | index | 004\_create\_permissions.sql | 784 | 1 | 004\_create\_permissions.sql:784 | - |
+| public | uq\_user\_group\_member | index | 004\_create\_permissions.sql | 797 | 1 | 004\_create\_permissions.sql:797 | - |
+| public | uq\_user\_identity | index | 004\_create\_permissions.sql | 713 | 1 | 004\_create\_permissions.sql:713 | - |
+| public | uq\_user\_permission\_cache | index | 018\_update\_permissions\_v1-10.sql | 487 | 1 | 018\_update\_permissions\_v1-10.sql:487 | - |
+| public | uq\_user\_tenant\_preference | index | 018\_update\_permissions\_v1-10.sql | 144 | 1 | 018\_update\_permissions\_v1-10.sql:144 | - |
+| public | uq\_version | index | 002\_create\_version\_management.sql | 23 | 1 | 002\_create\_version\_management.sql:23 | - |
+| public | validate\_token | function | 012\_update\_permissions\_v1-6.sql | 56 | 1 | 012\_update\_permissions\_v1-6.sql:56 | - |
+| stage | external\_group\_member | table | 014\_update\_permissions\_v1-8.sql | 420 | 1 | 014\_update\_permissions\_v1-8.sql:420 | - |
+| triggers | calculate\_user\_data | function | 011\_update\_permissions\_v1-5.sql | 33 | 1 | 011\_update\_permissions\_v1-5.sql:33 | - |
+| triggers | calculate\_user\_data\_search\_values | function | 011\_update\_permissions\_v1-5.sql | 23 | 1 | 011\_update\_permissions\_v1-5.sql:23 | - |
+| triggers | calculate\_user\_info | function | 011\_update\_permissions\_v1-5.sql | 72 | 1 | 011\_update\_permissions\_v1-5.sql:72 | - |
+| triggers | calculate\_user\_info\_search\_values | function | 011\_update\_permissions\_v1-5.sql | 59 | 1 | 011\_update\_permissions\_v1-5.sql:59 | - |
+| unsecure | add\_user\_to\_default\_groups | function | 021\_update\_permissions\_v1-13.sql | 17 | 2 | 021\_update\_permissions\_v1-13.sql:17<br>004\_create\_permissions.sql:5211 | - |
+| unsecure | assign\_permission | function | 022\_update\_permissions\_v1-14.sql | 133 | 2 | 022\_update\_permissions\_v1-14.sql:133<br>004\_create\_permissions.sql:3718 | - |
+| unsecure | assign\_permission\_as\_system | function | 004\_create\_permissions.sql | 3933 | 1 | 004\_create\_permissions.sql:3933 | - |
+| unsecure | create\_api\_user | function | 004\_create\_permissions.sql | 5938 | 1 | 004\_create\_permissions.sql:5938 | - |
+| unsecure | create\_perm\_set | function | 004\_create\_permissions.sql | 4276 | 1 | 004\_create\_permissions.sql:4276 | - |
+| unsecure | create\_perm\_set\_as\_system | function | 004\_create\_permissions.sql | 4330 | 1 | 004\_create\_permissions.sql:4330 | - |
+| unsecure | create\_primary\_tenant | function | 004\_create\_permissions.sql | 1600 | 1 | 004\_create\_permissions.sql:1600 | - |
+| unsecure | create\_service\_user\_info | function | 004\_create\_permissions.sql | 4960 | 1 | 004\_create\_permissions.sql:4960 | - |
+| unsecure | create\_user\_event | function | 004\_create\_permissions.sql | 1902 | 1 | 004\_create\_permissions.sql:1902 | - |
+| unsecure | create\_user\_group | function | 004\_create\_permissions.sql | 2334 | 1 | 004\_create\_permissions.sql:2334 | - |
+| unsecure | create\_user\_group\_as\_system | function | 004\_create\_permissions.sql | 2376 | 1 | 004\_create\_permissions.sql:2376 | - |
+| unsecure | create\_user\_group\_member | function | 014\_update\_permissions\_v1-8.sql | 146 | 3 | 014\_update\_permissions\_v1-8.sql:146<br>014\_update\_permissions\_v1-8.sql:143<br>004\_create\_permissions.sql:2675 | - |
+| unsecure | create\_user\_group\_member\_as\_system | function | 004\_create\_permissions.sql | 2727 | 1 | 004\_create\_permissions.sql:2727 | - |
+| unsecure | create\_user\_identity | function | 015\_update\_permissions\_v1-9.sql | 442 | 3 | 015\_update\_permissions\_v1-9.sql:442<br>015\_update\_permissions\_v1-9.sql:437<br>004\_create\_permissions.sql:5048 | - |
+| unsecure | create\_user\_info | function | 004\_create\_permissions.sql | 4914 | 1 | 004\_create\_permissions.sql:4914 | - |
+| unsecure | create\_user\_system | function | 004\_create\_permissions.sql | 1612 | 1 | 004\_create\_permissions.sql:1612 | - |
+| unsecure | delete\_tenant | function | 018\_update\_permissions\_v1-10.sql | 342 | 1 | 018\_update\_permissions\_v1-10.sql:342 | - |
+| unsecure | delete\_user\_by\_id | function | 004\_create\_permissions.sql | 1636 | 1 | 004\_create\_permissions.sql:1636 | - |
+| unsecure | delete\_user\_by\_username\_as\_system | function | 004\_create\_permissions.sql | 1625 | 1 | 004\_create\_permissions.sql:1625 | - |
+| unsecure | expire\_tokens | function | 004\_create\_permissions.sql | 1984 | 1 | 004\_create\_permissions.sql:1984 | - |
+| unsecure | get\_all\_permissions | function | 004\_create\_permissions.sql | 4157 | 1 | 004\_create\_permissions.sql:4157 | - |
+| unsecure | get\_assigned\_group\_permissions | function | 004\_create\_permissions.sql | 3284 | 1 | 004\_create\_permissions.sql:3284 | - |
+| unsecure | get\_assigned\_user\_permissions | function | 018\_update\_permissions\_v1-10.sql | 1011 | 2 | 018\_update\_permissions\_v1-10.sql:1011<br>004\_create\_permissions.sql:5812 | - |
+| unsecure | get\_effective\_group\_permissions | function | 004\_create\_permissions.sql | 3207 | 1 | 004\_create\_permissions.sql:3207 | - |
+| unsecure | get\_perm\_sets | function | 004\_create\_permissions.sql | 4209 | 1 | 004\_create\_permissions.sql:4209 | - |
+| unsecure | get\_user\_assigned\_permissions | function | 027\_update\_permissions\_v1-17.sql | 24 | 3 | 027\_update\_permissions\_v1-17.sql:24<br>027\_update\_permissions\_v1-17.sql:21<br>018\_update\_permissions\_v1-10.sql:1016 | - |
+| unsecure | get\_user\_group\_by\_id | function | 004\_create\_permissions.sql | 3136 | 1 | 004\_create\_permissions.sql:3136 | - |
+| unsecure | get\_user\_group\_members | function | 014\_update\_permissions\_v1-8.sql | 248 | 3 | 014\_update\_permissions\_v1-8.sql:248<br>014\_update\_permissions\_v1-8.sql:247<br>004\_create\_permissions.sql:2802 | - |
+| unsecure | recalculate\_user\_groups | function | 022\_update\_permissions\_v1-14.sql | 17 | 4 | 022\_update\_permissions\_v1-14.sql:17<br>021\_update\_permissions\_v1-13.sql:75<br>018\_update\_permissions\_v1-10.sql:537<br>018\_update\_permissions\_v1-10.sql:532 | - |
+| unsecure | recalculate\_user\_permissions | function | 018\_update\_permissions\_v1-10.sql | 744 | 3 | 018\_update\_permissions\_v1-10.sql:744<br>018\_update\_permissions\_v1-10.sql:739<br>004\_create\_permissions.sql:1289 | - |
+| unsecure | set\_permission\_as\_assignable | function | 004\_create\_permissions.sql | 3861 | 1 | 004\_create\_permissions.sql:3861 | - |
+| unsecure | unassign\_permission | function | 004\_create\_permissions.sql | 3817 | 1 | 004\_create\_permissions.sql:3817 | - |
+| unsecure | update\_perm\_set | function | 004\_create\_permissions.sql | 4372 | 1 | 004\_create\_permissions.sql:4372 | - |
+| unsecure | update\_permission\_full\_code | function | 004\_create\_permissions.sql | 4013 | 1 | 004\_create\_permissions.sql:4013 | - |
+| unsecure | update\_permission\_full\_title | function | 004\_create\_permissions.sql | 3989 | 1 | 004\_create\_permissions.sql:3989 | - |
+| unsecure | update\_user\_identity\_oid | function | 020\_update\_permissions\_v1-12.sql | 40 | 2 | 020\_update\_permissions\_v1-12.sql:40<br>015\_update\_permissions\_v1-9.sql:490 | - |
+| unsecure | update\_user\_identity\_uid\_oid | function | 020\_update\_permissions\_v1-12.sql | 43 | 1 | 020\_update\_permissions\_v1-12.sql:43 | - |
+| unsecure | update\_user\_info\_basic\_data | function | 011\_update\_permissions\_v1-5.sql | 95 | 1 | 011\_update\_permissions\_v1-5.sql:95 | - |
+| unsecure | update\_user\_password | function | 004\_create\_permissions.sql | 5084 | 1 | 004\_create\_permissions.sql:5084 | - |
 
 ## Summary
 - **Total Objects**: 284

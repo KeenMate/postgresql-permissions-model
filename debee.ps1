@@ -4,7 +4,7 @@ param (
 	# Parameter help description
 	[string]$Environment,
 	[Parameter(Mandatory = $true)]
-	[ValidateSet("restoreDatabase", "recreateDatabase", "updateDatabase", "preUpdateScripts", "postUpdateScripts", "fullService")]
+	[ValidateSet("restoreDatabase", "recreateDatabase", "updateDatabase", "preUpdateScripts", "postUpdateScripts", "prepareVersionTable", "fullService")]
 	[string[]]$Operations = @("fullService"),
 	[int]$UpdateStartNumber = -1,
 	[int]$UpdateEndNumber = -1
@@ -336,6 +336,49 @@ function Update-DatabaseWithFiles {
 	}
 }
 
+function Prepare-VersionTable {
+	Write-Host "Preparing version table - extracting database objects and generating markdown"
+
+	# Check if extract-db-objects.py exists
+	if (-not (Test-Path "extract-db-objects.py")) {
+		Write-Error "extract-db-objects.py not found in current directory"
+		return
+	}
+
+	# Run extract-db-objects.py to generate JSON
+	Write-Host "Extracting database objects to db-objects.json..."
+	$pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
+
+	try {
+		& $pythonCmd "extract-db-objects.py" --format json --output "db-objects.json"
+		Write-Host "Successfully generated db-objects.json"
+	}
+	catch {
+		Write-Error "Failed to run extract-db-objects.py: $_"
+		return
+	}
+
+	# Check if JSON file was created
+	if (-not (Test-Path "db-objects.json")) {
+		Write-Error "db-objects.json was not created"
+		return
+	}
+
+	# Generate markdown table from JSON
+	Write-Host "Generating db-objects.md from JSON..."
+	try {
+		& $pythonCmd "extract-db-objects.py" --format markdown --output "db-objects.md"
+		Write-Host "Successfully generated db-objects.md"
+	}
+	catch {
+		Write-Error "Failed to generate markdown: $_"
+		return
+	}
+
+	Write-Host "Version table preparation completed successfully"
+	Write-Host "Generated files: db-objects.json, db-objects.md"
+}
+
 
 
 # Define the path to the environment file
@@ -386,6 +429,10 @@ foreach ($o in $Operations) {
 			Write-Host "Performing post update operation..."
 			Run-PostUpdateScripts
   }
+  "prepareVersionTable" {
+			Write-Host "Performing prepare version table operation..."
+			Prepare-VersionTable
+  }
   "fullService" {
 			Write-Host "Performing full service operation for us, lazy boys..."
 			Recreate-Database
@@ -400,5 +447,4 @@ foreach ($o in $Operations) {
   }
 	}
 }
-
 

@@ -85,6 +85,26 @@ The system implements a hierarchical permission model with clear separation betw
 - Can be assigned directly to users OR to groups (users inherit from group membership)
 - Assignment happens through permission sets or individual permissions
 
+## Database Object Tracking
+
+**IMPORTANT**: Before looking for any database object (function, table, view, etc.), always check `db-objects.md` first to find the latest definition location.
+
+- `db-objects.md` - Complete tracking table of all 284+ database objects with:
+  - Schema, object name, and type
+  - Latest update file and line number
+  - Complete update history across all migration files
+  - Separation of migration vs ad-hoc updates
+- `extract-db-objects.py` - Python script to regenerate the tracking table
+- `db-objects.json` - JSON version for programmatic access
+
+**Usage**: When asked about any function like `auth.has_permission`, first check `db-objects.md` to see it's defined in `004_create_permissions.sql:1588` with 1 total update.
+
+**Key Columns**:
+- **Last File**: The most recent file where the object was defined/modified
+- **Line**: The exact line number in that file where the current definition starts
+- **Migration Updates**: Chronological history of all changes (newest first)
+- **Ad-hoc Updates**: Any updates from ad-hoc scripts (if DBADHOCDIRECTORY is set)
+
 ## Development Commands
 
 ### Database Setup and Migration
