@@ -1,0 +1,4727 @@
+[
+  {
+    "schema": "auth",
+    "object_name": "active_user_groups",
+    "object_type": "view",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 930,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 930,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "add_perm_set_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4498,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4498,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "add_user_to_default_groups",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5267,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5267,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "api_key",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 881,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 881,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "assign_api_key_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6183,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6183,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "assign_permission",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3949,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3949,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "can_manage_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1455,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1455,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_api_key",
+    "object_type": "function",
+    "last_update_file": "024_update_permissions_v1-16.sql",
+    "last_update_line": 21,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5972,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "024_update_permissions_v1-16.sql",
+        "line": 21,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_external_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3038,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3038,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_owner",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3631,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3631,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_perm_set",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4347,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4347,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_provider",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1679,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1679,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_service_user_info",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5022,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5022,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_tenant",
+    "object_type": "function",
+    "last_update_file": "023_update_permissions_v1-15.sql",
+    "last_update_line": 83,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3364,
+        "operation": "CREATE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 157,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 165,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "023_update_permissions_v1-15.sql",
+        "line": 83,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_token",
+    "object_type": "function",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 27,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1997,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 27,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_user_event",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1953,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1953,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2390,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2390,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_user_group_mapping",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2920,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2920,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_user_group_member",
+    "object_type": "function",
+    "last_update_file": "009_update_permissions_v1-3.sql",
+    "last_update_line": 62,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2754,
+        "operation": "CREATE"
+      },
+      {
+        "file": "009_update_permissions_v1-3.sql",
+        "line": 60,
+        "operation": "DROP"
+      },
+      {
+        "file": "009_update_permissions_v1-3.sql",
+        "line": 62,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "create_user_tenant_preferences",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1173,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1173,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_api_key",
+    "object_type": "function",
+    "last_update_file": "007_update_permissions_v1-1.sql",
+    "last_update_line": 13,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6337,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "007_update_permissions_v1-1.sql",
+        "line": 13,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_owner",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3671,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3671,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_perm_set_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4578,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4578,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_provider",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1750,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1750,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_tenant",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 382,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 382,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_tenant_by_uuid",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 408,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 408,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2625,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2625,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_user_group_mapping",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2991,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2991,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_user_group_member",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 207,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2776,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 207,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "delete_user_info",
+    "object_type": "function",
+    "last_update_file": "010_update_permissions_v1-4.sql",
+    "last_update_line": 36,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "010_update_permissions_v1-4.sql",
+        "line": 22,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "010_update_permissions_v1-4.sql",
+        "line": 36,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "disable_provider",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1858,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1858,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "disable_user",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4651,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4651,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "disable_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2501,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2501,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "disable_user_identity",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4812,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4812,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "effective_permissions",
+    "object_type": "view",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 948,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 948,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "enable_provider",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1825,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1825,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "enable_user",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4614,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4614,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "enable_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2460,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2460,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "enable_user_identity",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4762,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4762,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "ensure_groups_and_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 922,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 914,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 922,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "ensure_user_from_provider",
+    "object_type": "function",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 534,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "009_update_permissions_v1-3.sql",
+        "line": 85,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 130,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 530,
+        "operation": "DROP"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 534,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "ensure_user_info",
+    "object_type": "function",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 254,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "009_update_permissions_v1-3.sql",
+        "line": 15,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 254,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "generate_api_key",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5908,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5908,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "generate_api_key_username",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5898,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5898,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "generate_api_secret",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5918,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5918,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "generate_api_secret_hash",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5928,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5928,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_all_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4185,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4185,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_all_tenants",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1360,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1360,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_api_key_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6108,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6108,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_assigned_group_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3332,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3332,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_assigned_user_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1069,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5864,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1069,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_effective_group_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3260,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3260,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_perm_sets",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4252,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4252,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_provider_users",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1785,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1785,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_tenant_by_id",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3459,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3459,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_tenants",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3422,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3422,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_assigned_groups",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 383,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "013_update_permissions_v1-7.sql",
+        "line": 13,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 382,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 383,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_assigned_permissions",
+    "object_type": "function",
+    "last_update_file": "027_update_permissions_v1-17.sql",
+    "last_update_line": 67,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1074,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "027_update_permissions_v1-17.sql",
+        "line": 20,
+        "operation": "DROP"
+      },
+      {
+        "file": "027_update_permissions_v1-17.sql",
+        "line": 67,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_available_tenants",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 440,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 363,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 434,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 440,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_by_email_for_authentication",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5395,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5395,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_by_id",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5291,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5291,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_by_provider_oid",
+    "object_type": "function",
+    "last_update_file": "020_update_permissions_v1-12.sql",
+    "last_update_line": 221,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "020_update_permissions_v1-12.sql",
+        "line": 221,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_data",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5703,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5703,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_group_by_id",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3177,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3177,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_group_mappings",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2894,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2894,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_group_members",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 310,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2862,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 309,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 310,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_groups_to_sync",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 442,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 442,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_identity",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5326,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5326,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_identity_by_email",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5359,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5359,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_last_selected_tenant",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1266,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1266,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5655,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5655,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_preferences",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1239,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1137,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1239,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_user_random_code",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 523,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 523,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "get_users_groups_and_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 982,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 982,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "has_owner",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1402,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1402,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "has_permission",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1588,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1588,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "has_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 649,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1494,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 649,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "is_group_member",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1436,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1436,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "is_owner",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1417,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1417,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "lock_user",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4725,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4725,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "lock_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2543,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2543,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "owner",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 799,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 799,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "perm_set",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 130,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 730,
+        "operation": "CREATE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 128,
+        "operation": "ALTER"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 130,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "perm_set_perm",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 746,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 746,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "permission",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 715,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 715,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "permission_assignment",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 809,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 809,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "process_external_group_member_sync",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 588,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 588,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "process_external_group_member_sync_by_mapping",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 474,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 474,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "provider",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 631,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 631,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "search_api_keys",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6047,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6047,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_permission_as_assignable",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3913,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3913,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_token_as_failed",
+    "object_type": "function",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 139,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 139,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_token_as_failed_by_token",
+    "object_type": "function",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 209,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 209,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_token_as_used",
+    "object_type": "function",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 223,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2175,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "008_update_permissions_v1-2.sql",
+        "line": 13,
+        "operation": "DROP"
+      },
+      {
+        "file": "008_update_permissions_v1-2.sql",
+        "line": 22,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 223,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_token_as_used_by_token",
+    "object_type": "function",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 15,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2243,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 13,
+        "operation": "DROP"
+      },
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 15,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_user_group_as_external",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 344,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3076,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 343,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 344,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "set_user_group_as_hybrid",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3109,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3109,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "tenant",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 133,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 639,
+        "operation": "CREATE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 133,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "tenant_user",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 670,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 670,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "throw_no_access",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1134,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1134,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "throw_no_permission",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1178,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1145,
+        "operation": "CREATE"
+      },
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1156,
+        "operation": "CREATE"
+      },
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1167,
+        "operation": "CREATE"
+      },
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1178,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "token",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 842,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 842,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "unassign_api_key_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6256,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6256,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "unassign_permission",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3973,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3973,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "unlock_user",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4688,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4688,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "unlock_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2584,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2584,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_api_key",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6135,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6135,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_api_key_secret",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6378,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6378,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_perm_set",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4415,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4415,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_provider",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1715,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1715,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_tenant",
+    "object_type": "function",
+    "last_update_file": "023_update_permissions_v1-15.sql",
+    "last_update_line": 184,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 251,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "023_update_permissions_v1-15.sql",
+        "line": 184,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_data",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5633,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5633,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2415,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2415,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_last_selected_tenant",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1303,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 312,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1299,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1303,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_password",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5119,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5119,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_preferences",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1106,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1106,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "update_user_tenant_preferences",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1202,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1202,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_data",
+    "object_type": "table",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 17,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 689,
+        "operation": "CREATE"
+      },
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 17,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_event",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 825,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 825,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_group",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 436,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 753,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 432,
+        "operation": "ALTER"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 436,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_group_mapping",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 774,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 774,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_group_member",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 417,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 788,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 25,
+        "operation": "ALTER"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 417,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_group_members",
+    "object_type": "view",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 29,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 903,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 28,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 29,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_identity",
+    "object_type": "table",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 431,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 699,
+        "operation": "CREATE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 424,
+        "operation": "ALTER"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 431,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_info",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 125,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 650,
+        "operation": "CREATE"
+      },
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 53,
+        "operation": "ALTER"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 309,
+        "operation": "ALTER"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 125,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_permission_cache",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 484,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 677,
+        "operation": "CREATE"
+      },
+      {
+        "file": "010_update_permissions_v1-4.sql",
+        "line": 14,
+        "operation": "ALTER"
+      },
+      {
+        "file": "010_update_permissions_v1-4.sql",
+        "line": 17,
+        "operation": "ALTER"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 484,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "user_tenant_preference",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 136,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 136,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "validate_api_key",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 6421,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 6421,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "validate_provider_is_active",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1653,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1653,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
+    "object_name": "validate_token",
+    "object_type": "function",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 129,
+    "total_updates": 5,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2087,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "008_update_permissions_v1-2.sql",
+        "line": 92,
+        "operation": "DROP"
+      },
+      {
+        "file": "008_update_permissions_v1-2.sql",
+        "line": 101,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 123,
+        "operation": "DROP"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 129,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "sys_param",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 588,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 588,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "tenant_access_type",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 600,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 600,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "token_channel",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 611,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 611,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "token_state",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 616,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 616,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "token_type",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 605,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 605,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "user_event_type",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 626,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 626,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "user_group_member_type",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 15,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 15,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "const",
+    "object_name": "user_type",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 621,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 621,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52101",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 41,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 41,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52102",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 54,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 54,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52103",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 67,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 67,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52104",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 81,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 81,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52105",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 95,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 95,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52106",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 108,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 108,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52107",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 121,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 121,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52108",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 134,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 134,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52109",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 147,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 147,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52110",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 160,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 160,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52111",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 173,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 173,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52112",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 186,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 186,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52171",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 199,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 199,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52172",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 213,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 213,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52173",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 227,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 227,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52174",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 241,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 241,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52175",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 253,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 253,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52176",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 264,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 264,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52177",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 276,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 276,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52178",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 289,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 289,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52179",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 302,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 302,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52180",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 435,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 435,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52181",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 448,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 448,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52271",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 316,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 316,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52272",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 330,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 330,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52273",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 343,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 343,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52274",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 356,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 356,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52275",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 369,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 369,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52276",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 383,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 383,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52277",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 396,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 396,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52278",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 409,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 409,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52279",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 422,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 422,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52282",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 461,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 461,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52283",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 475,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 475,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52301",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 489,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 489,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52401",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 502,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 502,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "compare_jsonb_objects",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 137,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 137,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "get_code",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 82,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 82,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "get_slug",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 106,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 106,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "is_empty_string",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 51,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 51,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "is_not_empty_string",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 62,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 62,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "ltree_parent",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 162,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 162,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "random_string",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 73,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 73,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "trg_generate_code_from_title",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 566,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 566,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "helpers",
+    "object_name": "unaccent_text",
+    "object_type": "function",
+    "last_update_file": "003_create_helpers.sql",
+    "last_update_line": 117,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "003_create_helpers.sql",
+        "line": 117,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "internal",
+    "object_name": "update_permissions_v1_6",
+    "object_type": "procedure",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 300,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 300,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_current_members",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 583,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 501,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 583,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_delete_members",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 692,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 692,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_ensure_users",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 581,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 507,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 581,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_ensured_users",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 582,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 535,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 582,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_external_group_sync",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 693,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 607,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 693,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_members_comparison",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 584,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 518,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 584,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_users_groups",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 952,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 952,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__temp_users_groups_permissions",
+    "object_type": "table",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 792,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 792,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "__version",
+    "object_type": "table",
+    "last_update_file": "002_create_version_management.sql",
+    "last_update_line": 12,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "002_create_version_management.sql",
+        "line": 12,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "_template_created",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 544,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 544,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "_template_timestamps",
+    "object_type": "table",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 550,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 550,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "add_journal_msg",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 995,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 995,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "add_journal_msg_jsonb",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 973,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 973,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "auth",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 18,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 18,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "c_perm_set_code",
+    "object_type": "trigger",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 740,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 740,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "c_user_group_code",
+    "object_type": "trigger",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 768,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 768,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "check_version",
+    "object_type": "function",
+    "last_update_file": "016_update_versions-management_v1-1.sql",
+    "last_update_line": 14,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "002_create_version_management.sql",
+        "line": 52,
+        "operation": "CREATE"
+      },
+      {
+        "file": "016_update_versions-management_v1-1.sql",
+        "line": 12,
+        "operation": "DROP"
+      },
+      {
+        "file": "016_update_versions-management_v1-1.sql",
+        "line": 14,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "const",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 13,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 13,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "error",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 12,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 12,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ext",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 17,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 17,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "get_version",
+    "object_type": "function",
+    "last_update_file": "017_update_versions-management_v1-2.sql",
+    "last_update_line": 12,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "017_update_versions-management_v1-2.sql",
+        "line": 12,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "helpers",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 16,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 16,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "internal",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 14,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 14,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_journal",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 878,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 878,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_owner",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 807,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 807,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_permission_node_path",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 728,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 728,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_token_expires_at",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 862,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 862,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_token_token",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 861,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 861,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_token_token_data",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 863,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 863,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_user_event_data",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 840,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 840,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_user_permission_cache",
+    "object_type": "index",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 488,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 488,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "ix_user_tenant_preference",
+    "object_type": "index",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 145,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 145,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "journal",
+    "object_type": "table",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 645,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 865,
+        "operation": "CREATE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 645,
+        "operation": "ALTER"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "search_journal_msgs",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 36,
+    "total_updates": 5,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1021,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 652,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 28,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 32,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 36,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "start_version_update",
+    "object_type": "function",
+    "last_update_file": "002_create_version_management.sql",
+    "last_update_line": 25,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "002_create_version_management.sql",
+        "line": 25,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "stop_version_update",
+    "object_type": "function",
+    "last_update_file": "002_create_version_management.sql",
+    "last_update_line": 38,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "002_create_version_management.sql",
+        "line": 38,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "tmp_default_groups",
+    "object_type": "table",
+    "last_update_file": "021_update_permissions_v1-13.sql",
+    "last_update_line": 69,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5232,
+        "operation": "DROP"
+      },
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5263,
+        "operation": "DROP"
+      },
+      {
+        "file": "021_update_permissions_v1-13.sql",
+        "line": 38,
+        "operation": "DROP"
+      },
+      {
+        "file": "021_update_permissions_v1-13.sql",
+        "line": 69,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "trg_auth_calculate_user_data",
+    "object_type": "trigger",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 47,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 47,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "trg_auth_calculate_user_info",
+    "object_type": "trigger",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 86,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 86,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "triggers",
+    "object_type": "schema",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 15,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 15,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "unsecure",
+    "object_type": "schema",
+    "last_update_file": "001_create_basic_structure.sql",
+    "last_update_line": 15,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "001_create_basic_structure.sql",
+        "line": 15,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_auth_permission_assignment_tenant_group",
+    "object_type": "index",
+    "last_update_file": "019_update_permissions_v1-11.sql",
+    "last_update_line": 31,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "019_update_permissions_v1-11.sql",
+        "line": 31,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_auth_permission_assignment_tenant_user",
+    "object_type": "index",
+    "last_update_file": "019_update_permissions_v1-11.sql",
+    "last_update_line": 28,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "019_update_permissions_v1-11.sql",
+        "line": 28,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_auth_user_info",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 668,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 668,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_external_group_member",
+    "object_type": "index",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 430,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 430,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_permission_assignment",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 821,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 821,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_permission_full_code",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 727,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 727,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_sys_params",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 598,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 598,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_tenant_uuid",
+    "object_type": "index",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 481,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 481,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_user_group_mapping",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 784,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 784,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_user_group_member",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 797,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 797,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_user_identity",
+    "object_type": "index",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 713,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 713,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_user_permission_cache",
+    "object_type": "index",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 487,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 487,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_user_tenant_preference",
+    "object_type": "index",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 144,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 144,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "uq_version",
+    "object_type": "index",
+    "last_update_file": "002_create_version_management.sql",
+    "last_update_line": 23,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "002_create_version_management.sql",
+        "line": 23,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "object_name": "validate_token",
+    "object_type": "function",
+    "last_update_file": "012_update_permissions_v1-6.sql",
+    "last_update_line": 56,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "012_update_permissions_v1-6.sql",
+        "line": 56,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "stage",
+    "object_name": "external_group_member",
+    "object_type": "table",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 420,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 420,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "triggers",
+    "object_name": "calculate_user_data",
+    "object_type": "function",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 33,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 33,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "triggers",
+    "object_name": "calculate_user_data_search_values",
+    "object_type": "function",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 23,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 23,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "triggers",
+    "object_name": "calculate_user_info",
+    "object_type": "function",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 72,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 72,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "triggers",
+    "object_name": "calculate_user_info_search_values",
+    "object_type": "function",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 59,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 59,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "add_user_to_default_groups",
+    "object_type": "function",
+    "last_update_file": "021_update_permissions_v1-13.sql",
+    "last_update_line": 17,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5211,
+        "operation": "CREATE"
+      },
+      {
+        "file": "021_update_permissions_v1-13.sql",
+        "line": 17,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "assign_permission",
+    "object_type": "function",
+    "last_update_file": "022_update_permissions_v1-14.sql",
+    "last_update_line": 133,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3718,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "022_update_permissions_v1-14.sql",
+        "line": 133,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "assign_permission_as_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3933,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3933,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_api_user",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5938,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5938,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_perm_set",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4276,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4276,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_perm_set_as_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4330,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4330,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_primary_tenant",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1600,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1600,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_service_user_info",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4960,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4960,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_event",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1902,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1902,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_group",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2334,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2334,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_group_as_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2376,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2376,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_group_member",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 146,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2675,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 143,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 146,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_group_member_as_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 2727,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2727,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_identity",
+    "object_type": "function",
+    "last_update_file": "015_update_permissions_v1-9.sql",
+    "last_update_line": 442,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5048,
+        "operation": "CREATE"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 437,
+        "operation": "DROP"
+      },
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 442,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_info",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4914,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4914,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "create_user_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1612,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1612,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "delete_tenant",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 342,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 342,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "delete_user_by_id",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1636,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1636,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "delete_user_by_username_as_system",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1625,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1625,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "expire_tokens",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 1984,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1984,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_all_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4157,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4157,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_assigned_group_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3284,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3284,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_assigned_user_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 1011,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5812,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1011,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_effective_group_permissions",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3207,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3207,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_perm_sets",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4209,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4209,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_user_assigned_permissions",
+    "object_type": "function",
+    "last_update_file": "027_update_permissions_v1-17.sql",
+    "last_update_line": 24,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 1016,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "027_update_permissions_v1-17.sql",
+        "line": 21,
+        "operation": "DROP"
+      },
+      {
+        "file": "027_update_permissions_v1-17.sql",
+        "line": 24,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_user_group_by_id",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3136,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3136,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "get_user_group_members",
+    "object_type": "function",
+    "last_update_file": "014_update_permissions_v1-8.sql",
+    "last_update_line": 248,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 2802,
+        "operation": "CREATE"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 247,
+        "operation": "DROP"
+      },
+      {
+        "file": "014_update_permissions_v1-8.sql",
+        "line": 248,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "recalculate_user_groups",
+    "object_type": "function",
+    "last_update_file": "022_update_permissions_v1-14.sql",
+    "last_update_line": 17,
+    "total_updates": 4,
+    "all_updates": [
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 532,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 537,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "021_update_permissions_v1-13.sql",
+        "line": 75,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "022_update_permissions_v1-14.sql",
+        "line": 17,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "recalculate_user_permissions",
+    "object_type": "function",
+    "last_update_file": "018_update_permissions_v1-10.sql",
+    "last_update_line": 744,
+    "total_updates": 3,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 1289,
+        "operation": "CREATE"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 739,
+        "operation": "DROP"
+      },
+      {
+        "file": "018_update_permissions_v1-10.sql",
+        "line": 744,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "set_permission_as_assignable",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3861,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3861,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "unassign_permission",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3817,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3817,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_perm_set",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4372,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4372,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_permission_full_code",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 4013,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 4013,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_permission_full_title",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 3989,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 3989,
+        "operation": "CREATE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_user_identity_oid",
+    "object_type": "function",
+    "last_update_file": "020_update_permissions_v1-12.sql",
+    "last_update_line": 40,
+    "total_updates": 2,
+    "all_updates": [
+      {
+        "file": "015_update_permissions_v1-9.sql",
+        "line": 490,
+        "operation": "CREATE_OR_REPLACE"
+      },
+      {
+        "file": "020_update_permissions_v1-12.sql",
+        "line": 40,
+        "operation": "DROP"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_user_identity_uid_oid",
+    "object_type": "function",
+    "last_update_file": "020_update_permissions_v1-12.sql",
+    "last_update_line": 43,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "020_update_permissions_v1-12.sql",
+        "line": 43,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_user_info_basic_data",
+    "object_type": "function",
+    "last_update_file": "011_update_permissions_v1-5.sql",
+    "last_update_line": 95,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "011_update_permissions_v1-5.sql",
+        "line": 95,
+        "operation": "CREATE_OR_REPLACE"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "update_user_password",
+    "object_type": "function",
+    "last_update_file": "004_create_permissions.sql",
+    "last_update_line": 5084,
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "004_create_permissions.sql",
+        "line": 5084,
+        "operation": "CREATE"
+      }
+    ]
+  }
+]
