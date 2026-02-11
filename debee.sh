@@ -300,12 +300,82 @@ run_post_update_scripts() {
 
 # Prepare version table
 prepare_version_table() {
-    print_info "Preparing version table - extracting database objects and generating markdown"
+    print_info "Preparing version table - extracting database objects"
+
+    # Get configuration values
+    local formats_str="${DBVERSIONTABLEFORMATS:-json;md}"
+    local output_folder="${DBVERSIONTABLEOUTPUTFOLDER:-.}"
+    local base_filename="${DBVERSIONTABLEFILENAME:-db-objects}"
+
+    # Remove comments from formats string (anything after #)
+    formats_str="${formats_str%%#*}"
+    formats_str="${formats_str%% }"  # trim trailing spaces
+
+    # Parse formats
+    IFS=';' read -ra formats_array <<< "$formats_str"
+    local formats=()
+    for fmt in "${formats_array[@]}"; do
+        fmt=$(echo "$fmt" | tr '[:upper:]' '[:lower:]' | xargs)  # trim and lowercase
+        if [[ -n "$fmt" ]]; then
+            formats+=("$fmt")
+        fi
+    done
+
+    if [[ ${#formats[@]} -eq 0 ]]; then
+        print_warning "No version table formats specified, using default: json, md"
+        formats=("json" "md")
+    fi
+
+    # Validate formats
+    local valid_formats=("json" "md" "markdown" "csv" "html")
+    local invalid_formats=()
+    for fmt in "${formats[@]}"; do
+        local valid=false
+        for valid_fmt in "${valid_formats[@]}"; do
+            if [[ "$fmt" == "$valid_fmt" ]]; then
+                valid=true
+                break
+            fi
+        done
+        if [[ "$valid" == false ]]; then
+            invalid_formats+=("$fmt")
+        fi
+    done
+
+    if [[ ${#invalid_formats[@]} -gt 0 ]]; then
+        print_error "Invalid formats: ${invalid_formats[*]}. Valid formats: json, md, csv, html"
+        return 1
+    fi
+
+    # Normalize markdown format
+    local normalized_formats=()
+    for fmt in "${formats[@]}"; do
+        if [[ "$fmt" == "md" ]]; then
+            normalized_formats+=("markdown")
+        else
+            normalized_formats+=("$fmt")
+        fi
+    done
+    formats=("${normalized_formats[@]}")
+
+    print_info "Version table configuration:"
+    print_info "  Formats: ${formats[*]}"
+    print_info "  Output folder: $output_folder"
+    print_info "  Base filename: $base_filename"
 
     # Check if extract-db-objects.py exists
     if [[ ! -f "extract-db-objects.py" ]]; then
         print_error "extract-db-objects.py not found in current directory"
         return 1
+    fi
+
+    # Create output folder if it doesn't exist
+    if [[ ! -d "$output_folder" ]]; then
+        if ! mkdir -p "$output_folder"; then
+            print_error "Failed to create output folder: $output_folder"
+            return 1
+        fi
+        print_info "Created output folder: $output_folder"
     fi
 
     # Determine Python command
@@ -319,30 +389,42 @@ prepare_version_table() {
         return 1
     fi
 
-    # Run extract-db-objects.py to generate JSON
-    print_info "Extracting database objects to db-objects.json..."
-    if ! $python_cmd "extract-db-objects.py" --format json --output "db-objects.json"; then
-        print_error "Failed to run extract-db-objects.py"
-        return 1
-    fi
-    print_success "Successfully generated db-objects.json"
+    local generated_files=()
 
-    # Check if JSON file was created
-    if [[ ! -f "db-objects.json" ]]; then
-        print_error "db-objects.json was not created"
-        return 1
+    # Generate each requested format
+    for fmt in "${formats[@]}"; do
+        # Determine extension
+        local extension="$fmt"
+        if [[ "$fmt" == "markdown" ]]; then
+            extension="md"
+        fi
+
+        local output_file="$output_folder/$base_filename.$extension"
+
+        print_info "Generating ${fmt^^} format: $output_file"
+
+        local output
+        if ! output=$($python_cmd "extract-db-objects.py" --format "$fmt" --output "$output_file" 2>&1); then
+            print_error "Failed to generate $fmt: $output"
+            return 1
+        fi
+
+        if [[ -f "$output_file" ]]; then
+            print_success "Successfully generated $output_file"
+            generated_files+=("$output_file")
+        else
+            print_error "$output_file was not created"
+            return 1
+        fi
+    done
+
+    if [[ ${#generated_files[@]} -gt 0 ]]; then
+        print_success "Version table preparation completed successfully"
+        print_info "Generated files: ${generated_files[*]}"
+    else
+        print_warning "No files were generated"
     fi
 
-    # Generate markdown table from JSON
-    print_info "Generating db-objects.md from JSON..."
-    if ! $python_cmd "extract-db-objects.py" --format markdown --output "db-objects.md"; then
-        print_error "Failed to generate markdown"
-        return 1
-    fi
-    print_success "Successfully generated db-objects.md"
-
-    print_success "Version table preparation completed successfully"
-    print_info "Generated files: db-objects.json, db-objects.md"
     return 0
 }
 

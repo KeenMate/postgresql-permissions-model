@@ -29,7 +29,7 @@ where component = _component
 	or (version_id in (select version_id
 										 from __version
 										 where component = _component
-										 order by created desc
+										 order by execution_started desc
 										 limit 1)));
 $$;
 

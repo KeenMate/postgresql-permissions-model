@@ -144,6 +144,12 @@ function Get-FilesByNumericPrefix {
 
 	# Iterate through each file
 	foreach ($file in $files) {
+		# Skip files that don't match pattern: 3 digits + underscore + name + .sql extension
+		if ($file.Name -notmatch '^\d{3}_.*\.sql$') {
+			Write-Host "Skipping file (not matching pattern XXX_*.sql): $($file.Name)"
+			continue
+		}
+
 		# Extract the numeric prefix and convert it to an integer
 		$prefix = [int]($file.Name -replace '^(\d{3})_.*$', '$1')
 
@@ -337,7 +343,41 @@ function Update-DatabaseWithFiles {
 }
 
 function Prepare-VersionTable {
-	Write-Host "Preparing version table - extracting database objects and generating markdown"
+	Write-Host "Preparing version table - extracting database objects"
+
+	# Get configuration values
+	$formatsStr = if ($env:DBVERSIONTABLEFORMATS) { $env:DBVERSIONTABLEFORMATS } else { "json;md" }
+	$outputFolder = if ($env:DBVERSIONTABLEOUTPUTFOLDER) { $env:DBVERSIONTABLEOUTPUTFOLDER } else { "." }
+	$baseFilename = if ($env:DBVERSIONTABLEFILENAME) { $env:DBVERSIONTABLEFILENAME } else { "db-objects" }
+
+	# Remove comments from formats string (anything after #)
+	if ($formatsStr -match '^([^#]*)') {
+		$formatsStr = $matches[1].Trim()
+	}
+
+	# Parse formats
+	$formats = $formatsStr -split ';' | Where-Object { $_.Trim() } | ForEach-Object { $_.Trim().ToLower() }
+
+	if ($formats.Count -eq 0) {
+		Write-Host "No version table formats specified, using default: json, md"
+		$formats = @("json", "md")
+	}
+
+	# Validate formats
+	$validFormats = @("json", "md", "markdown", "csv", "html")
+	$invalidFormats = $formats | Where-Object { $_ -notin $validFormats }
+	if ($invalidFormats) {
+		Write-Error "Invalid formats: $($invalidFormats -join ', '). Valid formats: json, md, csv, html"
+		return
+	}
+
+	# Normalize markdown format
+	$formats = $formats | ForEach-Object { if ($_ -eq "md") { "markdown" } else { $_ } }
+
+	Write-Host "Version table configuration:"
+	Write-Host "  Formats: $($formats -join ', ')"
+	Write-Host "  Output folder: $outputFolder"
+	Write-Host "  Base filename: $baseFilename"
 
 	# Check if extract-db-objects.py exists
 	if (-not (Test-Path "extract-db-objects.py")) {
@@ -345,38 +385,60 @@ function Prepare-VersionTable {
 		return
 	}
 
-	# Run extract-db-objects.py to generate JSON
-	Write-Host "Extracting database objects to db-objects.json..."
+	# Create output folder if it doesn't exist
+	if (-not (Test-Path $outputFolder)) {
+		try {
+			New-Item -ItemType Directory -Path $outputFolder -Force | Out-Null
+			Write-Host "Created output folder: $outputFolder"
+		}
+		catch {
+			Write-Error "Failed to create output folder: $_"
+			return
+		}
+	}
+
+	# Determine Python command
 	$pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "python" }
 
+	$generatedFiles = @()
+
 	try {
-		& $pythonCmd "extract-db-objects.py" --format json --output "db-objects.json"
-		Write-Host "Successfully generated db-objects.json"
+		# Generate each requested format
+		foreach ($fmt in $formats) {
+			# Determine extension
+			$extension = if ($fmt -eq "markdown") { "md" } else { $fmt }
+			$outputFile = Join-Path $outputFolder "$baseFilename.$extension"
+
+			Write-Host "Generating $($fmt.ToUpper()) format: $outputFile"
+
+			$result = & $pythonCmd "extract-db-objects.py" --format $fmt --output $outputFile 2>&1
+			if ($LASTEXITCODE -ne 0) {
+				Write-Error "Failed to generate $fmt`: $result"
+				return
+			}
+
+			if (Test-Path $outputFile) {
+				Write-Host "Successfully generated $outputFile" -ForegroundColor Green
+				$generatedFiles += $outputFile
+			}
+			else {
+				Write-Error "$outputFile was not created"
+				return
+			}
+		}
+
+		if ($generatedFiles.Count -gt 0) {
+			Write-Host "Version table preparation completed successfully" -ForegroundColor Green
+			Write-Host "Generated files: $($generatedFiles -join ', ')"
+		}
+		else {
+			Write-Host "No files were generated" -ForegroundColor Yellow
+		}
 	}
 	catch {
-		Write-Error "Failed to run extract-db-objects.py: $_"
+		Write-Error "Failed to prepare version table: $_"
 		return
 	}
-
-	# Check if JSON file was created
-	if (-not (Test-Path "db-objects.json")) {
-		Write-Error "db-objects.json was not created"
-		return
-	}
-
-	# Generate markdown table from JSON
-	Write-Host "Generating db-objects.md from JSON..."
-	try {
-		& $pythonCmd "extract-db-objects.py" --format markdown --output "db-objects.md"
-		Write-Host "Successfully generated db-objects.md"
-	}
-	catch {
-		Write-Error "Failed to generate markdown: $_"
-		return
-	}
-
-	Write-Host "Version table preparation completed successfully"
-	Write-Host "Generated files: db-objects.json, db-objects.md"
 }
 
 

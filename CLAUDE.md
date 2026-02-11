@@ -128,6 +128,20 @@ Use the PowerShell script `debee.ps1` for all database operations:
 ./debee.ps1 -Environment prod -Operations updateDatabase
 ```
 
+### Running SQL Commands
+Use `exec-sql.sh` for quick SQL execution (loads environment from debee.env/.debee.env):
+
+```bash
+# Run inline SQL
+./exec-sql.sh "SELECT * FROM auth.user_info LIMIT 5;"
+
+# Run SQL file
+./exec-sql.sh -f 999-examples.sql
+
+# Interactive psql session
+./exec-sql.sh
+```
+
 ### Legacy Windows Batch Script
 For simple setup on Windows:
 ```batch

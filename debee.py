@@ -364,14 +364,55 @@ class DebeeOrchestrator:
         return True
 
     def prepare_version_table(self) -> bool:
-        """Prepare version table by extracting database objects and generating markdown"""
-        self.print_info("Preparing version table - extracting database objects and generating markdown")
+        """Prepare version table by extracting database objects and generating specified formats"""
+        self.print_info("Preparing version table - extracting database objects")
+
+        # Get configuration values
+        formats_str = self.env_vars.get("DBVERSIONTABLEFORMATS", "json;md")
+        output_folder = self.env_vars.get("DBVERSIONTABLEOUTPUTFOLDER", ".")
+        base_filename = self.env_vars.get("DBVERSIONTABLEFILENAME", "db-objects")
+
+        # Remove comments from formats string (anything after #)
+        if '#' in formats_str:
+            formats_str = formats_str.split('#')[0].strip()
+
+        # Parse formats
+        formats = [fmt.strip().lower() for fmt in formats_str.split(';') if fmt.strip()]
+
+        if not formats:
+            self.print_warning("No version table formats specified, using default: json, md")
+            formats = ["json", "md"]
+
+        # Validate formats
+        valid_formats = {"json", "md", "markdown", "csv", "html"}
+        invalid_formats = [fmt for fmt in formats if fmt not in valid_formats]
+        if invalid_formats:
+            self.print_error(f"Invalid formats: {', '.join(invalid_formats)}. Valid formats: json, md, csv, html")
+            return False
+
+        # Normalize markdown format
+        formats = ["markdown" if fmt == "md" else fmt for fmt in formats]
+
+        self.print_info(f"Version table configuration:")
+        self.print_info(f"  Formats: {', '.join(formats)}")
+        self.print_info(f"  Output folder: {output_folder}")
+        self.print_info(f"  Base filename: {base_filename}")
 
         # Check if extract-db-objects.py exists
         extract_script = Path("extract-db-objects.py")
         if not extract_script.exists():
             self.print_error("extract-db-objects.py not found in current directory")
             return False
+
+        # Create output folder if it doesn't exist
+        output_path = Path(output_folder)
+        if not output_path.exists():
+            try:
+                output_path.mkdir(parents=True, exist_ok=True)
+                self.print_info(f"Created output folder: {output_folder}")
+            except Exception as e:
+                self.print_error(f"Failed to create output folder: {e}")
+                return False
 
         # Determine Python command
         python_cmd = None
@@ -388,47 +429,46 @@ class DebeeOrchestrator:
             self.print_error("Python not found. Please install Python 3.6+")
             return False
 
+        generated_files = []
+
         try:
-            # Run extract-db-objects.py to generate JSON
-            self.print_info("Extracting database objects to db-objects.json...")
-            result = subprocess.run(
-                [python_cmd, str(extract_script), "--format", "json", "--output", "db-objects.json"],
-                capture_output=True,
-                text=True,
-                cwd=Path.cwd(),
-                env=os.environ
-            )
+            # Generate each requested format
+            for fmt in formats:
+                # Determine extension
+                if fmt == "markdown":
+                    extension = "md"
+                else:
+                    extension = fmt
 
-            if result.returncode != 0:
-                self.print_error(f"Failed to run extract-db-objects.py: {result.stderr}")
-                return False
+                output_file = output_path / f"{base_filename}.{extension}"
 
-            self.print_success("Successfully generated db-objects.json")
+                self.print_info(f"Generating {fmt.upper()} format: {output_file}")
 
-            # Check if JSON file was created
-            json_file = Path("db-objects.json")
-            if not json_file.exists():
-                self.print_error("db-objects.json was not created")
-                return False
+                result = subprocess.run(
+                    [python_cmd, str(extract_script), "--format", fmt, "--output", str(output_file)],
+                    capture_output=True,
+                    text=True,
+                    cwd=Path.cwd(),
+                    env=os.environ
+                )
 
-            # Generate markdown table from JSON
-            self.print_info("Generating db-objects.md from JSON...")
-            result = subprocess.run(
-                [python_cmd, str(extract_script), "--format", "markdown", "--output", "db-objects.md"],
-                capture_output=True,
-                text=True,
-                cwd=Path.cwd(),
-                env=os.environ
-            )
+                if result.returncode != 0:
+                    self.print_error(f"Failed to generate {fmt}: {result.stderr}")
+                    return False
 
-            if result.returncode != 0:
-                self.print_error(f"Failed to generate markdown: {result.stderr}")
-                return False
+                if output_file.exists():
+                    self.print_success(f"Successfully generated {output_file}")
+                    generated_files.append(str(output_file))
+                else:
+                    self.print_error(f"{output_file} was not created")
+                    return False
 
-            self.print_success("Successfully generated db-objects.md")
+            if generated_files:
+                self.print_success("Version table preparation completed successfully")
+                self.print_info(f"Generated files: {', '.join(generated_files)}")
+            else:
+                self.print_warning("No files were generated")
 
-            self.print_success("Version table preparation completed successfully")
-            self.print_info("Generated files: db-objects.json, db-objects.md")
             return True
 
         except Exception as e:
