@@ -95,21 +95,14 @@ begin
 	return query
 		select __last_id, __api_key, __api_secret;
 
-	perform
-		public.add_journal_msg_jsonb(_created_by, _user_id
-			, format('User: %s created API key: %s in tenant: %s'
-																	 , _created_by, coalesce(_title, __api_key), __tenant_id)
-			, 'api_key'
-			, __last_id
-			, _data_object_code := __api_key
-			, _payload := jsonb_strip_nulls(jsonb_build_object('api_key', __api_key, 'title', _title, 'description',
-																												 _description,
-																												 'expire_at', _expire_at,
-																												 'notification_email', _notification_email
-			, 'perm_set_code', _perm_set_code
-			, 'permission_codes', _permission_codes))
-			, _event_id := 50501
-			, _tenant_id := coalesce(_tenant_id, 1));
+	perform create_journal_message(_created_by, _user_id
+			, 14001  -- apikey_created
+			, 'api_key', __last_id
+			, jsonb_strip_nulls(jsonb_build_object('api_key_title', coalesce(_title, __api_key)
+				, 'api_key', __api_key, 'description', _description
+				, 'expire_at', _expire_at, 'notification_email', _notification_email
+				, 'perm_set_code', _perm_set_code, 'permission_codes', _permission_codes))
+			, __tenant_id);
 
 end;
 $$;
@@ -201,16 +194,12 @@ begin
 		where api_key_id = _api_key_id
 			and tenant_id = _tenant_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s updated API key: %s in tenant: %s'
-											, _updated_by, _title, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 14002  -- apikey_updated
 			, 'api_key', _api_key_id
-			, array ['title', _title, 'description', _description,
-											'expire_at', _expire_at::text,
-											'notification_email', _notification_email]
-			, 50502
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('api_key_title', _title, 'description', _description
+				, 'expire_at', _expire_at, 'notification_email', _notification_email)
+			, _tenant_id);
 end;
 $$;
 
@@ -263,14 +252,13 @@ begin
 		where pa.user_id = __api_user_id
 		order by ps.code nulls last, p.full_code;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s assigned permissions to API key in tenant: %s'
-											, _created_by, _tenant_id)
+	perform create_journal_message(_created_by, _user_id
+			, 14002  -- apikey_updated (permissions assigned)
 			, 'api_key', _api_key_id
-			, array ['perm_set_code', _perm_set_code, 'permission_code', array_to_string(_permission_codes, ';')]
-			, 50504
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('api_key_title', _api_key_id::text
+				, 'action', 'permissions_assigned', 'perm_set_code', _perm_set_code
+				, 'permission_codes', array_to_string(_permission_codes, ';'))
+			, _tenant_id);
 end;
 $$;
 
@@ -330,14 +318,13 @@ begin
 		where pa.user_id = __api_user_id
 		order by ps.code nulls last, p.full_code;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s unassigned permissions to API key in tenant: %s'
-											, _deleted_by, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 14002  -- apikey_updated (permissions unassigned)
 			, 'api_key', _api_key_id
-			, array ['perm_set_code', _perm_set_code, 'permission_code', array_to_string(_permission_codes, ';')]
-			, 50505
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('api_key_title', _api_key_id::text
+				, 'action', 'permissions_unassigned', 'perm_set_code', _perm_set_code
+				, 'permission_codes', array_to_string(_permission_codes, ';'))
+			, _tenant_id);
 
 end;
 $$;
@@ -368,14 +355,11 @@ begin
 		delete from auth.api_key where api_key_id = _api_key_id
 			returning api_key_id;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s deleted API key in tenant: %s'
-											, _deleted_by, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 14003  -- apikey_deleted
 			, 'api_key', _api_key_id
-			, null
-			, 50503
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('api_key_title', _api_key_id::text)
+			, _tenant_id);
 
 end;
 $$;
@@ -406,14 +390,11 @@ begin
 	return query
 		select _api_key_id, __api_secret;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s updated API key secret in tenant: %s'
-											, _updated_by, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 14002  -- apikey_updated (secret rotated)
 			, 'api_key', _api_key_id
-			, null
-			, 50506
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('api_key_title', _api_key_id::text, 'action', 'secret_rotated')
+			, _tenant_id);
 
 end;
 $$;

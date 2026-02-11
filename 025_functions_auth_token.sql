@@ -77,14 +77,12 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform
-		add_journal_msg_jsonb(_created_by, _user_id
-			, format('Token: (type: %s, uid: %s) for user: (upn: %s) created by: %s'
-														, __last_item.token_type_code, __last_item.uid, __target_username, _created_by)
+	perform create_journal_message(_created_by, _user_id
+			, 15001  -- token_created
 			, 'token', __last_item.token_id
-			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username)
-			, 50401
-			, _tenant_id := 1);
+			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
+				, 'token_uid', __last_item.uid)
+			, 1);
 
 	return query
 		select __last_item.token_id, __last_item.uid, __last_item.expires_at;
@@ -134,17 +132,13 @@ begin
 				, user_oid
 				, token_data;
 
-	perform
-		add_journal_msg_jsonb(_updated_by, _user_id
-			, format('Token: (type: %s, uid: %s) for user: (upn: %s) set as used'
-														, __last_item.token_type_code, __last_item.uid, __target_username)
+	perform create_journal_message(_updated_by, _user_id
+			, 15002  -- token_used
 			, 'token', __last_item.token_id
-			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username
-														, 'ip_address', _ip_address
-														, 'user_agent', _user_agent
-														, 'origin', _origin)
-			, _event_id := 50403
-			, _tenant_id := 1);
+			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
+				, 'token_uid', __last_item.uid, 'ip_address', _ip_address
+				, 'user_agent', _user_agent, 'origin', _origin)
+			, 1);
 end;
 $$;
 
@@ -218,14 +212,13 @@ begin
 				, user_oid
 				, token_data;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('Token (uid: %s) set as validation_failed by user: %s'
-											, _token_uid, _updated_by)
+	perform create_journal_message(_updated_by, _user_id
+			, 15004  -- token_failed
 			, 'token', __token_id
-			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
-			, _event_id := 50403
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _user_id::text, 'token_uid', _token_uid
+				, 'reason', 'validation_failed', 'ip_address', _ip_address
+				, 'user_agent', _user_agent, 'origin', _origin)
+			, 1);
 
 end;
 $$;
@@ -300,17 +293,13 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform
-		add_journal_msg_jsonb(_updated_by, _user_id
-			, format('Token: (type: %s, uid: %s) for user: (upn: %s) validated by: %s'
-														, __last_item.token_type_code, __last_item.uid, __target_username, _updated_by)
+	perform create_journal_message(_updated_by, _user_id
+			, 15002  -- token_used (validated)
 			, 'token', __last_item.token_id
-			, jsonb_build_object('user_id', __last_item.user_id, 'username', __target_username
-														, 'ip_address', _ip_address
-														, 'user_agent', _user_agent
-														, 'origin', _origin)
-			, 50402
-			, _tenant_id := 1);
+			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
+				, 'token_uid', __last_item.uid, 'action', 'validated'
+				, 'ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin)
+			, 1);
 
 	if
 		_set_as_used then

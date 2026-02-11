@@ -67,14 +67,12 @@ begin
 			values (_created_by, _tenant_id, _user_group_id, _target_user_id)
 			returning owner_id;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s added new tenant/group owner in tenant: %s'
-											, _created_by, _tenant_id)
+	perform create_journal_message(_created_by, _user_id
+			, 11010  -- tenant_user_added
 			, 'tenant', _tenant_id
-			, array ['user_group_id', _user_group_id::text]
-			, 50004
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text
+				, 'user_group_id', _user_group_id, 'action', 'owner_added')
+			, _tenant_id);
 end;
 $$;
 
@@ -101,14 +99,12 @@ begin
 		and tenant_id = _tenant_id
 		and user_group_id = _user_group_id;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s deleted new tenant/group owner in tenant: %s'
-											, _deleted_by, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 11011  -- tenant_user_removed
 			, 'tenant', _tenant_id
-			, array ['user_group_id', _user_group_id::text]
-			, 50004
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text
+				, 'user_group_id', _user_group_id, 'action', 'owner_removed')
+			, _tenant_id);
 end;
 $$;
 

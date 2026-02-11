@@ -44,6 +44,7 @@ create table auth.tenant
     is_removable     boolean default true               not null,
     is_assignable    boolean default true               not null,
     is_default       boolean default false              not null,
+    nrm_search_data  text,
     constraint tenant_created_by_check
         check (length(created_by) <= 250),
     constraint tenant_updated_by_check
@@ -191,19 +192,20 @@ create table auth.user_identity
 
 create table auth.permission
 (
-    created_at    timestamp with time zone default now()           not null,
-    created_by    text                     default 'unknown'::text not null,
-    updated_at    timestamp with time zone default now()           not null,
-    updated_by    text                     default 'unknown'::text not null,
-    permission_id integer generated always as identity
+    created_at      timestamp with time zone default now()           not null,
+    created_by      text                     default 'unknown'::text not null,
+    updated_at      timestamp with time zone default now()           not null,
+    updated_by      text                     default 'unknown'::text not null,
+    permission_id   integer generated always as identity
         primary key,
-    is_assignable boolean default true  not null,
-    title         text                  not null,
-    code          text,
-    full_code     ltree,
-    node_path     ltree,
-    has_children  boolean default false not null,
-    full_title    text,
+    is_assignable   boolean default true  not null,
+    title           text                  not null,
+    code            text,
+    full_code       ltree,
+    node_path       ltree,
+    has_children    boolean default false not null,
+    full_title      text,
+    nrm_search_data text,
     constraint permission_created_by_check
         check (length(created_by) <= 250),
     constraint permission_updated_by_check
@@ -212,19 +214,20 @@ create table auth.permission
 
 create table auth.perm_set
 (
-    created_at    timestamp with time zone default now()           not null,
-    created_by    text                     default 'unknown'::text not null,
-    updated_at    timestamp with time zone default now()           not null,
-    updated_by    text                     default 'unknown'::text not null,
-    perm_set_id   integer generated always as identity
+    created_at      timestamp with time zone default now()           not null,
+    created_by      text                     default 'unknown'::text not null,
+    updated_at      timestamp with time zone default now()           not null,
+    updated_by      text                     default 'unknown'::text not null,
+    perm_set_id     integer generated always as identity
         primary key,
-    tenant_id     integer
+    tenant_id       integer
         references auth.tenant
             on delete cascade,
-    title         text                  not null,
-    code          text                  not null,
-    is_system     boolean default false not null,
-    is_assignable boolean default true  not null,
+    title           text                  not null,
+    code            text                  not null,
+    is_system       boolean default false not null,
+    is_assignable   boolean default true  not null,
+    nrm_search_data text,
     unique (code, tenant_id),
     constraint perm_set_created_by_check
         check (length(created_by) <= 250),
@@ -269,6 +272,7 @@ create table auth.user_group
     can_members_see_others       boolean default true  not null,
     is_synced                    boolean default false not null,
     create_missing_users_on_sync boolean default false not null,
+    nrm_search_data              text,
     constraint user_group_created_by_check
         check (length(created_by) <= 250),
     constraint user_group_updated_by_check
@@ -421,6 +425,7 @@ create table auth.api_key
     secret_hash        bytea             not null,
     expire_at          timestamp with time zone,
     notification_email text,
+    nrm_search_data    text,
     constraint api_key_created_by_check
         check (length(created_by) <= 250),
     constraint api_key_updated_by_check
@@ -529,4 +534,20 @@ create unique index uq_user_tenant_preference
 
 create index ix_user_tenant_preference
     on auth.user_tenant_preference (user_id, tenant_id);
+
+-- Search indexes for nrm_search_data columns
+create index ix_trgm_tenant_search
+    on auth.tenant using gin (nrm_search_data gin_trgm_ops);
+
+create index ix_trgm_user_group_search
+    on auth.user_group using gin (nrm_search_data gin_trgm_ops);
+
+create index ix_trgm_permission_search
+    on auth.permission using gin (nrm_search_data gin_trgm_ops);
+
+create index ix_trgm_perm_set_search
+    on auth.perm_set using gin (nrm_search_data gin_trgm_ops);
+
+create index ix_trgm_api_key_search
+    on auth.api_key using gin (nrm_search_data gin_trgm_ops);
 

@@ -143,17 +143,13 @@ begin
 	return query
 		select __last_id;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s created group: %s in tenant: %s'
-											, _created_by, _title, _tenant_id)
+	perform create_journal_message(_created_by, _user_id
+			, 13001  -- group_created
 			, 'group', __last_id
-			, array ['title', _title, 'is_default', _is_default::text
-											, 'is_system', _is_system::text
-											, 'is_assignable', _is_assignable::text
-											, 'is_active', _is_active::text]
-			, 50201
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _title, 'tenant_title', _tenant_id::text
+				, 'is_default', _is_default, 'is_system', _is_system
+				, 'is_assignable', _is_assignable, 'is_active', _is_active)
+			, _tenant_id);
 
 end ;
 $$;
@@ -212,14 +208,7 @@ begin
 							 from auth.user_group
 							 where user_group_id = _user_group_id;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested group info: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
-			, null
-			, 50211
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end
 $$;
 
@@ -256,14 +245,7 @@ begin
 					 inner join auth.permission sp
 											on sp.node_path <@ p.node_path and sp.is_assignable = true;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested effective permissions of user group: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
-			, null
-			, 50211
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -295,14 +277,7 @@ begin
 		group by pids.assignment_id, pids.perm_set_title, pids.perm_set_id, pids.code
 		order by perm_set_title nulls last;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested assigned permissions of user group: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
-			, 'group', _user_group_id
-			, null
-			, 50211
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 
 end;
 $$;
@@ -381,23 +356,22 @@ begin
 		from auth.permission_assignment
 		where assignment_id = __last_id;
 
-	if
-		_user_group_id is not null then
-		perform public.add_journal_msg(_created_by, _user_id
-			, format('User: %s assigned new permission: %s to group: %s in tenant: %s'
-															, _created_by, coalesce(_perm_set_code, _perm_code), _user_group_id, _tenant_id)
+	if _user_group_id is not null then
+		perform create_journal_message(_created_by, _user_id
+			, 12010  -- permission_assigned
 			, 'group', _user_group_id
-			, array ['assignment_id', __last_id::text, 'perm_set_code', _perm_set_code, 'permission_code', _perm_code]
-			, 50304
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
+				, 'target_type', 'group', 'target_name', _user_group_id::text
+				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
+			, _tenant_id);
 	else
-		perform public.add_journal_msg(_created_by, _user_id
-			, format('User: %s assigned new permission: %s to user: %s in tenant: %s'
-															, _created_by, coalesce(_perm_set_code, _perm_code), _target_user_id, _tenant_id)
+		perform create_journal_message(_created_by, _user_id
+			, 12010  -- permission_assigned
 			, 'user', _target_user_id
-			, array ['assignment_id', __last_id::text, 'perm_set_code', _perm_set_code, 'permission_code', _perm_code]
-			, 50304
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
+				, 'target_type', 'user', 'target_name', _target_user_id::text
+				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
+			, _tenant_id);
 	end if;
 end;
 $$;
@@ -422,23 +396,20 @@ begin
 				where assignment_id = _assignment_id
 				returning *;
 
-	if
-		__user_group_id is not null then
-		perform add_journal_msg(_deleted_by, _user_id
-			, format('User: %s unassigned permission from group: %s in tenant: %s'
-															, _deleted_by, __user_group_id, _tenant_id)
+	if __user_group_id is not null then
+		perform create_journal_message(_deleted_by, _user_id
+			, 12011  -- permission_revoked
 			, 'group', __user_group_id
-			, array ['assignment_id', _assignment_id::text]
-			, 50305
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('target_type', 'group', 'target_name', __user_group_id::text
+				, 'assignment_id', _assignment_id)
+			, _tenant_id);
 	else
-		perform add_journal_msg(_deleted_by, _user_id
-			, format('User: %s unassigned permission from user: %s in tenant: %s'
-															, _deleted_by, __user_group_id, _tenant_id)
+		perform create_journal_message(_deleted_by, _user_id
+			, 12011  -- permission_revoked
 			, 'user', __target_user_id
-			, array ['assignment_id', _assignment_id::text]
-			, 50304
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('target_type', 'user', 'target_name', __target_user_id::text
+				, 'assignment_id', _assignment_id)
+			, _tenant_id);
 	end if;
 end;
 
@@ -481,14 +452,11 @@ begin
 	returning full_code
 		into __permission_full_code;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s set permission: %s as assignable: %s'
-											, _updated_by, __permission_full_code, _is_assignable)
+	perform create_journal_message(_updated_by, _user_id
+			, 12002  -- permission_updated
 			, 'permission', __permission_id
-			, null
-			, 50306
-			, _tenant_id := 1);
+			, jsonb_build_object('permission_code', __permission_full_code, 'is_assignable', _is_assignable)
+			, 1);
 end;
 $$;
 
@@ -607,14 +575,11 @@ begin
 		from auth.permission
 		where permission_id = __last_id;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s created permission: %s'
-											, _created_by, __full_code)
+	perform create_journal_message(_created_by, _user_id
+			, 12001  -- permission_created
 			, 'permission', __last_id
-			, null
-			, 50331
-			, _tenant_id := 1);
+			, jsonb_build_object('permission_code', __full_code::text, 'title', _title)
+			, 1);
 end;
 $$;
 
@@ -636,14 +601,7 @@ begin
 	return query select permission_id, is_assignable, title, code, full_code::text, has_children
 							 from auth.permission
 							 order by full_code;
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested all permissions '
-											, _requested_by)
-			, 'user', null
-			, null
-			, 50310
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -667,14 +625,7 @@ begin
 		where ps.tenant_id = _tenant_id
 		group by ps.perm_set_id, ps.title, ps.code, ps.is_system, ps.is_assignable;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s request perm sets in tenant: %s'
-											, _requested_by, _tenant_id)
-			, 'perm_set', _tenant_id
-			, null
-			, 50300
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 
 end;
 $$;
@@ -708,15 +659,13 @@ begin
 				 inner join auth.permission p
 										on p.full_code = perm_code::ext.ltree;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s created new permission set: %s'
-											, _created_by, _title)
+	perform create_journal_message(_created_by, _user_id
+			, 12020  -- perm_set_created
 			, 'perm_set', __last_id
-			,
-										array ['title', _title, 'is_system', _is_system::text, 'is_assignable', _is_assignable::text, 'permissions', array_to_string(_permissions, ', ')]
-			, 50301
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
+				, 'is_system', _is_system, 'is_assignable', _is_assignable
+				, 'permissions', array_to_string(_permissions, ', '))
+			, _tenant_id);
 
 	return query
 		select *
@@ -755,14 +704,11 @@ begin
 	returning perm_set_id
 		into __last_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s updated permission set: %s'
-											, _updated_by, _title)
+	perform create_journal_message(_updated_by, _user_id
+			, 12021  -- perm_set_updated
 			, 'perm_set', __last_id
-			, array ['title', _title, 'is_assignable', _is_assignable::text]
-			, 50302
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('perm_set_code', _title, 'is_assignable', _is_assignable)
+			, _tenant_id);
 
 	return query
 		select *
@@ -794,14 +740,12 @@ begin
 	where p.code is not null
 		and psp.perm_set_id is null;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s added permission to permission set: %s'
-											, _created_by, array_to_string(_permissions, ', '))
+	perform create_journal_message(_created_by, _user_id
+			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
-			, array ['permissions', array_to_string(_permissions, ', ')]
-			, 50311
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('perm_set_code', _perm_set_id::text
+				, 'permissions_added', array_to_string(_permissions, ', '))
+			, _tenant_id);
 
 	return query
 		select ps.perm_set_id, ps.code, p.permission_id, p.full_code::text
@@ -838,14 +782,12 @@ begin
 																 inner join auth.perm_set ps
 																						on psp.perm_set_id = ps.perm_set_id and ps.tenant_id = _tenant_id);
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s deleted permission from permission set: %s'
-											, _deleted_by, array_to_string(_permissions, ', '))
+	perform create_journal_message(_deleted_by, _user_id
+			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
-			, array ['permissions', array_to_string(_permissions, ', ')]
-			, 50313
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('perm_set_code', _perm_set_id::text
+				, 'permissions_removed', array_to_string(_permissions, ', '))
+			, _tenant_id);
 
 	return query
 		select ps.perm_set_id, ps.code, p.permission_id, p.full_code::text
@@ -899,15 +841,12 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform
-		add_journal_msg('system', _user_id
-			, format('User: (id: %s) added new user: %s'
-											, _user_id, _username)
+	perform create_journal_message('system', _user_id
+			, 10001  -- user_created
 			, 'user', __last_id
-			, array ['username', __normalized_username, 'email', __normalized_email
-											, 'display_name', _display_name]
-			, _event_id := 50101
-			, _tenant_id := 1);
+			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
+				, 'display_name', _display_name)
+			, 1);
 end;
 $$;
 
@@ -957,15 +896,12 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform
-		add_journal_msg('system', _user_id
-			, format('User: (id: %s) added new service user: %s'
-											, _user_id, _username)
+	perform create_journal_message('system', _user_id
+			, 10001  -- user_created
 			, 'user', __last_id
-			, array ['username', __normalized_username, 'email', __normalized_email
-											, 'display_name', _display_name]
-			, _event_id := 50101
-			, _tenant_id := 1);
+			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
+				, 'display_name', _display_name, 'user_type', 'service')
+			, 1);
 end;
 $$;
 
@@ -987,13 +923,11 @@ begin
 				, provider_code
 				, uid;
 
-	perform
-		add_journal_msg('system', _user_id
-			, format('User: (id: %s) changed user''s password (id: %s)'
-											, _user_id, _target_user_id)
+	perform create_journal_message('system', _user_id
+			, 10020  -- password_changed
 			, 'user', _target_user_id
-			, _event_id := 50136
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1);
 end;
 $$;
 
@@ -1067,14 +1001,11 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform
-		add_journal_msg('system', _user_id
-			, format('User: (id: %s) created new API key user: %s'
-											, _user_id, __normalized_username)
+	perform create_journal_message('system', _user_id
+			, 10001  -- user_created
 			, 'user', __last_id
-			, array ['username', __normalized_username]
-			, _event_id := 50101
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('username', __normalized_username, 'user_type', 'api')
+			, _tenant_id);
 end;
 $$;
 
@@ -1095,15 +1026,11 @@ begin
 
 	perform auth.create_user_event(_updated_by, _user_id, 'update_user_info', _target_user_id);
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User basic data (upn: %s) updated by user: %s'
-											, _username, _updated_by)
-			, 'user_info', _target_user_id
-			, _payload := array ['username', _username, 'display_name', _display_name,
-			'email', _email]
-			, _event_id := 50102
-			, _tenant_id := 1);
+	perform create_journal_message(_updated_by, _user_id
+			, 10002  -- user_updated
+			, 'user', _target_user_id
+			, jsonb_build_object('username', _username, 'display_name', _display_name, 'email', _email)
+			, 1);
 end;
 $$;
 
@@ -1152,14 +1079,12 @@ begin
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
-	perform
-		add_journal_msg_jsonb(_created_by, _user_id
-			, format('User group: (code: %s) member: (upn: %s) in tenant: %s created by: %s'
-														, __user_group_code, __user_upn, _tenant_id, _created_by)
+	perform create_journal_message(_created_by, _user_id
+			, 13010  -- group_member_added
 			, 'group', _user_group_id
-			, jsonb_build_object('target_user_id', _target_user_id)
-			, 50131
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
+				, 'target_user_id', _target_user_id)
+			, _tenant_id);
 end;
 $$;
 
@@ -1231,17 +1156,12 @@ begin
 					 , _password_salt, _is_active)
 		returning user_id, provider_code, uid;
 
-	perform
-		add_journal_msg_jsonb('system', _user_id
-			, format('User identity for user: (upn: %s) created by user: %s'
-														, __user_info.username, _target_user_id)
-			, 'user'
-			, _target_user_id
-			, _data_object_code := __user_info.username
-			, _payload := jsonb_build_object('provider_code', _provider_code, 'provider_uid', _provider_uid, 'provider_oid',
-																			 _provider_oid, 'is_active', _is_active)
-			, _event_id := 50134
-			, _tenant_id := 1);
+	perform create_journal_message('system', _user_id
+			, 10030  -- identity_created
+			, 'user', _target_user_id
+			, jsonb_build_object('username', __user_info.username, 'provider_code', _provider_code
+				, 'provider_uid', _provider_uid, 'provider_oid', _provider_oid, 'is_active', _is_active)
+			, 1);
 end;
 $$;
 
@@ -1259,15 +1179,11 @@ begin
     where tenant_id = _tenant_id
     returning * into __last_item;
 
-    perform
-        add_journal_msg_jsonb(_deleted_by, _user_id
-            , format('Tenant: (code: %s, title: %s) deleted by: %s'
-                                  , __last_item.code, __last_item.title, _deleted_by)
-            , 'tenant'
-            , __last_item.tenant_id
-            , _data_object_code := __last_item.code
-            , _event_id := 50003
-            , _tenant_id := 1);
+    perform create_journal_message(_deleted_by, _user_id
+            , 11003  -- tenant_deleted
+            , 'tenant', __last_item.tenant_id
+            , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
+            , 1);
 
 
     return query
@@ -1574,16 +1490,12 @@ begin
 		set uid = _provider_uid
 		where user_identity_id = __user_identity_id;
 
-		perform
-			add_journal_msg_jsonb('system', _user_id
-				, format('User: (upn: %s) updated user: (upn: %) identity uid for provider: (code: %)'
-															, _updated_by, __upn, _provider_code)
-				, 'user'
-				, _target_user_id
-				, _data_object_code := __upn
-				, _payload := jsonb_build_object('provider_uid', _provider_uid)
-				, _event_id := 50137
-				, _tenant_id := 1);
+		perform create_journal_message('system', _user_id
+				, 10031  -- identity_updated
+				, 'user', _target_user_id
+				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
+					, 'provider_uid', _provider_uid)
+				, 1);
 	end if;
 
 	if __current_oid <> _provider_oid then
@@ -1592,16 +1504,12 @@ begin
 		set provider_oid = _provider_oid
 		where user_identity_id = __user_identity_id;
 
-		perform
-			add_journal_msg_jsonb('system', _user_id
-				, format('User: (upn: %s) updated user: (upn: %) identity uid for provider: (code: %)'
-															, _updated_by, __upn, _provider_code)
-				, 'user'
-				, _target_user_id
-				, _data_object_code := __upn
-				, _payload := jsonb_build_object('provider_oid', _provider_oid)
-				, _event_id := 50137
-				, _tenant_id := 1);
+		perform create_journal_message('system', _user_id
+				, 10031  -- identity_updated
+				, 'user', _target_user_id
+				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
+					, 'provider_oid', _provider_oid)
+				, 1);
 	end if;
 end;
 $$;
@@ -1652,15 +1560,14 @@ begin
 	from auth.perm_set_perm
 	where perm_set_id = __source_perm_set.perm_set_id;
 
-	perform
-		public.add_journal_msg_jsonb(_created_by, _user_id
-			, format('Permission set(code: %s) from tenant (code: %s) copied to tenant: (code: %s) by user: %s'
-																	 , _source_perm_set_code, __source_tenant_code, __target_tenant_code, _created_by)
-			, 'perm_set'
-			, __created_perm_set.perm_set_id
-			, _data_object_code := __created_perm_set.code
-			, _event_id := 50307
-			, _tenant_id := _target_tenant_id);
+	perform create_journal_message(_created_by, _user_id
+			, 12020  -- perm_set_created
+			, 'perm_set', __created_perm_set.perm_set_id
+			, jsonb_build_object('perm_set_code', __created_perm_set.code
+				, 'tenant_title', __target_tenant_code
+				, 'source_perm_set_code', _source_perm_set_code
+				, 'source_tenant', __source_tenant_code)
+			, _target_tenant_id);
 
 	return query select * from auth.perm_set where perm_set_id = __created_perm_set.perm_set_id;
 end;
@@ -1696,14 +1603,7 @@ begin
                  order by ps.title nulls last;
 
 
-    perform
-        add_journal_msg(_requested_by, _user_id
-            , format('User: %s requested assigned permissions of user: %s in tenant: %s'
-                            , _requested_by, _target_user_id, _tenant_id)
-            , 'user', _target_user_id
-            , null
-            , 50211
-            , _tenant_id := _tenant_id);
+    -- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 

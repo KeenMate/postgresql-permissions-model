@@ -55,6 +55,11 @@ INSERT INTO const.user_group_member_type (code) VALUES
     ('synced')
 ON CONFLICT DO NOTHING;
 
+-- System parameters
+INSERT INTO const.sys_param (group_code, code, text_value) VALUES
+    ('journal', 'level', 'update')  -- 'all', 'update', or 'none'
+ON CONFLICT DO NOTHING;
+
 /*
  * Event Categories
  * ================
@@ -71,6 +76,7 @@ INSERT INTO const.event_category (category_code, title, range_start, range_end, 
     ('group_event',      'Group Events',      13001, 13999, false),
     ('apikey_event',     'API Key Events',    14001, 14999, false),
     ('token_event',      'Token Events',      15001, 15999, false),
+    ('provider_event',   'Provider Events',   16001, 16999, false),
     -- Errors (30xxx)
     ('security_error',   'Security Errors',   30001, 30999, true),
     ('validation_error', 'Validation Errors', 31001, 31999, true),
@@ -150,7 +156,14 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description)
     (15001, 'token_created',          'token_event', 'Token Created',        'New token was created'),
     (15002, 'token_used',             'token_event', 'Token Used',           'Token was used'),
     (15003, 'token_expired',          'token_event', 'Token Expired',        'Token expired'),
-    (15004, 'token_failed',           'token_event', 'Token Failed',         'Token validation failed')
+    (15004, 'token_failed',           'token_event', 'Token Failed',         'Token validation failed'),
+
+    -- Provider events (16001-16999)
+    (16001, 'provider_created',       'provider_event', 'Provider Created',  'New provider was created'),
+    (16002, 'provider_updated',       'provider_event', 'Provider Updated',  'Provider was updated'),
+    (16003, 'provider_deleted',       'provider_event', 'Provider Deleted',  'Provider was deleted'),
+    (16004, 'provider_enabled',       'provider_event', 'Provider Enabled',  'Provider was enabled'),
+    (16005, 'provider_disabled',      'provider_event', 'Provider Disabled', 'Provider was disabled')
 ON CONFLICT DO NOTHING;
 
 /*
@@ -282,7 +295,14 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (15001, 'en', 'Token was created for user "{username}"'),
     (15002, 'en', 'Token was used by user "{username}"'),
     (15003, 'en', 'Token expired for user "{username}"'),
-    (15004, 'en', 'Token validation failed for user "{username}": {reason}')
+    (15004, 'en', 'Token validation failed for user "{username}": {reason}'),
+
+    -- Provider events (16001-16999)
+    (16001, 'en', 'Provider "{provider_code}" was created by {actor}'),
+    (16002, 'en', 'Provider "{provider_code}" was updated by {actor}'),
+    (16003, 'en', 'Provider "{provider_code}" was deleted by {actor}'),
+    (16004, 'en', 'Provider "{provider_code}" was enabled by {actor}'),
+    (16005, 'en', 'Provider "{provider_code}" was disabled by {actor}')
 ON CONFLICT DO NOTHING;
 
 /*

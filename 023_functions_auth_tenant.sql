@@ -79,14 +79,7 @@ begin
 							 from tenant_users tu
 							 group by tu.user_id, tu.username, tu.display_name;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested a list of all users for tenant: %s'
-											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
-			, null
-			, 50005
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -112,14 +105,7 @@ begin
 		group by ugs.user_group_id, ugs.group_title, ugs.group_code, ugs.is_external, ugs.is_assignable, ugs.is_active
 		order by ugs.group_title;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested a list of all groups for tenant: %s'
-											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
-			, null
-			, 50006
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -147,14 +133,7 @@ begin
 		group by ugs.user_id, ui.display_name, ui.code, ui.uuid
 		order by ui.display_name;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested a list of members for tenant: %s'
-											, _requested_by, _tenant_id)
-			, 'tenant', _tenant_id
-			, null
-			, 50005
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -335,14 +314,12 @@ begin
 
     if _user_id <> _target_user_id and _user_id <> 1
     then
-        perform
-            add_journal_msg_jsonb('system', _user_id
-                , format('User: (id: %s) updated last selected tenant for user: %s'
-                                      , _user_id, _target_user_id)
+        perform create_journal_message('system', _user_id
+                , 10002  -- user_updated
                 , 'user', _target_user_id
-                , jsonb_build_object('tenant_id', __tenant_id)
-                , _event_id := 50138
-                , _tenant_id := 1);
+                , jsonb_build_object('username', _target_user_id::text, 'tenant_id', __tenant_id
+                    , 'action', 'last_selected_tenant_updated')
+                , 1);
     end if;
 end;
 $$;
@@ -382,20 +359,12 @@ begin
 	returning *
 		into __last_item;
 
-	perform
-		add_journal_msg_jsonb(_created_by, _user_id
-			, format('Tenant: (code: %s, title: %s) created by: %s'
-														, __last_item.code, __last_item.title, _created_by)
-			, 'tenant'
-			, __last_item.tenant_id
-			, _data_object_code := __last_item.code
-			, _payload := jsonb_build_object(
-						'title', _title
-			, 'is_assignable', _is_assignable
-			, 'is_removable', _is_removable
-										)
-			, _event_id := 50001
-			, _tenant_id := 1);
+	perform create_journal_message(_created_by, _user_id
+			, 11001  -- tenant_created
+			, 'tenant', __last_item.tenant_id
+			, jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code
+				, 'is_assignable', _is_assignable, 'is_removable', _is_removable)
+			, 1);
 
 	-- Create tenant admins
 	select __user_group_id
@@ -462,20 +431,12 @@ begin
 		, updated_at    = now()
 	where tenant_id = _tenant_id;
 
-	perform
-		add_journal_msg_jsonb(_created_by, _user_id
-			, format('Tenant: (code: %s, title: %s) updated by: %s'
-														, _code, _title, _created_by)
-			, 'tenant'
-			, _tenant_id
-			, _data_object_code := _code
-			, _payload := jsonb_build_object(
-						'title', _title
-			, 'is_assignable', _is_assignable
-			, 'is_removable', _is_removable
-										)
-			, _event_id := 50002
-			, _tenant_id := 1);
+	perform create_journal_message(_created_by, _user_id
+			, 11002  -- tenant_updated
+			, 'tenant', _tenant_id
+			, jsonb_build_object('tenant_title', _title, 'tenant_code', _code
+				, 'is_assignable', _is_assignable, 'is_removable', _is_removable)
+			, 1);
 
 	if
 		(_tenant_owner_id is not null)
@@ -494,6 +455,59 @@ begin
 				 , is_default
 		from auth.tenant
 		where tenant_id = _tenant_id;
+end;
+$$;
+
+create or replace function auth.search_tenants(
+    _user_id bigint,
+    _search_text text default null,
+    _page integer default 1,
+    _page_size integer default 30
+)
+    returns TABLE(
+        __tenant_id integer,
+        __uuid text,
+        __title text,
+        __code text,
+        __is_removable boolean,
+        __is_assignable boolean,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+    set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, 'tenants.read_tenants');
+
+    __search_text := helpers.normalize_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    return query
+        with filtered_tenants as (
+            select t.tenant_id
+                 , count(*) over () as total_items
+            from auth.tenant t
+            where (helpers.is_empty_string(__search_text)
+                   or t.nrm_search_data like '%' || __search_text || '%')
+            order by t.title
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select t.tenant_id
+             , t.uuid::text
+             , t.title
+             , t.code
+             , t.is_removable
+             , t.is_assignable
+             , ft.total_items
+        from filtered_tenants ft
+                 inner join auth.tenant t on ft.tenant_id = t.tenant_id;
 end;
 $$;
 

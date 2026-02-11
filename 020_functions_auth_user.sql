@@ -31,14 +31,11 @@ begin
 				, is_active
 				, is_locked;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s enabled user: %s'
-											, _updated_by, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10004  -- user_enabled
 			, 'user', _target_user_id
-			, null
-			, 50104
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1);
 end;
 $$;
 
@@ -63,14 +60,11 @@ begin
 				, is_active
 				, is_locked;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s disabled user: %s'
-											, _updated_by, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10005  -- user_disabled
 			, 'user', _target_user_id
-			, null
-			, 50105
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1);
 end;
 $$;
 
@@ -95,14 +89,11 @@ begin
 				, is_active
 				, is_locked;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s unlocked user: %s'
-											, _updated_by, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10007  -- user_unlocked
 			, 'user', _target_user_id
-			, null
-			, 50106
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1);
 end;
 $$;
 
@@ -127,14 +118,11 @@ begin
 				, is_active
 				, is_locked;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s locked user: %s'
-											, _updated_by, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10006  -- user_locked
 			, 'user', _target_user_id
-			, null
-			, 50107
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1);
 end;
 $$;
 
@@ -172,14 +160,11 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s enabled user''s (id: %s) identity (provider code: %s)'
-											, _updated_by, _user_id, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10033  -- identity_enabled
 			, 'user', _target_user_id
-			, array ['provider_code', _provider_code]
-			, 50108
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
+			, 1);
 end;
 $$;
 
@@ -217,14 +202,11 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s disabled user''s (id: %s) identity (provider code: %s)'
-											, _updated_by, _user_id, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 10034  -- identity_disabled
 			, 'user', _target_user_id
-			, array ['provider_code', _provider_code]
-			, 50109
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
+			, 1);
 end;
 $$;
 
@@ -593,14 +575,11 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s removed user group: %s in tenant: %s'
-											, _deleted_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 13003  -- group_deleted
 			, 'group', _user_group_id
-			, null
-			, 50203
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text)
+			, _tenant_id);
 end;
 $$;
 
@@ -760,6 +739,72 @@ begin
 		from auth.user_identity uid
 			left join auth.user_info ui on ui.user_id = uid.user_id
 		where uid.provider_oid = _provider_oid;
+end;
+$$;
+
+create or replace function auth.search_users(
+    _user_id bigint,
+    _search_text text default null,
+    _user_type_code text default null,
+    _is_active boolean default null,
+    _is_locked boolean default null,
+    _page integer default 1,
+    _page_size integer default 30,
+    _tenant_id integer default 1
+)
+    returns TABLE(
+        __user_id bigint,
+        __code text,
+        __uuid text,
+        __username text,
+        __email text,
+        __display_name text,
+        __user_type_code text,
+        __is_active boolean,
+        __is_locked boolean,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+    set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, 'users.read_users', _tenant_id);
+
+    __search_text := helpers.normalize_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    return query
+        with filtered_users as (
+            select ui.user_id
+                 , count(*) over () as total_items
+            from auth.user_info ui
+            where (_user_type_code is null or ui.user_type_code = _user_type_code)
+              and (_is_active is null or ui.is_active = _is_active)
+              and (_is_locked is null or ui.is_locked = _is_locked)
+              and (helpers.is_empty_string(__search_text)
+                   or ui.nrm_search_data like '%' || __search_text || '%')
+            order by ui.display_name
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select ui.user_id
+             , ui.code
+             , ui.uuid::text
+             , ui.username
+             , ui.email
+             , ui.display_name
+             , ui.user_type_code
+             , ui.is_active
+             , ui.is_locked
+             , fu.total_items
+        from filtered_users fu
+                 inner join auth.user_info ui on fu.user_id = ui.user_id;
 end;
 $$;
 

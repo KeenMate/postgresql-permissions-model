@@ -16,6 +16,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
 - **Permission caching** for performance
+- **Built-in search/paging** for users, groups, tenants, permissions, and permission sets
 
 ## Quick Start
 
@@ -62,6 +63,22 @@ select auth.create_permission_by_path('orders.cancel_order', 'Cancel Order');
 
 -- Assign permission to user
 select auth.assign_permission(_created_by, _user_id, _tenant_id, _target_user_id, null, 'orders.cancel_order');
+
+-- Search users with pagination
+select * from auth.search_users(
+    _user_id := 1,
+    _search_text := 'john',
+    _is_active := true,
+    _page := 1,
+    _page_size := 20,
+    _tenant_id := 1
+);
+
+-- Search groups with member counts
+select * from auth.search_user_groups(1, 'admin', _is_active := true);
+
+-- Search permissions by parent
+select * from auth.search_permissions(1, null, _parent_code := 'users');
 ```
 
 ## Architecture

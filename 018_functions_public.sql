@@ -116,6 +116,7 @@ select coalesce(
 $$;
 
 -- Core function: Create journal entry with event ID
+-- Respects journal level setting from const.sys_param (journal.level)
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
@@ -129,6 +130,11 @@ create or replace function public.create_journal_message(
 as
 $$
 begin
+    -- Check if we should log based on journal level and event type
+    if not helpers.should_log_journal(helpers.is_event_read_only(_event_id)) then
+        return;
+    end if;
+
     return query
         insert into journal (created_by, user_id, event_id, keys, data_payload, tenant_id)
         values (_created_by, _user_id, _event_id, _keys, _payload, _tenant_id)
@@ -311,14 +317,12 @@ begin
 		perform error.raise_52279(__token_uid);
 	end if;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s validated a token for user: %s'
-											, _updated_by, _target_user_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 15002  -- token_used
 			, 'token', __token_id
-			, array ['ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin]
-			, 50402
-			, _tenant_id := 1);
+			, jsonb_build_object('username', _target_user_id::text
+				, 'ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin)
+			, 1);
 
 
 	if

@@ -100,7 +100,8 @@ create table const.event_code
     code          text    not null unique,
     category_code text    not null references const.event_category(category_code),
     title         text    not null,
-    description   text
+    description   text,
+    is_read_only  boolean not null default false
 );
 
 /*

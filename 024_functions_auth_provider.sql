@@ -45,14 +45,12 @@ begin
 	return query
 		select __last_id;
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s created new authentication provider: %s'
-											, _created_by, _provider_name)
+	perform create_journal_message(_created_by, _user_id
+			, 16001  -- provider_created
 			, 'provider', __last_id
-			, array ['provider_code', _provider_code, 'provider_name', _provider_name, 'is_active', _is_active::text]
-			, 50011
-			, _tenant_id := 1);
+			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
+				, 'is_active', _is_active)
+			, 1);
 end;
 $$;
 
@@ -75,14 +73,12 @@ begin
 			where provider_id = _provider_id
 			returning provider_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s updated authentication provider: %s'
-											, _updated_by, _provider_name)
+	perform create_journal_message(_updated_by, _user_id
+			, 16002  -- provider_updated
 			, 'provider', _provider_id
-			, array ['provider_code', _provider_code, 'provider_name', _provider_name, 'is_active', _is_active::text]
-			, 50012
-			, _tenant_id := 1);
+			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
+				, 'is_active', _is_active)
+			, 1);
 end;
 $$;
 
@@ -105,14 +101,11 @@ begin
 				where code = _provider_code
 				returning __provider_id;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s deleted authentication provider: %s'
-											, _deleted_by, _provider_code)
+	perform create_journal_message(_deleted_by, _user_id
+			, 16003  -- provider_deleted
 			, 'provider', __provider_id
-			, null
-			, 50013
-			, _tenant_id := 1);
+			, jsonb_build_object('provider_code', _provider_code)
+			, 1);
 end;
 $$;
 
@@ -135,14 +128,11 @@ begin
 			where code = _provider_code
 			returning provider_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s enabled authentication provider: %s'
-											, _updated_by, _provider_code)
+	perform create_journal_message(_updated_by, _user_id
+			, 16004  -- provider_enabled
 			, 'provider', __provider_id
-			, null
-			, 50014
-			, _tenant_id := 1);
+			, jsonb_build_object('provider_code', _provider_code)
+			, 1);
 end;
 $$;
 
@@ -165,14 +155,11 @@ begin
 			where code = _provider_code
 			returning provider_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s disabled authentication provider: %s'
-											, _updated_by, _provider_code)
+	perform create_journal_message(_updated_by, _user_id
+			, 16005  -- provider_disabled
 			, 'provider', __provider_id
-			, null
-			, 50015
-			, _tenant_id := 1);
+			, jsonb_build_object('provider_code', _provider_code)
+			, 1);
 end;
 $$;
 
@@ -199,14 +186,7 @@ begin
 		where uid.provider_code = _provider_code
 		order by ui.display_name;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested a list of all users for authentication provider: %s'
-											, _requested_by, _provider_code)
-			, 'provider', __provider_id
-			, null
-			, 50016
-			, _tenant_id := 1);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 

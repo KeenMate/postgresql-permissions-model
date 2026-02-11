@@ -107,19 +107,12 @@ begin
 				and user_group_id = _user_group_id
 			returning user_group_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s updated group: %s in tenant: %s'
-											, _updated_by, _title, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated
 			, 'group', _user_group_id
-			, array ['title', _title
-											, 'is_default', _is_default::text
-											, 'is_assignable', _is_assignable::text
-											, 'is_active', _is_active::text
-											, 'is_default', _is_default::text
-											]
-			, 50202
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _title, 'is_default', _is_default
+				, 'is_assignable', _is_assignable, 'is_active', _is_active, 'is_external', _is_external)
+			, _tenant_id);
 end;
 $$;
 
@@ -146,14 +139,11 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s enabled user group: %s in tenant: %s'
-											, _updated_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (enabled)
 			, 'group', _user_group_id
-			, null
-			, 50204
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'enabled')
+			, _tenant_id);
 end;
 $$;
 
@@ -180,14 +170,11 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s disabled user group: %s in tenant: %s'
-											, _updated_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (disabled)
 			, 'group', _user_group_id
-			, null
-			, 50205
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'disabled')
+			, _tenant_id);
 end;
 $$;
 
@@ -214,14 +201,11 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s enabled user group: %s in tenant: %s'
-											, _updated_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (locked)
 			, 'group', _user_group_id
-			, null
-			, 50207
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'locked')
+			, _tenant_id);
 end;
 $$;
 
@@ -248,14 +232,11 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s disabled user group: %s in tenant: %s'
-											, _updated_by, _user_group_id, _tenant_id)
-			, 'user_group', _user_group_id
-			, null
-			, 50206
-			, _tenant_id := _tenant_id);
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (unlocked)
+			, 'group', _user_group_id
+			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'unlocked')
+			, _tenant_id);
 end;
 $$;
 
@@ -294,14 +275,11 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s removed user group: %s in tenant: %s'
-											, _deleted_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 13003  -- group_deleted
 			, 'group', _user_group_id
-			, null
-			, 50203
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text)
+			, _tenant_id);
 end;
 $$;
 
@@ -331,14 +309,12 @@ begin
 		and user_id = _target_user_id;
 
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User group: (code: %s) member: (upn: %s) in tenant: %s deleted by: %s'
-											, __user_group_code, __user_upn, _tenant_id, _deleted_by)
+	perform create_journal_message(_deleted_by, _user_id
+			, 13011  -- group_member_removed
 			, 'group', _user_group_id
-			, array ['target_user_id', _target_user_id::text]
-			, 50133
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
+				, 'target_user_id', _target_user_id)
+			, _tenant_id);
 end;
 $$;
 
@@ -354,15 +330,7 @@ begin
 							 from auth.user_group_mapping ugm
 							 where ugm.group_id = _user_group_id;
 
-	perform
-		add_journal_msg(_requested_by, _user_id
-			, format('User: %s requested user group mappings for group: %s in tenant: %s'
-											, _requested_by, _user_group_id, _tenant_id)
-			, 'group'
-			, _user_group_id
-			, null
-			, 50230
-			, _tenant_id := _tenant_id);
+	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
@@ -415,21 +383,18 @@ begin
 										from affected_users);
 
 
-	perform
-		add_journal_msg(_created_by, _user_id
-			, format('User: %s added new provider: %s mapping: %s to group: %s in tenant: %s'
-											, _created_by, _provider_code, coalesce(_mapped_object_id, _mapped_role),
-							 _user_group_id, _tenant_id)
+	perform create_journal_message(_created_by, _user_id
+			, 13020  -- group_mapping_created
 			, 'group', _user_group_id
-			, array ['provider_code', _provider_code, 'mapped_object_id'
-											, _mapped_object_id::text, 'mapped_object_name'
-											, _mapped_object_name, '_mapped_role', _mapped_role]
-			, 50231
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text
+				, 'mapping_name', coalesce(_mapped_object_name, _mapped_object_id, _mapped_role)
+				, 'provider_code', _provider_code
+				, 'mapped_object_id', _mapped_object_id, 'mapped_role', _mapped_role)
+			, _tenant_id);
 end;
 $$;
 
-create or replace function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _ug_mapping_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _user_group_mapping_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -446,7 +411,7 @@ begin
 	-- expire user_permission_cache for affected users
 	with affected_users as (select user_id
 													from auth.user_group_member ugm
-													where ugm.mapping_id = _ug_mapping_id)
+													where ugm.mapping_id = _user_group_mapping_id)
 	update auth.user_permission_cache
 	set updated_by      = _deleted_by
 		, updated_at      = now()
@@ -456,20 +421,19 @@ begin
 
 	delete
 	from auth.user_group_mapping
-	where ug_mapping_id = _ug_mapping_id
+	where ug_mapping_id = _user_group_mapping_id
 	returning group_id, provider_code, mapped_object_id, mapped_object_name, mapped_role
 		into __user_group_id, __provider_code, __mapped_object_id, __mapped_object_name, __mapped_role;
 
 
-	perform
-		add_journal_msg(_deleted_by, _user_id
-			, format('User: %s removed group mapping: %s from group: %s in tenant: %s'
-											, _deleted_by, __mapped_object_name, __user_group_id, _tenant_id)
+	perform create_journal_message(_deleted_by, _user_id
+			, 13021  -- group_mapping_deleted
 			, 'group', __user_group_id
-			, array ['provider_code', __provider_code, 'mapped_object_id'
-											, __mapped_object_id::text, 'mapped_object_name', __mapped_object_name, 'mapped_role', __mapped_role]
-			, 50233
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', __user_group_id::text
+				, 'mapping_name', coalesce(__mapped_object_name, __mapped_object_id, __mapped_role)
+				, 'provider_code', __provider_code
+				, 'mapped_object_id', __mapped_object_id, 'mapped_role', __mapped_role)
+			, _tenant_id);
 end;
 $$;
 
@@ -516,14 +480,11 @@ begin
 		, is_external = false
 	where user_group_id = _user_group_id;
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User: %s set user group as hybrid in tenant: %s'
-											, _updated_by, _user_group_id, _tenant_id)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (set as hybrid)
 			, 'group', _user_group_id
-			, null
-			, 50209
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'set_hybrid')
+			, _tenant_id);
 end;
 $$;
 
@@ -600,15 +561,51 @@ begin
 		into __user_group_code;
 
 
-	perform
-		add_journal_msg(_updated_by, _user_id
-			, format('User group: (code: %s) set as external in tenant: %s by: %s'
-											, __user_group_code, _tenant_id, _updated_by)
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (set as external)
 			, 'group', _user_group_id
-			, _data_object_code := __user_group_code
-			, _payload := null
-			, _event_id := 50208
-			, _tenant_id := _tenant_id);
+			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_external')
+			, _tenant_id);
+end;
+$$;
+
+create or replace function auth.set_user_group_as_internal(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+    language plpgsql
+as
+$$
+declare
+	__user_group_code text;
+begin
+	perform
+		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+
+	-- Delete all external/sync members (keep manual members intact)
+	delete
+	from auth.user_group_member ugm
+	where ugm.group_id = _user_group_id
+		and ugm.member_type_code <> 'manual';
+
+	-- Delete all mappings for this group
+	delete
+	from auth.user_group_mapping ugm
+	where ugm.group_id = _user_group_id;
+
+	update auth.user_group
+	set updated_at  = now()
+		, updated_by  = _updated_by
+		, is_external = false
+		, is_synced   = false
+		, create_missing_users_on_sync = false
+	where user_group_id = _user_group_id
+	returning code
+		into __user_group_code;
+
+
+	perform create_journal_message(_updated_by, _user_id
+			, 13002  -- group_updated (set as internal)
+			, 'group', _user_group_id
+			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_internal')
+			, _tenant_id);
 end;
 $$;
 
@@ -863,6 +860,80 @@ begin
 
 	drop table if exists __temp_delete_members;
 	drop table if exists __temp_external_group_sync;
+end;
+$$;
+
+create or replace function auth.search_user_groups(
+    _user_id bigint,
+    _search_text text default null,
+    _is_active boolean default null,
+    _is_external boolean default null,
+    _is_system boolean default null,
+    _page integer default 1,
+    _page_size integer default 30,
+    _tenant_id integer default 1
+)
+    returns TABLE(
+        __user_group_id integer,
+        __title text,
+        __code text,
+        __is_system boolean,
+        __is_external boolean,
+        __is_assignable boolean,
+        __is_active boolean,
+        __is_default boolean,
+        __member_count bigint,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+    set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, 'groups.get_group', _tenant_id);
+
+    __search_text := helpers.normalize_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    return query
+        with filtered_groups as (
+            select ug.user_group_id
+                 , count(*) over () as total_items
+            from auth.user_group ug
+            where ug.tenant_id = _tenant_id
+              and (_is_active is null or ug.is_active = _is_active)
+              and (_is_external is null or ug.is_external = _is_external)
+              and (_is_system is null or ug.is_system = _is_system)
+              and (helpers.is_empty_string(__search_text)
+                   or ug.nrm_search_data like '%' || __search_text || '%')
+            order by ug.title
+            offset ((_page - 1) * _page_size) limit _page_size
+        ),
+        member_counts as (
+            select ugm.group_id, count(ugm.member_id) as member_count
+            from auth.user_group_member ugm
+            where ugm.group_id in (select user_group_id from filtered_groups)
+            group by ugm.group_id
+        )
+        select ug.user_group_id
+             , ug.title
+             , ug.code
+             , ug.is_system
+             , ug.is_external
+             , ug.is_assignable
+             , ug.is_active
+             , ug.is_default
+             , coalesce(mc.member_count, 0)
+             , fg.total_items
+        from filtered_groups fg
+                 inner join auth.user_group ug on fg.user_group_id = ug.user_group_id
+                 left join member_counts mc on ug.user_group_id = mc.group_id;
 end;
 $$;
 

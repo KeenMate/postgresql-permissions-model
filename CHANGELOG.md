@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-11
+
+### Added
+
+#### Search/Paging Functions
+New search functions with offset-based pagination for all auth entities:
+
+| Function | Description |
+|----------|-------------|
+| `auth.search_users` | Search users with filters for user_type, is_active, is_locked |
+| `auth.search_user_groups` | Search groups with member counts |
+| `auth.search_tenants` | Search tenants |
+| `auth.search_permissions` | Search permissions with parent_code filtering |
+| `auth.search_perm_sets` | Search permission sets with permission counts |
+
+All search functions support:
+- Text search on `nrm_search_data` column using LIKE pattern matching
+- Pagination via `_page` and `_page_size` parameters
+- `total_items` count via window function
+
+#### New Group Function
+- `auth.set_user_group_as_internal` - Convert hybrid/external group back to internal-only (complement to `set_user_group_as_external` and `set_user_group_as_hybrid`)
+
+#### New Permissions
+| Permission Code | Description |
+|-----------------|-------------|
+| `users.read_users` | Required for `search_users` |
+| `tenants.read_tenants` | Required for `search_tenants` |
+| `tenants.delete_tenant` | Required for tenant deletion |
+| `permissions.read_permissions` | Required for `search_permissions` |
+| `permissions.read_perm_sets` | Required for `search_perm_sets` |
+
+#### Schema Updates
+Added `nrm_search_data` columns with GIN indexes for trigram search to:
+- `auth.tenant`
+- `auth.user_group`
+- `auth.permission`
+- `auth.perm_set`
+- `auth.api_key`
+
+Added trigger functions in `017_functions_triggers.sql` to auto-populate search data on INSERT/UPDATE.
+
+### Changed
+
+#### Parameter Naming Fix
+- `auth.delete_user_group_mapping`: renamed `_ug_mapping_id` → `_user_group_mapping_id` for consistency
+
+---
+
 ## [2.0.0] - 2026-02-10
 
 ### Breaking Changes
@@ -247,6 +296,7 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.1.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |
 | 2.0.0 | 2026-02-10 | Major restructure: removed inheritance, new event codes |
 | 1.16 | - | API key tenant_id fix |
 | 1.0-1.15 | - | Incremental feature additions |

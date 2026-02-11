@@ -126,12 +126,12 @@ begin
 
     if (_throw_err)
     then
-        perform add_journal_msg('system', _target_user_id
-            , format('User: (id: %s) has no permission: %s'
-                                    , _target_user_id, array_to_string(_perm_codes, '; '))
+        perform create_journal_message('system', _target_user_id
+            , 32001  -- err_no_permission
             , 'perm', _target_user_id
-            , _event_id := 50003
-            , _tenant_id := _tenant_id);
+            , jsonb_build_object('username', _target_user_id::text
+                , 'permission_codes', array_to_string(_perm_codes, '; '))
+            , _tenant_id);
 
         perform
             auth.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
@@ -445,6 +445,8 @@ begin
 	perform unsecure.create_permission_as_system('Assign permission', 'permissions');
 	perform unsecure.create_permission_as_system('Unassign permission', 'permissions');
 	perform unsecure.create_permission_as_system('Get perm sets', 'permissions');
+	perform unsecure.create_permission_as_system('Read permissions', 'permissions');
+	perform unsecure.create_permission_as_system('Read perm sets', 'permissions');
 
 	perform unsecure.create_permission_as_system('Users');
 	perform unsecure.create_permission_as_system('Create service user', 'users');
@@ -462,6 +464,7 @@ begin
 	perform unsecure.create_permission_as_system('Update user data', 'users');
 	perform unsecure.create_permission_as_system('Get data', 'users');
 	perform unsecure.create_permission_as_system('Get permissions', 'users');
+	perform unsecure.create_permission_as_system('Read users', 'users');
 
 	perform unsecure.create_permission_as_system('Tenants');
 	perform unsecure.create_permission_as_system('Create tenant', 'tenants');
@@ -471,6 +474,8 @@ begin
 	perform unsecure.create_permission_as_system('Get tenants', 'tenants');
 	perform unsecure.create_permission_as_system('Get users', 'tenants');
 	perform unsecure.create_permission_as_system('Get groups', 'tenants');
+	perform unsecure.create_permission_as_system('Read tenants', 'tenants');
+	perform unsecure.create_permission_as_system('Delete tenant', 'tenants');
 
 
 	perform unsecure.create_permission_as_system('Providers');
@@ -791,6 +796,135 @@ begin
     return query select *
                  from unsecure.get_user_assigned_permissions(_requested_by, _user_id, _target_user_id, _tenant_id);
 
+end;
+$$;
+
+create or replace function auth.search_permissions(
+    _user_id bigint,
+    _search_text text default null,
+    _is_assignable boolean default null,
+    _parent_code text default null,
+    _page integer default 1,
+    _page_size integer default 30,
+    _tenant_id integer default 1
+)
+    returns TABLE(
+        __permission_id integer,
+        __title text,
+        __code text,
+        __full_code text,
+        __is_assignable boolean,
+        __has_children boolean,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+    set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+    __search_text text;
+    __parent_path ltree;
+begin
+    perform auth.has_permission(_user_id, 'permissions.read_permissions', _tenant_id);
+
+    __search_text := helpers.normalize_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    if helpers.is_not_empty_string(_parent_code) then
+        select node_path from auth.permission where full_code = _parent_code::ltree into __parent_path;
+    end if;
+
+    return query
+        with filtered_permissions as (
+            select p.permission_id
+                 , count(*) over () as total_items
+            from auth.permission p
+            where (_is_assignable is null or p.is_assignable = _is_assignable)
+              and (__parent_path is null or p.node_path <@ __parent_path)
+              and (helpers.is_empty_string(__search_text)
+                   or p.nrm_search_data like '%' || __search_text || '%')
+            order by p.full_code
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select p.permission_id
+             , p.title
+             , p.code
+             , p.full_code::text
+             , p.is_assignable
+             , p.has_children
+             , fp.total_items
+        from filtered_permissions fp
+                 inner join auth.permission p on fp.permission_id = p.permission_id;
+end;
+$$;
+
+create or replace function auth.search_perm_sets(
+    _user_id bigint,
+    _search_text text default null,
+    _is_assignable boolean default null,
+    _is_system boolean default null,
+    _page integer default 1,
+    _page_size integer default 30,
+    _tenant_id integer default 1
+)
+    returns TABLE(
+        __perm_set_id integer,
+        __title text,
+        __code text,
+        __is_system boolean,
+        __is_assignable boolean,
+        __permission_count bigint,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+    set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, 'permissions.read_perm_sets', _tenant_id);
+
+    __search_text := helpers.normalize_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    return query
+        with filtered_perm_sets as (
+            select ps.perm_set_id
+                 , count(*) over () as total_items
+            from auth.perm_set ps
+            where ps.tenant_id = _tenant_id
+              and (_is_assignable is null or ps.is_assignable = _is_assignable)
+              and (_is_system is null or ps.is_system = _is_system)
+              and (helpers.is_empty_string(__search_text)
+                   or ps.nrm_search_data like '%' || __search_text || '%')
+            order by ps.title
+            offset ((_page - 1) * _page_size) limit _page_size
+        ),
+        permission_counts as (
+            select psp.perm_set_id, count(psp.psp_id) as permission_count
+            from auth.perm_set_perm psp
+            where psp.perm_set_id in (select perm_set_id from filtered_perm_sets)
+            group by psp.perm_set_id
+        )
+        select ps.perm_set_id
+             , ps.title
+             , ps.code
+             , ps.is_system
+             , ps.is_assignable
+             , coalesce(pc.permission_count, 0)
+             , fps.total_items
+        from filtered_perm_sets fps
+                 inner join auth.perm_set ps on fps.perm_set_id = ps.perm_set_id
+                 left join permission_counts pc on ps.perm_set_id = pc.perm_set_id;
 end;
 $$;
 
