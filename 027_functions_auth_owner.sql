@@ -50,17 +50,8 @@ as
 $$
 begin
 
-	if not auth.is_owner(_user_id, _user_group_id, _tenant_id)
-		and not auth.is_owner(_user_id, null, _tenant_id)
-	then
-		if _user_group_id is not null then
-			perform auth.has_permission(_user_id
-				, 'tenants.assign_group_owner', _tenant_id);
-		else
-			perform auth.has_permission(_user_id
-				, 'tenants.assign_owner', _tenant_id);
-		end if;
-	end if;
+	-- Verify user is owner or has appropriate permission
+	perform unsecure.verify_owner_or_permission(_user_id, _user_group_id, _tenant_id);
 
 	return query
 		insert into auth.owner (created_by, tenant_id, user_group_id, user_id)
@@ -81,17 +72,8 @@ create or replace function auth.delete_owner(_deleted_by text, _user_id bigint, 
 as
 $$
 begin
-	if not auth.is_owner(_user_id, _user_group_id, _tenant_id)
-		and not auth.is_owner(_user_id, null, _tenant_id)
-	then
-		if _user_group_id is not null then
-			perform auth.has_permission(_user_id
-				, 'tenants.assign_group_owner', _tenant_id);
-		else
-			perform auth.has_permission(_user_id
-				, 'tenants.assign_owner', _tenant_id);
-		end if;
-	end if;
+	-- Verify user is owner or has appropriate permission
+	perform unsecure.verify_owner_or_permission(_user_id, _user_group_id, _tenant_id);
 
 	delete
 	from auth.owner

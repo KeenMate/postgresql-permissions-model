@@ -312,10 +312,39 @@ The system uses structured error codes (50001-52999) for different categories:
 Refer to `readme.md:16-124` for complete error code documentation.
 
 ## Testing and Validation
-- No specific test framework - manual testing through SQL scripts
-- Use `999-examples.sql` for testing scenarios
+
+### Automated Tests
+Test files are located in the `tests/` directory and can be run with:
+
+```bash
+# Run all tests
+./tests/run-tests.sh
+
+# Run specific test suite
+./tests/run-tests.sh cache                    # Cache invalidation tests
+./tests/run-tests.sh permission_cache_invalidation  # Same as above
+
+# Run individual test file directly
+./exec-sql.sh -f tests/test_permission_cache_invalidation.sql
+```
+
+**Available Test Suites:**
+| Test File | Description |
+|-----------|-------------|
+| `test_permission_cache_invalidation.sql` | Tests cache invalidation on permission changes, parameter validation, provider validation, and owner functions |
+
+### Manual Testing
+- Use `999-examples.sql` for interactive testing scenarios
 - Always test permission inheritance and tenant isolation
 - Verify audit events are properly logged
+
+### Writing New Tests
+Test files should:
+1. Be named `test_*.sql` in the `tests/` directory
+2. Use `DO $$ ... $$` blocks for each test case
+3. Use `RAISE NOTICE` for pass/fail output
+4. Use `RAISE EXCEPTION` for failures
+5. Clean up test data at the end
 
 ## Important Notes
 - This is a pure PostgreSQL solution - no external dependencies beyond PostgreSQL extensions

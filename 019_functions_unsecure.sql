@@ -10,15 +10,95 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function unsecure.clear_permission_cache(_deleted_by text, _target_user_id bigint, _tenant_id integer DEFAULT 1) returns void
+create or replace function unsecure.clear_permission_cache(_deleted_by text, _target_user_id bigint, _tenant_id integer DEFAULT NULL) returns void
     language sql
 as
 $$
-
+-- Clear permission cache for user
+-- If _tenant_id is NULL, clears cache for ALL tenants (used when user is locked/disabled)
+-- If _tenant_id is specified, clears only that tenant's cache
 delete
 from auth.user_permission_cache
-where tenant_id = _tenant_id
-	and user_id = _target_user_id;
+where user_id = _target_user_id
+  and (_tenant_id is null or tenant_id = _tenant_id);
+$$;
+
+-- Helper function to invalidate cache for all members of a group
+-- Uses soft invalidation (UPDATE expiration_date) instead of DELETE for better performance
+create or replace function unsecure.invalidate_group_members_permission_cache(_updated_by text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+    language plpgsql
+as
+$$
+begin
+    update auth.user_permission_cache
+    set expiration_date = now(),
+        updated_by = _updated_by,
+        updated_at = now()
+    where tenant_id = _tenant_id
+      and user_id in (
+          select user_id
+          from auth.user_group_member
+          where group_id = _user_group_id
+      );
+end;
+$$;
+
+-- Helper function to invalidate cache for all users with a specific perm_set assigned
+-- Uses soft invalidation (UPDATE expiration_date) instead of DELETE for better performance:
+-- - UPDATE is ~5-10x faster than DELETE (no index rebalancing)
+-- - Next has_permission call will recalculate immediately (checks expiration_date > now())
+-- - No transaction blocking from mass row deletions
+create or replace function unsecure.invalidate_perm_set_users_permission_cache(_updated_by text, _perm_set_id integer, _tenant_id integer DEFAULT 1) returns void
+    language plpgsql
+as
+$$
+begin
+    -- Soft invalidate cache for users who have this perm_set directly assigned
+    update auth.user_permission_cache
+    set expiration_date = now(),
+        updated_by = _updated_by,
+        updated_at = now()
+    where tenant_id = _tenant_id
+      and user_id in (
+          select user_id
+          from auth.permission_assignment
+          where perm_set_id = _perm_set_id
+            and user_id is not null
+      );
+
+    -- Soft invalidate cache for users who are members of groups that have this perm_set assigned
+    update auth.user_permission_cache
+    set expiration_date = now(),
+        updated_by = _updated_by,
+        updated_at = now()
+    where tenant_id = _tenant_id
+      and user_id in (
+          select ugm.user_id
+          from auth.permission_assignment pa
+          inner join auth.user_group_member ugm on ugm.group_id = pa.group_id
+          where pa.perm_set_id = _perm_set_id
+      );
+end;
+$$;
+
+-- Helper function to verify owner or permission for owner management operations
+create or replace function unsecure.verify_owner_or_permission(_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+    language plpgsql
+as
+$$
+begin
+    if not auth.is_owner(_user_id, _user_group_id, _tenant_id)
+        and not auth.is_owner(_user_id, null, _tenant_id)
+    then
+        if _user_group_id is not null then
+            perform auth.has_permission(_user_id
+                , 'tenants.assign_group_owner', _tenant_id);
+        else
+            perform auth.has_permission(_user_id
+                , 'tenants.assign_owner', _tenant_id);
+        end if;
+    end if;
+end;
 $$;
 
 create or replace function unsecure.create_primary_tenant() returns SETOF auth.tenant
@@ -298,6 +378,12 @@ begin
 		perform error.raise_52272();
 	end if;
 
+	-- Enforce mutual exclusivity: cannot specify both group and user
+	if _user_group_id is not null and _target_user_id is not null then
+		raise exception 'Cannot specify both group and user for permission assignment'
+			using errcode = '22023';  -- invalid_parameter_value
+	end if;
+
 	if
 		_perm_set_code is null and _perm_code is null then
 		perform error.raise_52273();
@@ -364,6 +450,9 @@ begin
 				, 'target_type', 'group', 'target_name', _user_group_id::text
 				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
 			, _tenant_id);
+
+		-- Invalidate permission cache for all members of the group
+		perform unsecure.invalidate_group_members_permission_cache(_created_by, _user_group_id, _tenant_id);
 	else
 		perform create_journal_message(_created_by, _user_id
 			, 12010  -- permission_assigned
@@ -372,6 +461,9 @@ begin
 				, 'target_type', 'user', 'target_name', _target_user_id::text
 				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
 			, _tenant_id);
+
+		-- Invalidate permission cache for the target user
+		perform unsecure.clear_permission_cache(_created_by, _target_user_id, _tenant_id);
 	end if;
 end;
 $$;
@@ -403,6 +495,9 @@ begin
 			, jsonb_build_object('target_type', 'group', 'target_name', __user_group_id::text
 				, 'assignment_id', _assignment_id)
 			, _tenant_id);
+
+		-- Invalidate permission cache for all members of the group
+		perform unsecure.invalidate_group_members_permission_cache(_deleted_by, __user_group_id, _tenant_id);
 	else
 		perform create_journal_message(_deleted_by, _user_id
 			, 12011  -- permission_revoked
@@ -410,6 +505,9 @@ begin
 			, jsonb_build_object('target_type', 'user', 'target_name', __target_user_id::text
 				, 'assignment_id', _assignment_id)
 			, _tenant_id);
+
+		-- Invalidate permission cache for the target user
+		perform unsecure.clear_permission_cache(_deleted_by, __target_user_id, _tenant_id);
 	end if;
 end;
 
@@ -747,6 +845,9 @@ begin
 				, 'permissions_added', array_to_string(_permissions, ', '))
 			, _tenant_id);
 
+	-- Invalidate permission cache for all users who have this perm_set assigned
+	perform unsecure.invalidate_perm_set_users_permission_cache(_created_by, _perm_set_id, _tenant_id);
+
 	return query
 		select ps.perm_set_id, ps.code, p.permission_id, p.full_code::text
 		from auth.perm_set ps
@@ -788,6 +889,9 @@ begin
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
 				, 'permissions_removed', array_to_string(_permissions, ', '))
 			, _tenant_id);
+
+	-- Invalidate permission cache for all users who have this perm_set assigned
+	perform unsecure.invalidate_perm_set_users_permission_cache(_deleted_by, _perm_set_id, _tenant_id);
 
 	return query
 		select ps.perm_set_id, ps.code, p.permission_id, p.full_code::text
@@ -1204,6 +1308,12 @@ declare
     __provider_roles  text[];
 begin
 
+    -- Validate provider code exists (prevent silent failures with NULL arrays)
+    if _provider_code is not null and not exists(select 1 from auth.provider where code = _provider_code) then
+        raise exception 'Provider "%" does not exist', _provider_code
+            using errcode = '22023';  -- invalid_parameter_value
+    end if;
+
     select provider_groups
          , provider_roles
     from auth.user_identity
@@ -1309,7 +1419,27 @@ $$
 declare
     __perm_cache_timeout_in_s bigint;
     __expiration_date         timestamptz;
+    __is_active               boolean;
+    __is_locked               boolean;
 begin
+
+    -- Check if user is active and not locked
+    select is_active, is_locked
+    from auth.user_info
+    where user_id = _target_user_id
+    into __is_active, __is_locked;
+
+    if __is_active is null then
+        perform error.raise_33001(_target_user_id, null);
+    end if;
+
+    if not __is_active then
+        perform error.raise_33003(_target_user_id);
+    end if;
+
+    if __is_locked then
+        perform error.raise_33004(_target_user_id);
+    end if;
 
     if _tenant_id is not null and exists(
             select

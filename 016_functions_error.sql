@@ -263,6 +263,17 @@ begin
 end;
 $$;
 
+-- 33004: User locked (by user_id)
+create or replace function error.raise_33004(_user_id bigint) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User (id: %) is locked out', _user_id
+        using errcode = '33004';
+end;
+$$;
+
 -- 33005: User cannot login
 create or replace function error.raise_33005(_user_id bigint) returns void
     language plpgsql

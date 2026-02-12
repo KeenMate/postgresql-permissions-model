@@ -422,14 +422,32 @@ create table auth.api_key
     description        text,
     api_key            text              not null
         unique,
-    secret_hash        bytea             not null,
+    -- Inbound key fields (for validating incoming requests)
+    secret_hash        bytea,
+    -- Outbound key fields (for calling external services)
+    key_type           text              not null default 'inbound'
+        check (key_type in ('inbound', 'outbound')),
+    encrypted_secret   bytea,            -- Pre-encrypted by application layer
+    service_code       text,             -- e.g., 'sendgrid', 'slack', 'azure_storage'
+    service_url        text,             -- e.g., 'https://api.sendgrid.com'
+    extra_data         jsonb,            -- Extra headers, config, etc.
+    -- Common fields
     expire_at          timestamp with time zone,
     notification_email text,
     nrm_search_data    text,
     constraint api_key_created_by_check
         check (length(created_by) <= 250),
     constraint api_key_updated_by_check
-        check (length(updated_by) <= 250)
+        check (length(updated_by) <= 250),
+    -- Ensure proper secret storage based on key type
+    constraint api_key_type_secret_check
+        check (
+            (key_type = 'inbound' and secret_hash is not null) or
+            (key_type = 'outbound' and encrypted_secret is not null)
+        ),
+    -- Service code required for outbound keys
+    constraint api_key_outbound_service_check
+        check (key_type = 'inbound' or service_code is not null)
 );
 
 create table auth.user_group_member

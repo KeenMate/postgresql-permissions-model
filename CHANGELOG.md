@@ -5,6 +5,138 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-02-11
+
+### Fixed
+
+#### Critical: Cache Invalidation on Permission Changes
+Permission cache is now properly invalidated when permissions are assigned, unassigned, or when permission set contents change:
+
+- `unsecure.assign_permission()` - Now clears cache for affected user or group members
+- `unsecure.unassign_permission()` - Now clears cache for affected user or group members
+- `unsecure.add_perm_set_permissions()` - Now clears cache for all users with this perm_set
+- `unsecure.delete_perm_set_permissions()` - Now clears cache for all users with this perm_set
+
+**Impact:** Users now see permission changes immediately instead of waiting 15-300 seconds for cache expiry.
+
+### Changed
+
+#### Soft Invalidation Strategy for Group/PermSet Operations
+For large-scale cache invalidation (groups and permission sets), the system now uses "soft invalidation" instead of DELETE:
+
+```sql
+-- Before: Hard DELETE (caused index rebalancing, slow for large datasets)
+DELETE FROM auth.user_permission_cache WHERE user_id IN (SELECT ...);
+
+-- After: Soft invalidation (UPDATE expiration_date, ~5-10x faster)
+UPDATE auth.user_permission_cache
+SET expiration_date = now(), updated_by = _deleted_by, updated_at = now()
+WHERE user_id IN (SELECT ...);
+```
+
+**Functions using soft invalidation:**
+- `unsecure.invalidate_group_members_permission_cache()` - For group membership changes
+- `unsecure.invalidate_perm_set_users_permission_cache()` - For permission set changes
+
+**Why this works:** `has_permissions()` checks `expiration_date > now()` before using cache. If expired, it calls `recalculate_user_permissions()`. The next permission check triggers immediate recalculation.
+
+**Benefits:**
+- ~5-10x faster than DELETE (no index rebalancing)
+- No transaction blocking from mass row deletions
+- Cache rows ready for reuse (no INSERT overhead on recalc)
+- Scales well for large deployments (100+ groups × 1000+ members)
+
+**Individual user cache** (`clear_permission_cache`) still uses DELETE since it only affects one user's rows where the performance difference is negligible.
+
+#### Disabled/Locked Users Now Blocked from Permission Checks
+- `unsecure.recalculate_user_permissions()` now validates user is active and not locked
+- `auth.disable_user()` and `auth.lock_user()` now clear permission cache for all tenants
+- Previously, disabled/locked users could still pass permission checks until cache expired
+
+**Impact:** Disabled or locked users are immediately blocked from all permission-protected operations.
+
+### Added
+
+#### Outbound API Key Support
+New capability to store credentials for calling external services (SendGrid, Slack, Azure, etc.):
+
+**Table Changes (`auth.api_key`):**
+| Column | Type | Description |
+|--------|------|-------------|
+| `key_type` | text | `'inbound'` (default) or `'outbound'` |
+| `encrypted_secret` | bytea | Pre-encrypted secret (application-side encryption) |
+| `service_code` | text | Service identifier (e.g., `'sendgrid'`, `'slack'`) |
+| `service_url` | text | Service endpoint URL |
+| `extra_data` | jsonb | Extra headers, config, etc. |
+
+**Security Model:**
+- Encryption/decryption handled by application layer
+- Database stores pre-encrypted `bytea` data (no pg_crypto required)
+- Separate permission `api_keys.read_outbound_secret` for retrieving secrets
+
+**New Functions:**
+| Function | Description |
+|----------|-------------|
+| `auth.create_outbound_api_key` | Create outbound key with encrypted secret |
+| `auth.get_outbound_api_key` | Get outbound key by service code |
+| `auth.get_outbound_api_key_by_id` | Get outbound key by ID |
+| `auth.get_outbound_api_key_secret` | Retrieve encrypted secret (requires special permission) |
+| `auth.get_outbound_api_key_secret_by_id` | Retrieve encrypted secret by ID |
+| `auth.update_outbound_api_key` | Update metadata (not secret) |
+| `auth.update_outbound_api_key_secret` | Rotate encrypted secret |
+| `auth.search_outbound_api_keys` | Search outbound keys |
+| `auth.delete_outbound_api_key` | Delete outbound key |
+
+**Example Usage:**
+```sql
+-- Create outbound key (app encrypts 'my-sendgrid-key' → bytea)
+SELECT auth.create_outbound_api_key(
+    'admin', 1, 'SendGrid API', 'Email service',
+    _service_code := 'sendgrid',
+    _encrypted_secret := '\x...'::bytea,  -- Pre-encrypted by app
+    _service_url := 'https://api.sendgrid.com',
+    _extra_data := '{"headers": {"X-Custom": "value"}}'::jsonb,
+    _tenant_id := 1
+);
+
+-- Retrieve encrypted secret (app decrypts result)
+SELECT auth.get_outbound_api_key_secret('admin', 1, 'sendgrid', 1);
+```
+
+#### New Helper Functions
+| Function | Description |
+|----------|-------------|
+| `unsecure.invalidate_group_members_permission_cache` | Invalidates permission cache for all members of a group |
+| `unsecure.invalidate_perm_set_users_permission_cache` | Invalidates permission cache for all users with a specific perm_set |
+| `unsecure.verify_owner_or_permission` | Validates user is owner or has appropriate permission (consolidates duplicate code) |
+| `error.raise_33004(bigint)` | Overload for locked user error that accepts user_id instead of email |
+
+#### New Permissions
+| Permission Code | Description |
+|-----------------|-------------|
+| `api_keys.read_outbound_secret` | Required to retrieve encrypted secrets for outbound API keys |
+
+### Changed
+
+#### Enhanced clear_permission_cache
+- `unsecure.clear_permission_cache()` now accepts NULL for `_tenant_id` parameter
+- When NULL, clears cache for ALL tenants (used when user is locked/disabled)
+- Default changed from 1 to NULL for broader utility
+
+#### Parameter Validation in assign_permission
+- `unsecure.assign_permission()` now throws error `22023` (invalid_parameter_value) if both `_user_group_id` AND `_target_user_id` are provided
+- Previously the function silently used whichever parameter was non-null first, which was ambiguous
+
+#### Provider Validation in recalculate_user_groups
+- `unsecure.recalculate_user_groups()` now validates that `_provider_code` exists before proceeding
+- Previously a non-existent provider code would silently result in NULL arrays, which would incorrectly clear all external group memberships
+
+#### Refactored Owner Functions
+- `auth.create_owner()` and `auth.delete_owner()` now use `unsecure.verify_owner_or_permission()` helper
+- Eliminates code duplication between these functions
+
+---
+
 ## [2.1.0] - 2026-02-11
 
 ### Added
@@ -296,6 +428,7 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.2.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |
 | 2.1.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |
 | 2.0.0 | 2026-02-10 | Major restructure: removed inheritance, new event codes |
 | 1.16 | - | API key tenant_id fix |

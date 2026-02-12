@@ -60,6 +60,9 @@ begin
 				, is_active
 				, is_locked;
 
+	-- Clear permission cache for all tenants to ensure immediate effect
+	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
+
 	perform create_journal_message(_updated_by, _user_id
 			, 10005  -- user_disabled
 			, 'user', _target_user_id
@@ -117,6 +120,9 @@ begin
 			returning user_id
 				, is_active
 				, is_locked;
+
+	-- Clear permission cache for all tenants to ensure immediate effect
+	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
 	perform create_journal_message(_updated_by, _user_id
 			, 10006  -- user_locked

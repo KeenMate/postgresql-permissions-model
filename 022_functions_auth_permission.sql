@@ -507,6 +507,7 @@ begin
 	perform unsecure.create_permission_as_system('Validate api key', 'api_keys');
 	perform unsecure.create_permission_as_system('Search', 'api_keys');
 	perform unsecure.create_permission_as_system('Update permissions', 'api_keys');
+	perform unsecure.create_permission_as_system('Read outbound secret', 'api_keys');
 
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
 																						 _permissions := array ['tenants', 'providers'

@@ -457,3 +457,427 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- Outbound API Key Functions
+-- ============================================================================
+-- For storing credentials to call external services (SendGrid, Slack, Azure, etc.)
+-- Encryption/decryption is handled by the application layer; PostgreSQL stores
+-- pre-encrypted bytea data.
+
+create or replace function auth.create_outbound_api_key(
+    _created_by text,
+    _user_id bigint,
+    _title text,
+    _description text,
+    _service_code text,
+    _encrypted_secret bytea,
+    _service_url text DEFAULT NULL,
+    _extra_data jsonb DEFAULT NULL,
+    _expire_at timestamp with time zone DEFAULT NULL,
+    _notification_email text DEFAULT NULL,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(__api_key_id integer, __api_key text, __service_code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __api_key text;
+    __last_id int;
+begin
+    perform auth.has_permission(_user_id, 'api_keys.create_api_key', _tenant_id);
+
+    if _service_code is null or _service_code = '' then
+        raise exception 'Service code is required for outbound API keys'
+            using errcode = '22023';
+    end if;
+
+    if _encrypted_secret is null then
+        raise exception 'Encrypted secret is required for outbound API keys'
+            using errcode = '22023';
+    end if;
+
+    __api_key := 'outbound_' || _service_code || '_' || auth.generate_api_key();
+
+    insert into auth.api_key(
+        created_by, updated_by, tenant_id, title, description,
+        api_key, key_type, encrypted_secret, service_code, service_url,
+        extra_data, expire_at, notification_email
+    )
+    values (
+        _created_by, _created_by, _tenant_id, _title, _description,
+        __api_key, 'outbound', _encrypted_secret, lower(_service_code), _service_url,
+        _extra_data, _expire_at, _notification_email
+    )
+    returning api_key_id into __last_id;
+
+    return query
+        select __last_id, __api_key, lower(_service_code);
+
+    perform create_journal_message(_created_by, _user_id
+        , 14001  -- apikey_created
+        , 'api_key', __last_id
+        , jsonb_strip_nulls(jsonb_build_object(
+            'api_key_title', coalesce(_title, __api_key),
+            'key_type', 'outbound',
+            'service_code', _service_code,
+            'service_url', _service_url,
+            'expire_at', _expire_at,
+            'notification_email', _notification_email))
+        , _tenant_id);
+end;
+$$;
+
+create or replace function auth.get_outbound_api_key(
+    _user_id bigint,
+    _service_code text,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __api_key text,
+        __title text,
+        __description text,
+        __service_code text,
+        __service_url text,
+        __extra_data jsonb,
+        __expire_at timestamp with time zone,
+        __notification_email text,
+        __created_at timestamp with time zone,
+        __updated_at timestamp with time zone
+    )
+    stable
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'api_keys.search', _tenant_id);
+
+    return query
+        select ak.api_key_id, ak.api_key, ak.title, ak.description,
+               ak.service_code, ak.service_url, ak.extra_data,
+               ak.expire_at, ak.notification_email,
+               ak.created_at, ak.updated_at
+        from auth.api_key ak
+        where ak.tenant_id = _tenant_id
+          and ak.key_type = 'outbound'
+          and ak.service_code = lower(_service_code);
+end;
+$$;
+
+create or replace function auth.get_outbound_api_key_by_id(
+    _user_id bigint,
+    _api_key_id integer,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __api_key text,
+        __title text,
+        __description text,
+        __service_code text,
+        __service_url text,
+        __extra_data jsonb,
+        __expire_at timestamp with time zone,
+        __notification_email text,
+        __created_at timestamp with time zone,
+        __updated_at timestamp with time zone
+    )
+    stable
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'api_keys.search', _tenant_id);
+
+    return query
+        select ak.api_key_id, ak.api_key, ak.title, ak.description,
+               ak.service_code, ak.service_url, ak.extra_data,
+               ak.expire_at, ak.notification_email,
+               ak.created_at, ak.updated_at
+        from auth.api_key ak
+        where ak.tenant_id = _tenant_id
+          and ak.key_type = 'outbound'
+          and ak.api_key_id = _api_key_id;
+end;
+$$;
+
+-- Retrieves encrypted secret for outbound API keys.
+-- Requires api_keys.read_outbound_secret permission.
+-- Decryption is handled by application layer.
+create or replace function auth.get_outbound_api_key_secret(
+    _requested_by text,
+    _user_id bigint,
+    _service_code text,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __service_code text,
+        __service_url text,
+        __encrypted_secret bytea,
+        __extra_data jsonb
+    )
+    stable
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'api_keys.read_outbound_secret', _tenant_id);
+
+    return query
+        select ak.api_key_id, ak.service_code, ak.service_url,
+               ak.encrypted_secret, ak.extra_data
+        from auth.api_key ak
+        where ak.tenant_id = _tenant_id
+          and ak.key_type = 'outbound'
+          and ak.service_code = lower(_service_code)
+          and (ak.expire_at is null or ak.expire_at > now());
+
+    -- Read operation - journal message omitted for performance
+    -- Use audit events for security-sensitive access tracking if needed
+end;
+$$;
+
+create or replace function auth.get_outbound_api_key_secret_by_id(
+    _requested_by text,
+    _user_id bigint,
+    _api_key_id integer,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __service_code text,
+        __service_url text,
+        __encrypted_secret bytea,
+        __extra_data jsonb
+    )
+    stable
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'api_keys.read_outbound_secret', _tenant_id);
+
+    return query
+        select ak.api_key_id, ak.service_code, ak.service_url,
+               ak.encrypted_secret, ak.extra_data
+        from auth.api_key ak
+        where ak.tenant_id = _tenant_id
+          and ak.key_type = 'outbound'
+          and ak.api_key_id = _api_key_id
+          and (ak.expire_at is null or ak.expire_at > now());
+end;
+$$;
+
+create or replace function auth.update_outbound_api_key(
+    _updated_by text,
+    _user_id bigint,
+    _api_key_id integer,
+    _title text,
+    _description text,
+    _service_url text DEFAULT NULL,
+    _extra_data jsonb DEFAULT NULL,
+    _expire_at timestamp with time zone DEFAULT NULL,
+    _notification_email text DEFAULT NULL,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __title text,
+        __description text,
+        __service_url text,
+        __extra_data jsonb,
+        __expire_at timestamp with time zone,
+        __notification_email text
+    )
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, 'api_keys.update_api_key', _tenant_id);
+
+    update auth.api_key
+    set updated_by = _updated_by,
+        updated_at = now(),
+        title = _title,
+        description = _description,
+        service_url = _service_url,
+        extra_data = _extra_data,
+        expire_at = _expire_at,
+        notification_email = _notification_email
+    where api_key_id = _api_key_id
+      and tenant_id = _tenant_id
+      and key_type = 'outbound';
+
+    return query
+        select ak.api_key_id, ak.title, ak.description, ak.service_url,
+               ak.extra_data, ak.expire_at, ak.notification_email
+        from auth.api_key ak
+        where ak.api_key_id = _api_key_id
+          and ak.tenant_id = _tenant_id;
+
+    perform create_journal_message(_updated_by, _user_id
+        , 14002  -- apikey_updated
+        , 'api_key', _api_key_id
+        , jsonb_build_object('api_key_title', _title, 'key_type', 'outbound',
+            'description', _description, 'service_url', _service_url,
+            'expire_at', _expire_at, 'notification_email', _notification_email)
+        , _tenant_id);
+end;
+$$;
+
+-- Update encrypted secret for outbound API key.
+-- Application encrypts new secret before calling this function.
+create or replace function auth.update_outbound_api_key_secret(
+    _updated_by text,
+    _user_id bigint,
+    _api_key_id integer,
+    _encrypted_secret bytea,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(__api_key_id integer, __service_code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __service_code text;
+begin
+    perform auth.has_permission(_user_id, 'api_keys.update_api_secret', _tenant_id);
+
+    if _encrypted_secret is null then
+        raise exception 'Encrypted secret is required'
+            using errcode = '22023';
+    end if;
+
+    update auth.api_key
+    set updated_by = _updated_by,
+        updated_at = now(),
+        encrypted_secret = _encrypted_secret
+    where api_key_id = _api_key_id
+      and tenant_id = _tenant_id
+      and key_type = 'outbound'
+    returning service_code into __service_code;
+
+    if __service_code is null then
+        raise exception 'Outbound API key not found'
+            using errcode = '02000';
+    end if;
+
+    return query
+        select _api_key_id, __service_code;
+
+    perform create_journal_message(_updated_by, _user_id
+        , 14002  -- apikey_updated (secret rotated)
+        , 'api_key', _api_key_id
+        , jsonb_build_object('api_key_id', _api_key_id, 'key_type', 'outbound',
+            'action', 'secret_rotated', 'service_code', __service_code)
+        , _tenant_id);
+end;
+$$;
+
+create or replace function auth.search_outbound_api_keys(
+    _user_id bigint,
+    _search_text text DEFAULT NULL,
+    _service_code text DEFAULT NULL,
+    _page integer DEFAULT 1,
+    _page_size integer DEFAULT 10,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(
+        __api_key_id integer,
+        __api_key text,
+        __title text,
+        __description text,
+        __service_code text,
+        __service_url text,
+        __extra_data jsonb,
+        __expire_at timestamp with time zone,
+        __notification_email text,
+        __created_at timestamp with time zone,
+        __updated_at timestamp with time zone,
+        __total_items bigint
+    )
+    stable
+    rows 100
+    language plpgsql
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, 'api_keys.search', _tenant_id);
+
+    __search_text := helpers.unaccent_text(_search_text);
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 10), 100);
+
+    return query
+        with filtered_rows as (
+            select ak.api_key_id, count(*) over () as total_items
+            from auth.api_key ak
+            where ak.tenant_id = _tenant_id
+              and ak.key_type = 'outbound'
+              and (_service_code is null or ak.service_code = lower(_service_code))
+              and (helpers.is_empty_string(__search_text)
+                   or lower(ak.title) like '%' || __search_text || '%'
+                   or lower(ak.service_code) like '%' || __search_text || '%')
+            order by ak.service_code, ak.title
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select ak.api_key_id, ak.api_key, ak.title, ak.description,
+               ak.service_code, ak.service_url, ak.extra_data,
+               ak.expire_at, ak.notification_email,
+               ak.created_at, ak.updated_at, fr.total_items
+        from filtered_rows fr
+        inner join auth.api_key ak on fr.api_key_id = ak.api_key_id;
+end;
+$$;
+
+create or replace function auth.delete_outbound_api_key(
+    _deleted_by text,
+    _user_id bigint,
+    _api_key_id integer,
+    _tenant_id integer DEFAULT 1
+)
+    returns TABLE(__api_key_id integer, __service_code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __service_code text;
+begin
+    perform auth.has_permission(_user_id, 'api_keys.delete_api_key', _tenant_id);
+
+    delete from auth.api_key
+    where api_key_id = _api_key_id
+      and tenant_id = _tenant_id
+      and key_type = 'outbound'
+    returning service_code into __service_code;
+
+    if __service_code is null then
+        raise exception 'Outbound API key not found'
+            using errcode = '02000';
+    end if;
+
+    return query
+        select _api_key_id, __service_code;
+
+    perform create_journal_message(_deleted_by, _user_id
+        , 14003  -- apikey_deleted
+        , 'api_key', _api_key_id
+        , jsonb_build_object('api_key_id', _api_key_id, 'key_type', 'outbound',
+            'service_code', __service_code)
+        , _tenant_id);
+end;
+$$;
+
