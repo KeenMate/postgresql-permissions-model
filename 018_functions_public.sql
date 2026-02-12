@@ -120,6 +120,7 @@ $$;
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _event_id integer,
     _keys jsonb default null,
     _payload jsonb default null,
@@ -136,8 +137,8 @@ begin
     end if;
 
     return query
-        insert into journal (created_by, user_id, event_id, keys, data_payload, tenant_id)
-        values (_created_by, _user_id, _event_id, _keys, _payload, _tenant_id)
+        insert into journal (created_by, user_id, correlation_id, event_id, keys, data_payload, tenant_id)
+        values (_created_by, _user_id, _correlation_id, _event_id, _keys, _payload, _tenant_id)
         returning *;
 end;
 $$;
@@ -146,6 +147,7 @@ $$;
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _event_code text,
     _keys jsonb default null,
     _payload jsonb default null,
@@ -169,7 +171,7 @@ begin
 
     return query
         select * from create_journal_message(
-            _created_by, _user_id, __event_id, _keys, _payload, _tenant_id
+            _created_by, _user_id, _correlation_id, __event_id, _keys, _payload, _tenant_id
         );
 end;
 $$;
@@ -178,6 +180,7 @@ $$;
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _event_id integer,
     _entity_type text,
     _entity_id bigint,
@@ -189,7 +192,7 @@ create or replace function public.create_journal_message(
 as
 $$
 select * from create_journal_message(
-    _created_by, _user_id, _event_id,
+    _created_by, _user_id, _correlation_id, _event_id,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id
 );
@@ -199,6 +202,7 @@ $$;
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _event_code text,
     _entity_type text,
     _entity_id bigint,
@@ -210,13 +214,13 @@ create or replace function public.create_journal_message(
 as
 $$
 select * from create_journal_message(
-    _created_by, _user_id, _event_code,
+    _created_by, _user_id, _correlation_id, _event_code,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id
 );
 $$;
 
-create or replace function public.get_journal_entry(_user_id bigint, _tenant_id integer, _journal_id bigint)
+create or replace function public.get_journal_entry(_user_id bigint, _correlation_id text, _tenant_id integer, _journal_id bigint)
     returns table(
         __journal_id bigint,
         __event_id integer,
@@ -226,7 +230,8 @@ create or replace function public.get_journal_entry(_user_id bigint, _tenant_id 
         __keys jsonb,
         __payload jsonb,
         __created_at timestamptz,
-        __created_by text
+        __created_by text,
+        __correlation_id text
     )
     stable
     rows 1
@@ -234,7 +239,7 @@ create or replace function public.get_journal_entry(_user_id bigint, _tenant_id 
 as
 $$
 begin
-    perform auth.has_permission(_user_id, 'journal.read_journal', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'journal.read_journal', _tenant_id);
 
     return query
         select j.journal_id
@@ -250,6 +255,7 @@ begin
              , j.data_payload
              , j.created_at
              , j.created_by
+             , j.correlation_id
         from journal j
         left join const.event_code ec on ec.event_id = j.event_id
         where j.tenant_id = _tenant_id
@@ -258,7 +264,7 @@ end;
 $$;
 
 -- Legacy alias
-create or replace function public.get_journal_payload(_user_id bigint, _tenant_id integer, _journal_id bigint)
+create or replace function public.get_journal_payload(_user_id bigint, _correlation_id text, _tenant_id integer, _journal_id bigint)
     returns TABLE(__journal_id bigint, __payload text)
     stable
     rows 1
@@ -266,7 +272,7 @@ create or replace function public.get_journal_payload(_user_id bigint, _tenant_i
 as
 $$
 begin
-    perform auth.has_permission(_user_id, 'journal.read_journal', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'journal.read_journal', _tenant_id);
 
     return query
         select journal_id, data_payload::text
@@ -276,7 +282,7 @@ begin
 end;
 $$;
 
-create or replace function public.validate_token(_updated_by text, _user_id bigint, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
+create or replace function public.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
     returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
     language plpgsql
 as
@@ -288,7 +294,7 @@ declare
 	__token_user_id    bigint;
 begin
 	perform
-		auth.has_permission(_user_id, 'tokens.validate_token');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.validate_token');
 
 	-- invalidate old tokens, this way we don't need a job to do that, every user will work for us this way
 	perform unsecure.expire_tokens(_updated_by);
@@ -317,7 +323,7 @@ begin
 		perform error.raise_52279(__token_uid);
 	end if;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __token_id
 			, jsonb_build_object('username', _target_user_id::text
@@ -335,7 +341,7 @@ begin
 					 , used_token.__user_id
 					 , used_token.__user_oid
 					 , used_token.__token_data
-			from auth.set_token_as_used(_updated_by, _user_id, __token_uid, _token,
+			from auth.set_token_as_used(_updated_by, _user_id, _correlation_id, __token_uid, _token,
 																	_token_type, _ip_address, _user_agent,
 																	_origin) used_token;
 	else
@@ -399,6 +405,7 @@ $$;
  */
 create or replace function public.search_journal(
     _user_id bigint,
+    _correlation_id text default null,
     _search_text text default null,
     _from timestamptz default null,
     _to timestamptz default null,
@@ -421,6 +428,7 @@ create or replace function public.search_journal(
         __keys jsonb,
         __created_at timestamptz,
         __created_by text,
+        __correlation_id text,
         __total_items bigint
     )
     stable
@@ -431,14 +439,14 @@ declare
     __can_read_global_journal bool;
     __normalized_search text;
 begin
-    __can_read_global_journal = auth.has_permission(_user_id, 'journal.read_global_journal', _throw_err := false);
+    __can_read_global_journal = auth.has_permission(_user_id, _correlation_id, 'journal.read_global_journal', _throw_err := false);
 
     if (_tenant_id = 1) then
         if not __can_read_global_journal then
             perform auth.throw_no_permission(_user_id, 'journal.read_global_journal');
         end if;
     else
-        perform auth.has_permission(_user_id, 'journal.read_journal', _tenant_id);
+        perform auth.has_permission(_user_id, _correlation_id, 'journal.read_journal', _tenant_id);
     end if;
 
     __normalized_search := helpers.normalize_text(_search_text);
@@ -457,6 +465,7 @@ begin
               and (_event_category is null or ec.category_code = _event_category)
               and (_keys_criteria is null or j.keys @> _keys_criteria)
               and (_payload_criteria is null or j.data_payload @> _payload_criteria)
+              and (_correlation_id is null or j.correlation_id = _correlation_id)
               and j.created_at between coalesce(_from, now() - interval '100 years')
                                    and coalesce(_to, now() + interval '100 years')
             order by j.created_at desc
@@ -475,6 +484,7 @@ begin
              , j.keys
              , j.created_at
              , j.created_by
+             , j.correlation_id
              , fr.total_items
         from filtered_rows fr
         inner join journal j on fr.journal_id = j.journal_id
@@ -502,6 +512,7 @@ $$;
 create or replace function public.add_journal_msg_jsonb(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _msg text,
     _data_group text default 'system',
     _data_object_id bigint default null,
@@ -539,6 +550,7 @@ begin
         select * from create_journal_message(
             _created_by,
             _user_id,
+            _correlation_id,
             __actual_event_id,
             __keys,
             __payload,
@@ -551,6 +563,7 @@ $$;
 create or replace function public.add_journal_msg(
     _created_by text,
     _user_id bigint,
+    _correlation_id text,
     _msg text,
     _data_group text default 'system',
     _data_object_id bigint default null,
@@ -566,6 +579,7 @@ $$
 select * from add_journal_msg_jsonb(
     _created_by,
     _user_id,
+    _correlation_id,
     _msg,
     _data_group,
     _data_object_id,
@@ -579,7 +593,8 @@ $$;
 -- Legacy alias for backwards compatibility
 create or replace function public.search_journal_msgs(
     _user_id bigint,
-    _search_text text,
+    _correlation_id text default null,
+    _search_text text default null,
     _from timestamptz default null,
     _to timestamptz default null,
     _target_user_id integer default null,
@@ -623,6 +638,7 @@ begin
              , sj.__total_items
         from search_journal(
             _user_id,
+            _correlation_id,
             _search_text,
             _from,
             _to,

@@ -10,7 +10,7 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.enable_user(_updated_by text, _user_id bigint, _target_user_id bigint)
+create or replace function auth.enable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -18,7 +18,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.enable_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.enable_user');
 
 	return query
 		update auth.user_info
@@ -31,7 +31,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10004  -- user_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -39,7 +39,7 @@ begin
 end;
 $$;
 
-create or replace function auth.disable_user(_updated_by text, _user_id bigint, _target_user_id bigint)
+create or replace function auth.disable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -47,7 +47,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.disable_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.disable_user');
 
 	return query
 		update auth.user_info
@@ -63,7 +63,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10005  -- user_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -71,7 +71,7 @@ begin
 end;
 $$;
 
-create or replace function auth.unlock_user(_updated_by text, _user_id bigint, _target_user_id bigint)
+create or replace function auth.unlock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -79,7 +79,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.unlock_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.unlock_user');
 
 	return query
 		update auth.user_info
@@ -92,7 +92,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10007  -- user_unlocked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -100,7 +100,7 @@ begin
 end;
 $$;
 
-create or replace function auth.lock_user(_updated_by text, _user_id bigint, _target_user_id bigint)
+create or replace function auth.lock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -108,7 +108,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.lock_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.lock_user');
 
 	return query
 		update auth.user_info
@@ -124,7 +124,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10006  -- user_locked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -132,7 +132,7 @@ begin
 end;
 $$;
 
-create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _target_user_id bigint, _provider_code text)
+create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -142,7 +142,7 @@ declare
 	__user_identity_id bigint;
 begin
 	perform
-		auth.has_permission(_user_id, 'users.enable_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.enable_user_identity');
 
 	select user_identity_id
 	from auth.user_identity uid
@@ -166,7 +166,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10033  -- identity_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -174,7 +174,7 @@ begin
 end;
 $$;
 
-create or replace function auth.disable_user_identity(_updated_by text, _user_id bigint, _target_user_id bigint, _provider_code text)
+create or replace function auth.disable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -184,7 +184,7 @@ declare
 	__user_identity_id bigint;
 begin
 	perform
-		auth.has_permission(_user_id, 'users.disable_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.disable_user_identity');
 
 	select user_identity_id
 	from auth.user_identity uid
@@ -208,7 +208,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10034  -- identity_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -216,24 +216,24 @@ begin
 end;
 $$;
 
-create or replace function auth.create_service_user_info(_created_by text, _user_id bigint, _username text, _email text DEFAULT NULL::text, _display_name text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint)
+create or replace function auth.create_service_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _email text DEFAULT NULL::text, _display_name text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint)
     returns TABLE(__user_id bigint, __username text, __email text, __display_name text)
     rows 1
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'users.create_service_user');
+	perform auth.has_permission(_user_id, _correlation_id, 'users.create_service_user');
 
 	return query
 		select user_id, username, email, display_name
-		from unsecure.create_service_user_info(_created_by, _user_id, _username,
+		from unsecure.create_service_user_info(_created_by, _user_id, _correlation_id, _username,
 																					 _email, _display_name,
 																					 _custom_service_user_id);
 end;
 $$;
 
-create or replace function auth.update_user_password(_updated_by text, _user_id bigint, _target_user_id bigint, _password_hash text, _ip_address text, _user_agent text, _origin text, _password_salt text DEFAULT NULL::text)
+create or replace function auth.update_user_password(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _password_hash text, _ip_address text, _user_agent text, _origin text, _password_salt text DEFAULT NULL::text)
     returns TABLE(__user_id bigint, __provider_code text, __provider_uid text)
     rows 1
     language plpgsql
@@ -243,21 +243,21 @@ begin
 
 	if
 		_user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, 'users.change_password');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.change_password');
 	end if;
 
-	perform unsecure.create_user_event(_updated_by, _user_id, 'change_password',
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id, 'change_password',
 																		 _target_user_id, _ip_address, _user_agent, _origin);
 
 	return query
 		select *
-		from unsecure.update_user_password(_updated_by, _user_id, _target_user_id,
+		from unsecure.update_user_password(_updated_by, _user_id, _correlation_id, _target_user_id,
 																			 _password_hash,
 																			 _password_salt);
 end;
 $$;
 
-create or replace function auth.register_user(_created_by text, _user_id bigint, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.register_user(_created_by text, _user_id bigint, _correlation_id text, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     rows 1
     language plpgsql
@@ -269,7 +269,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'users.register_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.register_user');
 
 	perform
 		auth.validate_provider_is_active('email');
@@ -285,15 +285,15 @@ begin
 	end if;
 
 	select *
-	from unsecure.create_user_info(_created_by, _user_id, _email, _email, _display_name,
+	from unsecure.create_user_info(_created_by, _user_id, _correlation_id, _email, _email, _display_name,
 																 'email')
 	into __new_user;
 
-	perform unsecure.create_user_identity(_created_by, _user_id, __new_user.user_id
+	perform unsecure.create_user_identity(_created_by, _user_id, _correlation_id, __new_user.user_id
 		, 'email', lower(trim(_email)), _password_hash);
 
 	perform
-		auth.update_user_data(_created_by, _user_id, __new_user.user_id, 'email', _user_data);
+		auth.update_user_data(_created_by, _user_id, _correlation_id, __new_user.user_id, 'email', _user_data);
 
 	return query
 		select __new_user.user_id
@@ -306,7 +306,7 @@ begin
 end;
 $$;
 
-create or replace function auth.add_user_to_default_groups(_created_by text, _user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.add_user_to_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text)
     language plpgsql
 as
@@ -314,16 +314,16 @@ $$
 begin
 
 	perform
-		auth.has_permission(_user_id, 'users.add_to_default_groups', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'users.add_to_default_groups', _tenant_id);
 
 	return query
 		select *
-		from unsecure.add_user_to_default_groups(_created_by, _user_id, _target_user_id,
+		from unsecure.add_user_to_default_groups(_created_by, _user_id, _correlation_id, _target_user_id,
 																						 _tenant_id);
 end;
 $$;
 
-create or replace function auth.get_user_by_id(_user_id bigint)
+create or replace function auth.get_user_by_id(_user_id bigint, _correlation_id text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     language plpgsql
 as
@@ -350,14 +350,14 @@ end;
 
 $$;
 
-create or replace function auth.get_user_identity(_user_id bigint, _target_user_id bigint, _provider_code text)
+create or replace function auth.get_user_identity(_user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
     returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.get_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity');
 
 	return query
 		select uid.user_identity_id
@@ -374,14 +374,14 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_identity_by_email(_user_id bigint, _email text, _provider_code text)
+create or replace function auth.get_user_identity_by_email(_user_id bigint, _correlation_id text, _email text, _provider_code text)
     returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'users.get_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity');
 
 	return query
 		select uid.user_identity_id
@@ -398,7 +398,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _email text)
+create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _correlation_id text, _email text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text, __provider text, __password_hash text, __password_salt text)
     language plpgsql
 as
@@ -414,7 +414,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'authentication.get_data');
+		auth.has_permission(_user_id, _correlation_id, 'authentication.get_data');
 
 	perform
 		auth.validate_provider_is_active('email');
@@ -475,7 +475,7 @@ end;
 
 $$;
 
-create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.ensure_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _display_name text, _provider_code text DEFAULT NULL::text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     language plpgsql
 as
@@ -495,7 +495,7 @@ begin
 	if
 		__last_id is null then
 		select user_id
-		from unsecure.create_user_info(_created_by, _user_id, __username, lower(_email), _display_name,
+		from unsecure.create_user_info(_created_by, _user_id, _correlation_id, __username, lower(_email), _display_name,
 																	 _provider_code)
 		into __last_id;
 	end if;
@@ -512,7 +512,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_data(_updated_by text, _user_id bigint, _target_user_id bigint, _provider text, _user_data jsonb)
+create or replace function auth.update_user_data(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider text, _user_data jsonb)
     returns TABLE(__user_id bigint, __user_data_id bigint)
     language plpgsql
 as
@@ -528,7 +528,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_data(_user_id bigint, _target_user_id bigint) returns SETOF auth.user_data
+create or replace function auth.get_user_data(_user_id bigint, _correlation_id text, _target_user_id bigint) returns SETOF auth.user_data
     language plpgsql
 as
 $$
@@ -536,7 +536,7 @@ begin
 
 	if
 		_user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, 'users.get_data');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
 	end if;
 
 	select *
@@ -546,7 +546,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_user_info(_deleted_by text, _user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.delete_user_info(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_info_id integer)
     rows 1
     language plpgsql
@@ -557,7 +557,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'users.delete_user_info', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'users.delete_user_info', _tenant_id);
 
 	select is_system, tenant_id
 	from auth.user_group ug
@@ -581,7 +581,7 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 13003  -- group_deleted
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text)
@@ -589,7 +589,7 @@ begin
 end;
 $$;
 
-create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _provider_code text, _provider_uid text, _provider_oid text, _username text, _display_name text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_uid text, _provider_oid text, _username text, _display_name text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     language plpgsql
 as
@@ -623,16 +623,16 @@ begin
 		__target_user_id is null then
 		-- create user because it does not exists
 		select user_id
-		from unsecure.create_user_info(_created_by, _user_id, lower(_username), lower(_email), _display_name,
+		from unsecure.create_user_info(_created_by, _user_id, _correlation_id, lower(_username), lower(_email), _display_name,
 																	 _provider_code)
 		into __target_user_id;
 
 		perform
-			unsecure.create_user_identity(_created_by, _user_id, __target_user_id
+			unsecure.create_user_identity(_created_by, _user_id, _correlation_id, __target_user_id
 				, _provider_code, _provider_uid, _provider_oid, _is_active := true);
 	else
 		-- update provider_oid
-		perform unsecure.update_user_identity_uid_oid(_created_by, _user_id, __target_user_id
+		perform unsecure.update_user_identity_uid_oid(_created_by, _user_id, _correlation_id, __target_user_id
 			, _provider_code, _provider_uid
 			, _provider_oid);
 
@@ -641,7 +641,7 @@ begin
 			(trim(lower(_username)) <> __username
 				or _display_name <> __display_name
 				or _email <> __email) then
-			perform unsecure.update_user_info_basic_data(_created_by, _user_id, __target_user_id, _username, _display_name,
+			perform unsecure.update_user_info_basic_data(_created_by, _user_id, _correlation_id, __target_user_id, _username, _display_name,
 																									 _email);
 		end if;
 
@@ -685,7 +685,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_preferences(_updated_by text, _user_id bigint, _target_user_id bigint, _update_data text)
+create or replace function auth.update_user_preferences(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text)
     returns TABLE(__updated_at timestamp with time zone, __updated_by character varying)
     rows 1
     language plpgsql
@@ -694,7 +694,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.update_user_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_user_data');
     end if;
 
     return query
@@ -708,7 +708,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_preferences(_user_id bigint, _target_user_id bigint)
+create or replace function auth.get_user_preferences(_user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__value text)
     stable
     rows 1
@@ -718,7 +718,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.get_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
     end if;
 
     return query
@@ -728,7 +728,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_by_provider_oid(_user_id bigint, _provider_oid text)
+create or replace function auth.get_user_by_provider_oid(_user_id bigint, _correlation_id text, _provider_oid text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     language plpgsql
 as
@@ -750,6 +750,7 @@ $$;
 
 create or replace function auth.search_users(
     _user_id bigint,
+    _correlation_id text,
     _search_text text default null,
     _user_type_code text default null,
     _is_active boolean default null,
@@ -779,7 +780,7 @@ $$
 declare
     __search_text text;
 begin
-    perform auth.has_permission(_user_id, 'users.read_users', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'users.read_users', _tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 

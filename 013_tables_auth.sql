@@ -45,6 +45,7 @@ create table auth.tenant
     is_assignable    boolean default true               not null,
     is_default       boolean default false              not null,
     nrm_search_data  text,
+    unique (code),
     constraint tenant_created_by_check
         check (length(created_by) <= 250),
     constraint tenant_updated_by_check
@@ -110,6 +111,7 @@ create table auth.tenant_user
     user_id        integer not null
         references auth.user_info
             on delete cascade,
+    unique (tenant_id, user_id),
     constraint tenant_user_created_by_check
         check (length(created_by) <= 250)
 );
@@ -247,6 +249,7 @@ create table auth.perm_set_perm
     permission_id integer not null
         references auth.permission
             on delete cascade,
+    unique (perm_set_id, permission_id),
     constraint perm_set_perm_created_by_check
         check (length(created_by) <= 250)
 );
@@ -282,7 +285,8 @@ create table auth.user_group
     constraint must_be_external
         check ((not is_synced) or ((is_synced = true) and (is_external = true))),
     constraint must_be_synced
-        check ((not create_missing_users_on_sync) or ((create_missing_users_on_sync = true) and (is_synced = true)))
+        check ((not create_missing_users_on_sync) or ((create_missing_users_on_sync = true) and (is_synced = true))),
+    unique (code, tenant_id)
 );
 
 create table auth.user_group_mapping
@@ -351,6 +355,7 @@ create table auth.user_event
 (
     created_at         timestamp with time zone default now()           not null,
     created_by         text                     default 'unknown'::text not null,
+    correlation_id     text,
     user_event_id      bigint generated always as identity
         primary key,
     event_type_code    text not null
@@ -502,9 +507,6 @@ create index ix_trgm_user_info_search
 create unique index uq_user_permission_cache
     on auth.user_permission_cache (user_id, tenant_id);
 
-create index ix_user_permission_cache
-    on auth.user_permission_cache (user_id, tenant_id);
-
 create index ix_trgm_user_data_search
     on auth.user_data using gin (nrm_search_data gin_trgm_ops);
 
@@ -535,6 +537,9 @@ create unique index uq_auth_permission_assignment_tenant_group
 create index ix_user_event_data
     on auth.user_event using gin (event_data jsonb_path_ops);
 
+create index ix_user_event_correlation_id
+    on auth.user_event(correlation_id) where correlation_id is not null;
+
 create index ix_token_token
     on auth.token using hash (token);
 
@@ -548,9 +553,6 @@ create unique index uq_user_group_member
     on auth.user_group_member (group_id, user_id, coalesce(mapping_id, 0));
 
 create unique index uq_user_tenant_preference
-    on auth.user_tenant_preference (user_id, tenant_id);
-
-create index ix_user_tenant_preference
     on auth.user_tenant_preference (user_id, tenant_id);
 
 -- Search indexes for nrm_search_data columns

@@ -77,12 +77,6 @@ begin
 		new.code := helpers.get_code(new.code, '_');
 	end if;
 
-	if TG_TABLE_NAME = 'user_group' then
-		if new.tenant_id is not null then
-			new.code := concat(new.code, '-', new.tenant_id);
-		end if;
-	end if;
-
 	return new;
 end;
 $$;

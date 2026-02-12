@@ -24,7 +24,7 @@ begin
 end;
 $$;
 
-create or replace function auth.is_owner(_user_id bigint, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
+create or replace function auth.is_owner(_user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
     immutable
     language plpgsql
 as
@@ -42,7 +42,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_owner(_created_by text, _user_id bigint, _target_user_id bigint, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_owner(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__owner_id bigint)
     rows 1
     language plpgsql
@@ -51,14 +51,14 @@ $$
 begin
 
 	-- Verify user is owner or has appropriate permission
-	perform unsecure.verify_owner_or_permission(_user_id, _user_group_id, _tenant_id);
+	perform unsecure.verify_owner_or_permission(_user_id, _correlation_id, _user_group_id, _tenant_id);
 
 	return query
 		insert into auth.owner (created_by, tenant_id, user_group_id, user_id)
 			values (_created_by, _tenant_id, _user_group_id, _target_user_id)
 			returning owner_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 11010  -- tenant_user_added
 			, 'tenant', _tenant_id
 			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text
@@ -67,13 +67,13 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_owner(_deleted_by text, _user_id bigint, _target_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.delete_owner(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
 	-- Verify user is owner or has appropriate permission
-	perform unsecure.verify_owner_or_permission(_user_id, _user_group_id, _tenant_id);
+	perform unsecure.verify_owner_or_permission(_user_id, _correlation_id, _user_group_id, _tenant_id);
 
 	delete
 	from auth.owner
@@ -81,7 +81,7 @@ begin
 		and tenant_id = _tenant_id
 		and user_group_id = _user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 11011  -- tenant_user_removed
 			, 'tenant', _tenant_id
 			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text

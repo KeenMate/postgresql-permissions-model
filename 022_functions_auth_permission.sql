@@ -60,7 +60,7 @@ begin
 end;
 $$;
 
-create or replace function auth.has_permissions(_target_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
+create or replace function auth.has_permissions(_target_user_id bigint, _correlation_id text, _perm_codes text[], _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
     stable
     language plpgsql
 as
@@ -77,7 +77,7 @@ begin
     end if;
 
     -- NOT REALLY SAFE FOR SOME INTERNAL/SYSTEM PERMISSIONS
-    if (auth.is_owner(_target_user_id, null, _tenant_id))
+    if (auth.is_owner(_target_user_id, _correlation_id, null, _tenant_id))
     then
         return true;
     end if;
@@ -126,7 +126,7 @@ begin
 
     if (_throw_err)
     then
-        perform create_journal_message('system', _target_user_id
+        perform create_journal_message('system', _target_user_id, _correlation_id
             , 32001  -- err_no_permission
             , 'perm', _target_user_id
             , jsonb_build_object('username', _target_user_id::text
@@ -141,67 +141,67 @@ begin
 end ;
 $$;
 
-create or replace function auth.has_permission(_target_user_id bigint, _perm_code text, _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
+create or replace function auth.has_permission(_target_user_id bigint, _correlation_id text, _perm_code text, _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
     stable
     language plpgsql
 as
 $$
 begin
-	return auth.has_permissions(_target_user_id, array [_perm_code], _tenant_id, _throw_err);
+	return auth.has_permissions(_target_user_id, _correlation_id, array [_perm_code], _tenant_id, _throw_err);
 end ;
 $$;
 
-create or replace function auth.get_effective_group_permissions(_requested_by text, _user_id bigint, _group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_effective_group_permissions(_requested_by text, _user_id bigint, _correlation_id text, _group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__full_code text, __permission_title text, __perm_set_title text, __perm_set_code text, __perm_set_id integer, __assignment_id bigint)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'groups.get_permissions', _tenant_id);
+	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_permissions', _tenant_id);
 
 	return query select * from unsecure.get_effective_group_permissions(_requested_by, _user_id, _group_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.get_assigned_group_permissions(_requested_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_assigned_group_permissions(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'groups.get_permissions', _tenant_id);
+	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_permissions', _tenant_id);
 
 	return query select *
 							 from unsecure.get_assigned_group_permissions(_requested_by, _user_id, _user_group_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission_assignment
+create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'permissions.update_permission');
+		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission');
 
 	return query
 		select *
-		from unsecure.set_permission_as_assignable(_updated_by, _user_id, _permission_id, _permission_full_code,
+		from unsecure.set_permission_as_assignable(_updated_by, _user_id, _correlation_id, _permission_id, _permission_full_code,
 																							 _is_assignable);
 end;
 $$;
 
-create or replace function auth.assign_permission(_created_by text, _user_id bigint, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function auth.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'permissions.assign_permission', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.assign_permission', _tenant_id);
 
 	return query
 		select *
-		from unsecure.assign_permission(_created_by, _user_id
+		from unsecure.assign_permission(_created_by, _user_id, _correlation_id
 			, _user_group_id, _target_user_id
 			, _perm_set_code
 			, _perm_code
@@ -210,21 +210,21 @@ end;
 
 $$;
 
-create or replace function auth.unassign_permission(_deleted_by text, _user_id bigint, _assignment_id bigint, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function auth.unassign_permission(_deleted_by text, _user_id bigint, _correlation_id text, _assignment_id bigint, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'permissions.unassign_permission', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.unassign_permission', _tenant_id);
 
 	return query
 		select *
-		from unsecure.unassign_permission(_deleted_by, _user_id, _assignment_id, _tenant_id);
+		from unsecure.unassign_permission(_deleted_by, _user_id, _correlation_id, _assignment_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.create_permission(_created_by text, _user_id bigint, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
+create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -237,38 +237,38 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'permissions.add_permission');
+		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission');
 
 	return query
-		select * from unsecure.create_permission(_created_by, _user_id, _title, _parent_full_code, _is_assignable);
+		select * from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable);
 end;
 $$;
 
-create or replace function auth.get_all_permissions(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_all_permissions(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'permissions.get_perm_sets', _tenant_id);
+	perform auth.has_permission(_user_id, _correlation_id, 'permissions.get_perm_sets', _tenant_id);
 
 	return query select * from unsecure.get_all_permissions(_requested_by, _user_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.get_perm_sets(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_perm_sets(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __title text, __code text, __is_system boolean, __is_assignable boolean, __permissions jsonb)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'permissions.get_perm_sets', _tenant_id);
+	perform auth.has_permission(_user_id, _correlation_id, 'permissions.get_perm_sets', _tenant_id);
 
 	return query select * from unsecure.get_perm_sets(_requested_by, _user_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.create_perm_set(_created_by text, _user_id bigint, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function auth.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
     rows 1
     language plpgsql
 as
@@ -276,16 +276,16 @@ $$
 begin
 
 	perform
-		auth.has_permission(_user_id, 'permissions.create_permission_set', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.create_permission_set', _tenant_id);
 
 	return query
 		select *
-		from unsecure.create_perm_set(_created_by, _user_id, _title, _is_system, _is_assignable,
+		from unsecure.create_perm_set(_created_by, _user_id, _correlation_id, _title, _is_system, _is_assignable,
 																	_permissions, _tenant_id);
 end;
 $$;
 
-create or replace function auth.update_perm_set(_updated_by text, _user_id bigint, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function auth.update_perm_set(_updated_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
     rows 1
     language plpgsql
 as
@@ -299,16 +299,16 @@ begin
 	end if;
 
 	perform
-		auth.has_permission(_user_id, 'permissions.update_permission_set', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission_set', _tenant_id);
 
 	return query
 		select *
-		from unsecure.update_perm_set(_updated_by, _user_id
+		from unsecure.update_perm_set(_updated_by, _user_id, _correlation_id
 			, _perm_set_id, _title, _is_assignable, _tenant_id);
 end;
 $$;
 
-create or replace function auth.add_perm_set_permissions(_created_by text, _user_id bigint, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function auth.add_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -317,16 +317,16 @@ $$
 begin
 
 	perform
-		auth.has_permission(_user_id, 'permissions.update_permission_set', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission_set', _tenant_id);
 
 	return query
 		select *
-		from unsecure.add_perm_set_permissions(_created_by, _user_id
+		from unsecure.add_perm_set_permissions(_created_by, _user_id, _correlation_id
 			, _perm_set_id, _permissions, _tenant_id);
 end;
 $$;
 
-create or replace function auth.delete_perm_set_permissions(_created_by text, _user_id bigint, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function auth.delete_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -335,16 +335,16 @@ $$
 begin
 
 	perform
-		auth.has_permission(_user_id, 'permissions.update_permission_set', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission_set', _tenant_id);
 
 	return query
 		select *
-		from unsecure.delete_perm_set_permissions(_created_by, _user_id
+		from unsecure.delete_perm_set_permissions(_created_by, _user_id, _correlation_id
 			, _perm_set_id, _permissions, _tenant_id);
 end;
 $$;
 
-create or replace function auth.get_user_permissions(_user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_user_permissions(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text)
     stable
     language plpgsql
@@ -352,7 +352,7 @@ as
 $$
 begin
 	if _user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, 'users.get_permissions', _tenant_id);
+		perform auth.has_permission(_user_id, _correlation_id, 'users.get_permissions', _tenant_id);
 	end if;
 
 	return query
@@ -382,59 +382,36 @@ begin
 end;
 $$;
 
-create or replace function auth.update_permission_data_v1() returns SETOF integer
+create or replace function auth.seed_permission_data() returns void
     language plpgsql
 as
 $$
-declare
 begin
 
-	-- COMMMON WITH ALL DATABASES
-
-	insert into const.tenant_access_type(code)
-	values ('members_only');
-	insert into const.tenant_access_type(code)
-	values ('authenticated');
-
-	perform unsecure.create_primary_tenant();
-
-	insert into const.sys_param(created_by, group_code, code, number_value)
-	values ('initial', 'auth', 'perm_cache_timeout_in_s', 15); -- 15seconds intentionally for better debugging
-
-	insert into const.user_type(code)
-	values ('normal');
-	insert into const.user_type(code)
-	values ('system');
-	insert into const.user_type(code)
-	values ('api');
-	insert into const.user_type(code)
-	values ('service');
-
-
-	perform unsecure.create_user_system();
-
-	-- resetting sequence to 1000 to allocate space for system users
-	alter sequence auth.user_info_user_id_seq restart with 1000;
-
+	-- Permissions: Authentication
 	perform unsecure.create_permission_as_system('Authentication', null, false);
 	perform unsecure.create_permission_as_system('Get data', 'authentication');
 	perform unsecure.create_permission_as_system('Create auth event', 'authentication');
+	perform unsecure.create_permission_as_system('Read user events', 'authentication');
 
+	-- Permissions: Journal
 	perform unsecure.create_permission_as_system('Journal', _is_assignable := true);
 	perform unsecure.create_permission_as_system('Read journal', 'journal', _is_assignable := true);
-	perform unsecure.create_permission_as_system('Read global journal', 'journal',
-																							 _is_assignable := true);
+	perform unsecure.create_permission_as_system('Read global journal', 'journal', _is_assignable := true);
 	perform unsecure.create_permission_as_system('Get payload', 'journal', _is_assignable := true);
 
+	-- Permissions: Areas
 	perform unsecure.create_permission_as_system('Areas', null, false);
 	perform unsecure.create_permission_as_system('Public', 'areas');
 	perform unsecure.create_permission_as_system('Admin', 'areas');
 
+	-- Permissions: Tokens
 	perform unsecure.create_permission_as_system('Tokens', null, false);
 	perform unsecure.create_permission_as_system('Create token', 'tokens', true);
 	perform unsecure.create_permission_as_system('Validate token', 'tokens', true);
 	perform unsecure.create_permission_as_system('Set as used', 'tokens', true);
 
+	-- Permissions: Permissions management
 	perform unsecure.create_permission_as_system('Permissions', null, false);
 	perform unsecure.create_permission_as_system('Create permission', 'permissions');
 	perform unsecure.create_permission_as_system('Update permission', 'permissions');
@@ -448,6 +425,7 @@ begin
 	perform unsecure.create_permission_as_system('Read permissions', 'permissions');
 	perform unsecure.create_permission_as_system('Read perm sets', 'permissions');
 
+	-- Permissions: Users
 	perform unsecure.create_permission_as_system('Users');
 	perform unsecure.create_permission_as_system('Create service user', 'users');
 	perform unsecure.create_permission_as_system('Register user', 'users');
@@ -465,7 +443,17 @@ begin
 	perform unsecure.create_permission_as_system('Get data', 'users');
 	perform unsecure.create_permission_as_system('Get permissions', 'users');
 	perform unsecure.create_permission_as_system('Read users', 'users');
+	perform unsecure.create_permission_as_system('Delete system user info', 'users');
+	perform unsecure.create_permission_as_system('Delete user info', 'users');
+	perform unsecure.create_permission_as_system('Delete user identity', 'users');
+	perform unsecure.create_permission_as_system('Read user group memberships', 'users');
+	perform unsecure.create_permission_as_system('Update last selected tenant', 'users');
+	perform unsecure.create_permission_as_system('Get available tenants', 'users');
+	perform unsecure.create_permission_as_system('Get users groups and permissions', 'users');
+	perform unsecure.create_permission_as_system('Create user tenant preferences', 'users');
+	perform unsecure.create_permission_as_system('Update user tenant preferences', 'users');
 
+	-- Permissions: Tenants
 	perform unsecure.create_permission_as_system('Tenants');
 	perform unsecure.create_permission_as_system('Create tenant', 'tenants');
 	perform unsecure.create_permission_as_system('Update tenant', 'tenants');
@@ -477,13 +465,14 @@ begin
 	perform unsecure.create_permission_as_system('Read tenants', 'tenants');
 	perform unsecure.create_permission_as_system('Delete tenant', 'tenants');
 
-
+	-- Permissions: Providers
 	perform unsecure.create_permission_as_system('Providers');
 	perform unsecure.create_permission_as_system('Create provider', 'providers');
 	perform unsecure.create_permission_as_system('Update provider', 'providers');
 	perform unsecure.create_permission_as_system('Delete provider', 'providers');
 	perform unsecure.create_permission_as_system('Get users', 'providers');
 
+	-- Permissions: Groups
 	perform unsecure.create_permission_as_system('Groups');
 	perform unsecure.create_permission_as_system('Get group', 'groups');
 	perform unsecure.create_permission_as_system('Get permissions', 'groups');
@@ -499,6 +488,7 @@ begin
 	perform unsecure.create_permission_as_system('Create mapping', 'groups');
 	perform unsecure.create_permission_as_system('Delete mapping', 'groups');
 
+	-- Permissions: API keys
 	perform unsecure.create_permission_as_system('Api keys');
 	perform unsecure.create_permission_as_system('Create api key', 'api_keys');
 	perform unsecure.create_permission_as_system('Update api key', 'api_keys');
@@ -509,193 +499,38 @@ begin
 	perform unsecure.create_permission_as_system('Update permissions', 'api_keys');
 	perform unsecure.create_permission_as_system('Read outbound secret', 'api_keys');
 
+	-- Permission sets
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
-																						 _permissions := array ['tenants', 'providers'
-																							 , 'users','groups', 'journal', 'api_keys']);
-
+		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'api_keys']);
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
-																						 _permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload']);
-
+		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload']);
 	perform unsecure.create_perm_set_as_system('Tenant admin', true, _is_assignable := true,
-																						 _permissions := array ['tenants', 'journal.read_journal', 'journal.get_payload']);
-
+		_permissions := array ['tenants', 'journal.read_journal', 'journal.get_payload']);
 	perform unsecure.create_perm_set_as_system('Tenant owner', true, _is_assignable := true,
-																						 _permissions := array ['groups'
-																							 , 'tenants.update_tenant'
-																							 , 'tenants.assign_owner'
-																							 , 'tenants.get_users'
-																							 , 'journal.read_journal', 'journal.get_journal_payload']);
-
+		_permissions := array ['groups', 'tenants.update_tenant', 'tenants.assign_owner',
+			'tenants.get_users', 'journal.read_journal', 'journal.get_journal_payload']);
 	perform unsecure.create_perm_set_as_system('Tenant member', true, _is_assignable := true,
-																						 _permissions := array ['tenants.get_groups'
-																							 , 'tenants.get_users']);
+		_permissions := array ['tenants.get_groups', 'tenants.get_users']);
 
+	-- Default groups
 	perform unsecure.create_user_group_as_system('System admins', true, true);
 	perform unsecure.assign_permission_as_system(1, null, 'system_admin');
-
 	perform unsecure.create_user_group_as_system('Tenant admins', true, true);
 	perform unsecure.assign_permission_as_system(2, null, 'tenant_admin');
 
-	perform
-		auth.create_provider('initial', 1, 'email', 'Email authentication', false);
-	perform
-		auth.create_provider('initial', 1, 'aad', 'Azure authentication', false);
+	-- Providers
+	perform auth.create_provider('initial', 1, null, 'email', 'Email authentication', false);
+	perform auth.create_provider('initial', 1, null, 'aad', 'Azure authentication', false);
+	perform auth.enable_provider('system', 1, null, 'aad');
+	perform auth.enable_provider('system', 1, null, 'email');
 
-	insert into const.user_event_type(code)
-	values ('create_user_info');
-	insert into const.user_event_type(code)
-	values ('update_user_info');
-	insert into const.user_event_type(code)
-	values ('delete_user_info');
-
-	insert into const.user_event_type(code)
-	values ('create_user_identity');
-	insert into const.user_event_type(code)
-	values ('update_user_identity');
-	insert into const.user_event_type(code)
-	values ('delete_user_identity');
-
-	insert into const.user_event_type(code)
-	values ('user_logged_in');
-	insert into const.user_event_type(code)
-	values ('user_logged_out');
-
-	insert into const.user_event_type(code)
-	values ('user_invitation_sent');
-	insert into const.user_event_type(code)
-	values ('user_invitation_accepted');
-	insert into const.user_event_type(code)
-	values ('user_invitation_rejected');
-
-	insert into const.user_event_type(code)
-	values ('email_verification');
-	insert into const.user_event_type(code)
-	values ('phone_verification');
-	insert into const.user_event_type(code)
-	values ('password_reset_requested');
-	insert into const.user_event_type(code)
-	values ('password_change');
-	insert into const.user_event_type(code)
-	values ('password_changed');
-
-	insert into const.user_event_type(code)
-	values ('create_mfa_email');
-	insert into const.user_event_type(code)
-	values ('update_mfa_email');
-	insert into const.user_event_type(code)
-	values ('delete_mfa_email');
-
-	insert into const.user_event_type(code)
-	values ('create_mfa_phone');
-	insert into const.user_event_type(code)
-	values ('update_mfa_phone');
-	insert into const.user_event_type(code)
-	values ('delete_mfa_phone');
-
-	insert into const.user_event_type(code)
-	values ('external_data_update'); -- when data are about to be changed directly at identity provider or elsewhere
-	insert into const.user_event_type(code)
-	values ('external_data_updated'); -- when data are changed directly at identity provider or elsewhere
-
-	insert into const.user_event_type(code)
-	values ('api_key_validating');
-
-	insert into const.token_type(code, default_expiration_in_seconds)
-	values ('email_verification', 1 * 60 * 60);
-	insert into const.token_type(code, default_expiration_in_seconds)
-	values ('phone_verification', 10 * 60);
-	insert into const.token_type(code, default_expiration_in_seconds)
-	values ('password_reset', 10 * 60);
-	insert into const.token_type(code, default_expiration_in_seconds)
-	values ('invitation', 5 * 24 * 60 * 60);
-
-	insert into const.token_channel(code)
-	values ('email');
-	insert into const.token_channel(code)
-	values ('mobile_phone');
-
-	insert into const.token_state(code)
-	values ('valid');
-	insert into const.token_state(code)
-	values ('invalid');
-	insert into const.token_state(code)
-	values ('expired');
-	insert into const.token_state(code)
-	values ('used');
-
-	-- UNIQUE FOR THIS DATABASE
-
---     insert into tenant (created_by, updated_by, name, code, is_removable, is_assignable)
---     values ('system', 'system', 'App 1', 'app1', true, true)
---          , ('system', 'system', 'App 2', 'app2', true, true);
-
-	perform
-		auth.enable_provider('system', 1, 'aad');
-	perform
-		auth.enable_provider('system', 1, 'email');
-
-end
-
-
-$$;
-
-create or replace function auth.update_permission_data_v1_4() returns SETOF integer
-    language plpgsql
-as
-$$
-declare
-	__update_username text:='auth_update_v1_4';
-begin
-	
-	perform unsecure.create_permission_as_system('Delete system user info', 'users');
-	perform unsecure.create_permission_as_system('Delete user info', 'users');
-	perform unsecure.create_permission_as_system('Delete user identity', 'users');
+	-- Set primary tenant as default
+	update auth.tenant set is_default = true where tenant_id = 1;
 
 end;
 $$;
 
-create or replace function auth.update_permission_data_v1_7() returns SETOF integer
-    language plpgsql
-as
-$$
-declare
-	__update_username text := 'auth_update_v1_7';
-begin
-
-	perform unsecure.create_permission_as_system('Read user group memberships', 'users');
-
-end;
-$$;
-
-create or replace function auth.update_permission_data_v1_8() returns SETOF integer
-    language plpgsql
-as
-$$
-declare
-	__update_username text := 'auth_update_v1_8';
-begin
-
-	-- 	perform unsecure.create_permission_as_system('Read user group memberships', 'users');
-
-end;
-$$;
-
-create or replace function auth.update_permission_data_v1_9() returns SETOF integer
-    language plpgsql
-as
-$$
-declare
-	__update_username text := 'auth_update_v1_9';
-begin
-
-	perform unsecure.create_permission(__update_username, 1, 'Update last selected tenant', 'users');
-	perform unsecure.create_permission(__update_username, 1, 'Get available tenants', 'users');
-	-- 	perform unsecure.create_permission_as_system('Read user group memberships', 'users');
-
-end;
-$$;
-
-create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _target_user_id bigint, _provider_code text, _provider_groups text[] DEFAULT NULL::text[], _provider_roles text[] DEFAULT NULL::text[])
+create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_groups text[] DEFAULT NULL::text[], _provider_roles text[] DEFAULT NULL::text[])
     returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[])
     rows 1
     language plpgsql
@@ -703,7 +538,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, 'authentication.ensure_permissions');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.ensure_permissions');
 
     update auth.user_identity
     set updated_by      = _created_by
@@ -738,7 +573,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _target_user_id bigint)
+create or replace function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[])
     rows 1
     language plpgsql
@@ -746,7 +581,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, 'authentication.get_users_groups_and_permissions');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.get_users_groups_and_permissions');
 
     return query
         select up.__tenant_id
@@ -758,41 +593,14 @@ begin
 end;
 $$;
 
-create or replace function auth.update_permission_data_v1_10() returns SETOF integer
-    language plpgsql
-as
-$$
-declare
-    __update_username text := 'auth_update_v1_10';
-begin
 
-    perform unsecure.create_permission_as_system('Get users groups and permissions', 'users');
-    perform unsecure.create_permission_as_system('Create user tenant preferences', 'users');
-    perform unsecure.create_permission_as_system('Update user tenant preferences', 'users');
-
-
-    update auth.tenant
-    set is_default = true
-    where tenant_id = 1;
-
-    -- I could not find an evidence that would suggest there exists a column of such a similar name, or functionality, to this newly created `user_preferences` column
-    -- 	update auth.user_info ui
-    -- 	set updated_at = now()
-    -- 		, updated_by = __update_username
-    -- 		, user_preferences = ud.
-    -- 	from auth.user_data ud
-    -- 	where ud.user_id = ui.user_id;
-
-end;
-$$;
-
-create or replace function auth.get_user_assigned_permissions(_requested_by text, _user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_user_assigned_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint, __group_id integer)
     language plpgsql
 as
 $$
 begin
-    perform auth.has_permission(_user_id, 'users.get_permissions', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'users.get_permissions', _tenant_id);
 
     return query select *
                  from unsecure.get_user_assigned_permissions(_requested_by, _user_id, _target_user_id, _tenant_id);
@@ -802,6 +610,7 @@ $$;
 
 create or replace function auth.search_permissions(
     _user_id bigint,
+    _correlation_id text,
     _search_text text default null,
     _is_assignable boolean default null,
     _parent_code text default null,
@@ -828,7 +637,7 @@ declare
     __search_text text;
     __parent_path ltree;
 begin
-    perform auth.has_permission(_user_id, 'permissions.read_permissions', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'permissions.read_permissions', _tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -865,6 +674,7 @@ $$;
 
 create or replace function auth.search_perm_sets(
     _user_id bigint,
+    _correlation_id text,
     _search_text text default null,
     _is_assignable boolean default null,
     _is_system boolean default null,
@@ -890,7 +700,7 @@ $$
 declare
     __search_text text;
 begin
-    perform auth.has_permission(_user_id, 'permissions.read_perm_sets', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'permissions.read_perm_sets', _tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 

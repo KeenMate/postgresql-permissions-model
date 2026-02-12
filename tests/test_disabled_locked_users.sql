@@ -82,7 +82,7 @@ BEGIN
     RAISE NOTICE '-- Test 2: disable_user clears permission cache --';
 
     -- Disable the user
-    PERFORM auth.disable_user('test', 1, __test_user_id);
+    PERFORM auth.disable_user('test', 1, null, __test_user_id);
 
     SELECT EXISTS(
         SELECT 1 FROM auth.user_permission_cache
@@ -142,7 +142,7 @@ BEGIN
     RAISE NOTICE '-- Test 5: lock_user clears permission cache --';
 
     -- Lock the user
-    PERFORM auth.lock_user('test', 1, __test_user_id2);
+    PERFORM auth.lock_user('test', 1, null, __test_user_id2);
 
     SELECT EXISTS(
         SELECT 1 FROM auth.user_permission_cache
@@ -185,7 +185,7 @@ BEGIN
     RAISE NOTICE '-- Test 7: Re-enabled user can recalculate permissions --';
 
     -- Re-enable user 1
-    PERFORM auth.enable_user('test', 1, __test_user_id);
+    PERFORM auth.enable_user('test', 1, null, __test_user_id);
 
     BEGIN
         SELECT * INTO __result FROM unsecure.recalculate_user_permissions('test', __test_user_id, 1);
@@ -203,7 +203,7 @@ BEGIN
     RAISE NOTICE '-- Test 8: Unlocked user can recalculate permissions --';
 
     -- Unlock user 2
-    PERFORM auth.unlock_user('test', 1, __test_user_id2);
+    PERFORM auth.unlock_user('test', 1, null, __test_user_id2);
 
     -- Note: Due to temp table persistence within DO block, this may fail with
     -- "relation already exists" - that's a test artifact, not a real issue.

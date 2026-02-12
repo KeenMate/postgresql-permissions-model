@@ -24,7 +24,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_provider(_created_by text, _user_id bigint, _provider_code text, _provider_name text, _is_active boolean DEFAULT true)
+create or replace function auth.create_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean DEFAULT true)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -35,7 +35,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'providers.create_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.create_provider');
 
 	insert into auth.provider (created_by, updated_by, code, name, is_active)
 	values (_created_by, _created_by, _provider_code, _provider_name, _is_active)
@@ -45,7 +45,7 @@ begin
 	return query
 		select __last_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 16001  -- provider_created
 			, 'provider', __last_id
 			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
@@ -54,7 +54,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_provider(_updated_by text, _user_id bigint, _provider_id integer, _provider_code text, _provider_name text, _is_active boolean DEFAULT true)
+create or replace function auth.update_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_id integer, _provider_code text, _provider_name text, _is_active boolean DEFAULT true)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -64,7 +64,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
 
 	return query
 		update auth.provider
@@ -73,7 +73,7 @@ begin
 			where provider_id = _provider_id
 			returning provider_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 16002  -- provider_updated
 			, 'provider', _provider_id
 			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
@@ -82,7 +82,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_provider(_deleted_by text, _user_id bigint, _provider_code text)
+create or replace function auth.delete_provider(_deleted_by text, _user_id bigint, _correlation_id text, _provider_code text)
     returns TABLE(__user_id bigint, __username text, __display_name text)
     rows 1
     language plpgsql
@@ -93,7 +93,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'providers.delete_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.delete_provider');
 
 	return query
 		delete
@@ -101,7 +101,7 @@ begin
 				where code = _provider_code
 				returning __provider_id;
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 16003  -- provider_deleted
 			, 'provider', __provider_id
 			, jsonb_build_object('provider_code', _provider_code)
@@ -109,7 +109,7 @@ begin
 end;
 $$;
 
-create or replace function auth.enable_provider(_updated_by text, _user_id bigint, _provider_code text)
+create or replace function auth.enable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -120,7 +120,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
 
 	return query
 		update auth.provider
@@ -128,7 +128,7 @@ begin
 			where code = _provider_code
 			returning provider_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 16004  -- provider_enabled
 			, 'provider', __provider_id
 			, jsonb_build_object('provider_code', _provider_code)
@@ -136,7 +136,7 @@ begin
 end;
 $$;
 
-create or replace function auth.disable_provider(_updated_by text, _user_id bigint, _provider_code text)
+create or replace function auth.disable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -147,7 +147,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
 
 	return query
 		update auth.provider
@@ -155,7 +155,7 @@ begin
 			where code = _provider_code
 			returning provider_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 16005  -- provider_disabled
 			, 'provider', __provider_id
 			, jsonb_build_object('provider_code', _provider_code)
@@ -163,7 +163,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_provider_users(_requested_by text, _user_id bigint, _provider_code text)
+create or replace function auth.get_provider_users(_requested_by text, _user_id bigint, _correlation_id text, _provider_code text)
     returns TABLE(__user_id bigint, __user_identity_id bigint, __username text, __display_name text)
     language plpgsql
 as
@@ -172,7 +172,7 @@ declare
 	__provider_id int;
 begin
 	perform
-		auth.has_permission(_user_id, 'manage_provider.get_users');
+		auth.has_permission(_user_id, _correlation_id, 'manage_provider.get_users');
 
 	select provider_id
 	from auth.provider

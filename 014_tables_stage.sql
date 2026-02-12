@@ -48,14 +48,15 @@ create unique index uq_external_group_member
 
 create table public.journal
 (
-    created_at   timestamp with time zone default now()           not null,
-    created_by   text                     default 'unknown'::text not null,
-    journal_id   bigint generated always as identity primary key,
-    tenant_id    integer references auth.tenant,
-    event_id     integer not null references const.event_code,
-    user_id      bigint references auth.user_info on delete set null,
-    keys         jsonb,
-    data_payload jsonb,
+    created_at     timestamp with time zone default now()           not null,
+    created_by     text                     default 'unknown'::text not null,
+    correlation_id text,
+    journal_id     bigint generated always as identity primary key,
+    tenant_id      integer references auth.tenant,
+    event_id       integer not null references const.event_code,
+    user_id        bigint references auth.user_info on delete set null,
+    keys           jsonb,
+    data_payload   jsonb,
     constraint journal_created_by_check check (length(created_by) <= 250)
 );
 
@@ -73,4 +74,7 @@ create index ix_journal_tenant_event
 
 create index ix_journal_created
     on public.journal (created_at desc);
+
+create index ix_journal_correlation_id
+    on public.journal(correlation_id) where correlation_id is not null;
 

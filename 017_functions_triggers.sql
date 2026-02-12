@@ -213,11 +213,23 @@ create trigger trg_auth_calculate_permission
 	for each row
 execute function triggers.calculate_permission();
 
+create trigger trg_auth_perm_set_code
+	before insert
+	on auth.perm_set
+	for each row
+execute function helpers.trg_generate_code_from_title();
+
 create trigger trg_auth_calculate_perm_set
 	before insert or update
 	on auth.perm_set
 	for each row
 execute function triggers.calculate_perm_set();
+
+create trigger trg_auth_user_group_code
+	before insert
+	on auth.user_group
+	for each row
+execute function helpers.trg_generate_code_from_title();
 
 create trigger trg_auth_calculate_api_key
 	before insert or update

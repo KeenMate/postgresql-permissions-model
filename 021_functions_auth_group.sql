@@ -10,7 +10,7 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.is_group_member(_user_id bigint, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
+create or replace function auth.is_group_member(_user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
     immutable
     language plpgsql
 as
@@ -28,7 +28,7 @@ begin
 end;
 $$;
 
-create or replace function auth.can_manage_user_group(_user_id bigint, _user_group_id integer, _permission text, _tenant_id integer DEFAULT 1) returns boolean
+create or replace function auth.can_manage_user_group(_user_id bigint, _correlation_id text, _user_group_id integer, _permission text, _tenant_id integer DEFAULT 1) returns boolean
     immutable
     language plpgsql
 as
@@ -48,15 +48,15 @@ begin
 	if not (__can_members_manage_others and __is_member) then
 		__has_owner := auth.has_owner(_user_group_id, _tenant_id);
 
-		if not (auth.is_owner(_user_id, null, _tenant_id)) then
+		if not (auth.is_owner(_user_id, _correlation_id, null, _tenant_id)) then
 			if __has_owner then
 				-- if user group has owner and user is not one of them throw 52281 exception
-				if not auth.is_owner(_user_id, _user_group_id, _tenant_id) then
+				if not auth.is_owner(_user_id, _correlation_id, _user_group_id, _tenant_id) then
 					perform error.raise_52401(_user_id, _user_group_id, _tenant_id);
 				end if;
 			else
 				-- when there is no owner anybody with the right permission can add new members
-				perform auth.has_permission(_user_id, _permission, _tenant_id);
+				perform auth.has_permission(_user_id, _correlation_id, _permission, _tenant_id);
 			end if;
 		end if;
 	end if;
@@ -65,7 +65,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_user_group(_created_by text, _user_id bigint, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -73,18 +73,18 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id,
+		auth.has_permission(_user_id, _correlation_id,
 												'groups.create_group', _tenant_id);
 
 	return query
 		select *
-		from unsecure.create_user_group(_created_by, _user_id, _title
+		from unsecure.create_user_group(_created_by, _user_id, _correlation_id, _title
 			, _is_assignable, _is_active, _is_external, false,
 																		_is_default, _tenant_id);
 end ;
 $$;
 
-create or replace function auth.update_user_group(_updated_by text, _user_id bigint, _user_group_id integer, _title text, _is_assignable boolean, _is_active boolean, _is_external boolean, _is_default boolean, _tenant_id integer DEFAULT 1)
+create or replace function auth.update_user_group(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _title text, _is_assignable boolean, _is_active boolean, _is_external boolean, _is_default boolean, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -92,7 +92,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	return query
 		update auth.user_group
@@ -107,7 +107,7 @@ begin
 				and user_group_id = _user_group_id
 			returning user_group_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _title, 'is_default', _is_default
@@ -116,7 +116,7 @@ begin
 end;
 $$;
 
-create or replace function auth.enable_user_group(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.enable_user_group(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __is_active boolean, __is_assignable boolean, __updated_at timestamp with time zone, __updated_by text)
     rows 1
     language plpgsql
@@ -124,7 +124,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	return query
 		update auth.user_group
@@ -139,7 +139,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (enabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'enabled')
@@ -147,7 +147,7 @@ begin
 end;
 $$;
 
-create or replace function auth.disable_user_group(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.disable_user_group(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __is_active boolean, __is_assignable boolean, __updated_at timestamp with time zone, __updated_by text)
     rows 1
     language plpgsql
@@ -155,7 +155,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	return query
 		update auth.user_group
@@ -170,7 +170,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (disabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'disabled')
@@ -178,7 +178,7 @@ begin
 end;
 $$;
 
-create or replace function auth.lock_user_group(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.lock_user_group(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __is_active boolean, __is_assignable boolean, __updated_at timestamp with time zone, __updated_by text)
     rows 1
     language plpgsql
@@ -186,7 +186,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.lock_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.lock_group', _tenant_id);
 
 	return query
 		update auth.user_group
@@ -201,7 +201,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (locked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'locked')
@@ -209,7 +209,7 @@ begin
 end;
 $$;
 
-create or replace function auth.unlock_user_group(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.unlock_user_group(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __is_active boolean, __is_assignable boolean, __updated_at timestamp with time zone, __updated_by text)
     rows 1
     language plpgsql
@@ -217,7 +217,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	return query
 		update auth.user_group
@@ -232,7 +232,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (unlocked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'unlocked')
@@ -240,7 +240,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_user_group(_deleted_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.delete_user_group(_deleted_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -251,7 +251,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'groups.delete_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.delete_group', _tenant_id);
 
 	select is_system, tenant_id
 	from auth.user_group ug
@@ -275,7 +275,7 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 13003  -- group_deleted
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text)
@@ -283,7 +283,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_user_group_member(_deleted_by text, _user_id bigint, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.delete_user_group_member(_deleted_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -291,7 +291,7 @@ declare
 	__user_group_code text;
 	__user_upn        text;
 begin
-	perform auth.can_manage_user_group(_user_id, _user_group_id, 'groups.delete_member', _tenant_id);
+	perform auth.can_manage_user_group(_user_id, _correlation_id, _user_group_id, 'groups.delete_member', _tenant_id);
 
 	select code
 	from auth.user_group
@@ -309,7 +309,7 @@ begin
 		and user_id = _target_user_id;
 
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 13011  -- group_member_removed
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -318,13 +318,13 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns SETOF auth.user_group_mapping
+create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns SETOF auth.user_group_mapping
     language plpgsql
 as
 $$
 begin
 
-	perform auth.has_permission(_user_id, 'groups.get_mapping', _tenant_id);
+	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_mapping', _tenant_id);
 
 	return query select *
 							 from auth.user_group_mapping ugm
@@ -334,7 +334,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_user_group_mapping(_created_by text, _user_id bigint, _user_group_id integer, _provider_code text, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_user_group_mapping(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _provider_code text, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
     returns TABLE(__ug_mapping_id integer)
     rows 1
     language plpgsql
@@ -351,7 +351,7 @@ begin
 	end if;
 
 	perform
-		auth.has_permission(_user_id, 'groups.create_mapping', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.create_mapping', _tenant_id);
 
 	select is_active, tenant_id
 	from auth.user_group ug
@@ -383,7 +383,7 @@ begin
 										from affected_users);
 
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 13020  -- group_mapping_created
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text
@@ -394,7 +394,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _user_group_mapping_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.delete_user_group_mapping(_deleted_by text, _user_id bigint, _correlation_id text, _user_group_mapping_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -406,7 +406,7 @@ declare
 	__mapped_role        text;
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.delete_mapping', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.delete_mapping', _tenant_id);
 
 	-- expire user_permission_cache for affected users
 	with affected_users as (select user_id
@@ -426,7 +426,7 @@ begin
 		into __user_group_id, __provider_code, __mapped_object_id, __mapped_object_name, __mapped_role;
 
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 13021  -- group_mapping_deleted
 			, 'group', __user_group_id
 			, jsonb_build_object('group_title', __user_group_id::text
@@ -437,7 +437,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_external_user_group(_created_by text, _user_id bigint, _title text, _provider text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_external_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _provider text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -447,18 +447,18 @@ declare
 	__last_id int;
 begin
 	perform
-		auth.has_permission(_user_id,
+		auth.has_permission(_user_id, _correlation_id,
 												'groups.create_group', _tenant_id);
 
 
 	select *
-	from unsecure.create_user_group(_created_by, _user_id, _title
+	from unsecure.create_user_group(_created_by, _user_id, _correlation_id, _title
 		, _is_assignable, _is_active, true,
 																	false, _tenant_id := _tenant_id)
 	into __last_id;
 
 	perform
-		auth.create_user_group_mapping(_created_by, _user_id, __last_id, _provider, _mapped_object_id,
+		auth.create_user_group_mapping(_created_by, _user_id, _correlation_id, __last_id, _provider, _mapped_object_id,
 																	 _mapped_object_name, _mapped_role, _tenant_id := _tenant_id);
 
 	return query
@@ -466,13 +466,13 @@ begin
 end ;
 $$;
 
-create or replace function auth.set_user_group_as_hybrid(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.set_user_group_as_hybrid(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	update auth.user_group
 	set updated_at  = now()
@@ -480,7 +480,7 @@ begin
 		, is_external = false
 	where user_group_id = _user_group_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as hybrid)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'set_hybrid')
@@ -488,14 +488,14 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_group_by_id(_requested_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_user_group_by_id(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __tenant_id integer, __title text, __code text, __is_system boolean, __is_external boolean, __is_assignable boolean, __is_active boolean, __is_default boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.get_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.get_group', _tenant_id);
 
 	return query
 		select *
@@ -503,24 +503,24 @@ begin
 end
 $$;
 
-create or replace function auth.create_user_group_member(_created_by text, _user_id bigint, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_user_group_member(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_member_id bigint)
     rows 1
     language plpgsql
 as
 $$
 begin
-	perform auth.can_manage_user_group(_user_id, _user_group_id, 'groups.create_member', _tenant_id);
+	perform auth.can_manage_user_group(_user_id, _correlation_id, _user_group_id, 'groups.create_member', _tenant_id);
 
 	return query
 		select *
-		from unsecure.create_user_group_member(_created_by, _user_id
+		from unsecure.create_user_group_member(_created_by, _user_id, _correlation_id
 			, _user_group_id, _target_user_id, _tenant_id);
 end;
 
 $$;
 
-create or replace function auth.get_user_group_members(_requested_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_user_group_members(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1)
     returns TABLE(__created timestamp with time zone, __created_by text, __member_id bigint, __member_type_code text, __user_id bigint, __user_display_name text, __user_is_system boolean, __user_is_active boolean, __user_is_locked boolean, __mapping_id integer, __mapping_mapped_object_name text, __mapping_provider_code text)
     rows 1
     language plpgsql
@@ -528,7 +528,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.get_members', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.get_members', _tenant_id);
 
 	return query
 		select *
@@ -537,7 +537,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_user_group_as_external(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.set_user_group_as_external(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -545,7 +545,7 @@ declare
 	__user_group_code text;
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	delete
 	from auth.user_group_member ugm
@@ -561,7 +561,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as external)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_external')
@@ -569,7 +569,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_user_group_as_internal(_updated_by text, _user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function auth.set_user_group_as_internal(_updated_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -577,7 +577,7 @@ declare
 	__user_group_code text;
 begin
 	perform
-		auth.has_permission(_user_id, 'groups.update_group', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'groups.update_group', _tenant_id);
 
 	-- Delete all external/sync members (keep manual members intact)
 	delete
@@ -601,7 +601,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as internal)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_internal')
@@ -609,7 +609,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_assigned_groups(_user_id bigint, _target_user_id bigint)
+create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer)
     stable
     language plpgsql
@@ -618,7 +618,7 @@ $$
 begin
 
 	if (_user_id != _target_user_id) then
-		perform auth.has_permission(_user_id, 'users.read_user_group_memberships');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.read_user_group_memberships');
 	end if;
 
 	return query
@@ -631,13 +631,13 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_groups_to_sync(_user_id bigint)
+create or replace function auth.get_user_groups_to_sync(_user_id bigint, _correlation_id text)
     returns TABLE(__user_group_id integer, __user_group_mapping_id integer, __title text, __code text, __provider_code text, __mapped_object_id text, __mapped_object_name text)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, 'groups.get_groups');
+	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_groups');
 
 	return query
 		select ug.user_group_id,
@@ -654,7 +654,7 @@ begin
 end;
 $$;
 
-create or replace function auth.process_external_group_member_sync_by_mapping(_run_by text, _user_id bigint, _user_group_mapping_id integer)
+create or replace function auth.process_external_group_member_sync_by_mapping(_run_by text, _user_id bigint, _correlation_id text, _user_group_mapping_id integer)
     returns TABLE(__user_group_id integer, __user_group_mapping_id integer, __state_code text, __user_id bigint, __upn text)
     language plpgsql
 as
@@ -712,7 +712,7 @@ begin
 	select user_group_mapping_id,
 				 created_user.__user_id user_id
 	from __temp_ensure_users eu,
-			 auth.ensure_user_info(_run_by, _user_id, member_upn,
+			 auth.ensure_user_info(_run_by, _user_id, _correlation_id, member_upn,
 														 member_display_name, __provider_code, member_email) created_user
 	where __create_missing_users_on_sync;
 
@@ -761,7 +761,7 @@ begin
 end;
 $$;
 
-create or replace function auth.process_external_group_member_sync(_run_by text, _user_id bigint, _user_group_id integer DEFAULT NULL::integer)
+create or replace function auth.process_external_group_member_sync(_run_by text, _user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer)
     returns TABLE(__user_group_id integer, __user_group_mapping_id integer, __state_code text, __user_id bigint, __upn text)
     language plpgsql
 as
@@ -797,7 +797,7 @@ begin
 					raise notice 'Processing external user group members mapping for id: %', __mapping_id;
 					insert into __temp_external_group_sync
 					select *
-					from auth.process_external_group_member_sync_by_mapping(_run_by, _user_id, __mapping_id);
+					from auth.process_external_group_member_sync_by_mapping(_run_by, _user_id, _correlation_id, __mapping_id);
 
 					with deleted_users as materialized (
 						delete
@@ -865,6 +865,7 @@ $$;
 
 create or replace function auth.search_user_groups(
     _user_id bigint,
+    _correlation_id text,
     _search_text text default null,
     _is_active boolean default null,
     _is_external boolean default null,
@@ -894,7 +895,7 @@ $$
 declare
     __search_text text;
 begin
-    perform auth.has_permission(_user_id, 'groups.get_group', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'groups.get_group', _tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 

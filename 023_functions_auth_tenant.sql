@@ -10,14 +10,14 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.get_tenants(_user_id bigint)
+create or replace function auth.get_tenants(_user_id bigint, _correlation_id text)
     returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.get_tenants');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants');
 
 	return query
 		select created_at
@@ -54,14 +54,14 @@ from auth.tenant t
 where tenant_id = _tenant_id;
 $$;
 
-create or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __username text, __display_name text, __user_groups text[])
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.get_users', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'tenants.get_users', _tenant_id);
 
 	return query with tenant_users as (select ui.user_id
 																					, ui.username
@@ -83,14 +83,14 @@ begin
 end;
 $$;
 
-create or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __group_code text, __group_title text, __is_external boolean, __is_assignable boolean, __is_active boolean, __members_count bigint)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.get_groups', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'tenants.get_groups', _tenant_id);
 
 	return query
 		select ugs.user_group_id
@@ -109,14 +109,14 @@ begin
 end;
 $$;
 
-create or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __user_display_name text, __user_code text, __user_uuid text, __user_tenant_groups text)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.get_tenants', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants', _tenant_id);
 
 	return query
 		select ugs.user_id
@@ -137,7 +137,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_tenant(_deleted_by text, _user_id bigint, _tenant_uuid uuid)
+create or replace function auth.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
     language plpgsql
@@ -145,17 +145,17 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, 'tenants.delete_tenant');
+        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
 
     return query
         select *
         from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, t.tenant_id)
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id)
         where t.uuid = _tenant_uuid;
 end;
 $$;
 
-create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id bigint, _tenant_uuid uuid)
+create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
     language plpgsql
@@ -163,17 +163,17 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, 'tenants.delete_tenant');
+        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
 
     return query
         select *
         from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, t.tenant_id)
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id)
         where t.uuid = _tenant_uuid;
 end;
 $$;
 
-create or replace function auth.get_user_available_tenants(_user_id bigint, _target_user_id bigint)
+create or replace function auth.get_user_available_tenants(_user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__tenant_id integer, __tenant_uuid text, __tenant_code text, __tenant_title text, __tenant_is_default boolean)
     language plpgsql
 as
@@ -182,7 +182,7 @@ declare
     __necessary_permission_code text := 'users.get_available_tenants';
 begin
 
-    if _user_id <> _target_user_id and not auth.has_permission(_user_id, __necessary_permission_code)
+    if _user_id <> _target_user_id and not auth.has_permission(_user_id, _correlation_id, __necessary_permission_code)
     then
         perform auth.throw_no_permission(_user_id, __necessary_permission_code);
     end if;
@@ -205,7 +205,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_user_tenant_preferences(_created_by text, _user_id bigint, _target_user_id bigint, _update_data text, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_user_tenant_preferences(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text, _tenant_id integer DEFAULT 1)
     returns TABLE(__created_at timestamp with time zone, __created_by character varying)
     rows 1
     language plpgsql
@@ -214,7 +214,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.create_user_tenant_preferences', _tenant_id);
+        perform auth.has_permission(_user_id, _correlation_id, 'users.create_user_tenant_preferences', _tenant_id);
     end if;
 
     return query
@@ -225,7 +225,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_tenant_preferences(_updated_by text, _user_id bigint, _target_user_id bigint, _update_data text, _should_overwrite_data boolean DEFAULT false, _tenant_id integer DEFAULT 1)
+create or replace function auth.update_user_tenant_preferences(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text, _should_overwrite_data boolean DEFAULT false, _tenant_id integer DEFAULT 1)
     returns TABLE(__updated_at timestamp with time zone, __updated_by character varying)
     rows 1
     language plpgsql
@@ -237,7 +237,7 @@ begin
 
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.update_user_tenant_preferences', _tenant_id);
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_user_tenant_preferences', _tenant_id);
     end if;
 
     return query
@@ -252,7 +252,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_last_selected_tenant(_user_id bigint, _target_user_id bigint)
+create or replace function auth.get_user_last_selected_tenant(_user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__tenant_id integer, __tenant_uuid text, __tenant_code text, __tenant_title text)
     stable
     rows 1
@@ -262,7 +262,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.get_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
     end if;
 
     return query
@@ -277,7 +277,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_last_selected_tenant(_updated_by text, _user_id bigint, _target_user_id bigint, _tenant_uuid text)
+create or replace function auth.update_user_last_selected_tenant(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_uuid text)
     returns TABLE(__used_id bigint, __tenant_id integer)
     rows 1
     language plpgsql
@@ -288,7 +288,7 @@ declare
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, 'users.update_last_selected_tenant');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_last_selected_tenant');
     end if;
 
     select t.tenant_id
@@ -314,7 +314,7 @@ begin
 
     if _user_id <> _target_user_id and _user_id <> 1
     then
-        perform create_journal_message('system', _user_id
+        perform create_journal_message('system', _user_id, _correlation_id
                 , 10002  -- user_updated
                 , 'user', _target_user_id
                 , jsonb_build_object('username', _target_user_id::text, 'tenant_id', __tenant_id
@@ -338,7 +338,7 @@ from auth.tenant
 order by title
 $$;
 
-create or replace function auth.create_tenant(_created_by text, _user_id bigint, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT true, _is_assignable boolean DEFAULT true, _tenant_owner_id bigint DEFAULT NULL::bigint)
+create or replace function auth.create_tenant(_created_by text, _user_id bigint, _correlation_id text, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT true, _is_assignable boolean DEFAULT true, _tenant_owner_id bigint DEFAULT NULL::bigint)
     returns TABLE(__tenant_id integer, __uuid uuid, __title text, __code text, __is_removable boolean, __is_assignable boolean, __access_type_code text, __is_default boolean)
     rows 1
     language plpgsql
@@ -352,14 +352,14 @@ declare
 							int;
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.create_tenant');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.create_tenant');
 
 	insert into auth.tenant (created_by, updated_by, title, code, is_removable, is_assignable)
 	values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
 	returning *
 		into __last_item;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 11001  -- tenant_created
 			, 'tenant', __last_item.tenant_id
 			, jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code
@@ -368,34 +368,34 @@ begin
 
 	-- Create tenant admins
 	select __user_group_id
-	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Admins'
+	from unsecure.create_user_group(_created_by, _user_id, _correlation_id, 'Tenant Admins'
 		, true, true, false, true, _tenant_id := __last_item.tenant_id)
 	into __tenant_owner_group_id;
 
 	perform
-		unsecure.copy_perm_set(_created_by, _user_id, 'tenant_admin', 1,
+		unsecure.copy_perm_set(_created_by, _user_id, _correlation_id, 'tenant_admin', 1,
 													 __last_item.tenant_id::int);
 	perform
-		unsecure.assign_permission(_created_by, _user_id
+		unsecure.assign_permission(_created_by, _user_id, _correlation_id
 			, __tenant_owner_group_id, null, 'tenant_admin', _tenant_id := __last_item.tenant_id);
 
 	-- Create tenant members
 	select __user_group_id
-	from unsecure.create_user_group(_created_by, _user_id, 'Tenant Members'
+	from unsecure.create_user_group(_created_by, _user_id, _correlation_id, 'Tenant Members'
 		, true, true, false, true, _tenant_id := __last_item.tenant_id)
 	into __tenant_member_group_id;
 
 	perform
-		unsecure.copy_perm_set(_created_by, _user_id, 'tenant_member', 1,
+		unsecure.copy_perm_set(_created_by, _user_id, _correlation_id, 'tenant_member', 1,
 													 __last_item.tenant_id::int);
 	perform
-		unsecure.assign_permission(_created_by, _user_id
+		unsecure.assign_permission(_created_by, _user_id, _correlation_id
 			, __tenant_member_group_id, null, 'tenant_member', _tenant_id := __last_item.tenant_id);
 
 	if
 		(_tenant_owner_id is not null)
 	then
-		perform auth.create_owner(_created_by, _user_id, _tenant_owner_id, null, _tenant_id := __last_item.tenant_id);
+		perform auth.create_owner(_created_by, _user_id, _correlation_id, _tenant_owner_id, null, _tenant_id := __last_item.tenant_id);
 	end if;
 
 	return query
@@ -412,7 +412,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_tenant(_created_by text, _user_id bigint, _tenant_id integer, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT NULL::boolean, _is_assignable boolean DEFAULT NULL::boolean, _tenant_owner_id bigint DEFAULT NULL::bigint)
+create or replace function auth.update_tenant(_created_by text, _user_id bigint, _correlation_id text, _tenant_id integer, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT NULL::boolean, _is_assignable boolean DEFAULT NULL::boolean, _tenant_owner_id bigint DEFAULT NULL::bigint)
     returns TABLE(__tenant_id integer, __uuid uuid, __title text, __code text, __is_removable boolean, __is_assignable boolean, __access_type_code text, __is_default boolean)
     rows 1
     language plpgsql
@@ -420,7 +420,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, 'tenants.update_tenant');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.update_tenant');
 
 	update auth.tenant
 	set title         = _title
@@ -431,7 +431,7 @@ begin
 		, updated_at    = now()
 	where tenant_id = _tenant_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 11002  -- tenant_updated
 			, 'tenant', _tenant_id
 			, jsonb_build_object('tenant_title', _title, 'tenant_code', _code
@@ -441,7 +441,7 @@ begin
 	if
 		(_tenant_owner_id is not null)
 	then
-		perform auth.create_owner(_created_by, _user_id, _tenant_owner_id, null, _tenant_id := _tenant_id);
+		perform auth.create_owner(_created_by, _user_id, _correlation_id, _tenant_owner_id, null, _tenant_id := _tenant_id);
 	end if;
 
 	return query
@@ -460,6 +460,7 @@ $$;
 
 create or replace function auth.search_tenants(
     _user_id bigint,
+    _correlation_id text,
     _search_text text default null,
     _page integer default 1,
     _page_size integer default 30
@@ -482,7 +483,7 @@ $$
 declare
     __search_text text;
 begin
-    perform auth.has_permission(_user_id, 'tenants.read_tenants');
+    perform auth.has_permission(_user_id, _correlation_id, 'tenants.read_tenants');
 
     __search_text := helpers.normalize_text(_search_text);
 

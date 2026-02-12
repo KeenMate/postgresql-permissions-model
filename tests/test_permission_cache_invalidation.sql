@@ -112,7 +112,7 @@ BEGIN
 
     -- This should fail with error 22023
     BEGIN
-        PERFORM unsecure.assign_permission('test', 1, 1, 1000, 'nonexistent', null, 1);
+        PERFORM unsecure.assign_permission('test', 1, null, 1, 1000, 'nonexistent', null, 1);
         RAISE EXCEPTION '  FAIL: Expected error was not thrown';
     EXCEPTION
         WHEN SQLSTATE '22023' THEN
@@ -201,7 +201,7 @@ BEGIN
 
     -- Assign permission to user
     SELECT assignment_id INTO __assignment_id
-    FROM unsecure.assign_permission('test', 1, null, __user_id, null, 'cache_test_perm', 1);
+    FROM unsecure.assign_permission('test', 1, null, null, __user_id, null, 'cache_test_perm', 1);
 
     SELECT count(*) INTO __cache_after FROM auth.user_permission_cache WHERE user_id = __user_id AND tenant_id = 1;
 
@@ -231,7 +231,7 @@ BEGIN
 
     -- Create assignment first
     SELECT assignment_id INTO __assignment_id
-    FROM unsecure.assign_permission('test', 1, null, __user_id, null, 'cache_test_perm', 1);
+    FROM unsecure.assign_permission('test', 1, null, null, __user_id, null, 'cache_test_perm', 1);
 
     -- Populate cache
     INSERT INTO auth.user_permission_cache (created_by, user_id, tenant_id, tenant_uuid, groups, permissions, expiration_date)
@@ -242,7 +242,7 @@ BEGIN
     SELECT count(*) INTO __cache_before FROM auth.user_permission_cache WHERE user_id = __user_id AND tenant_id = 1;
 
     -- Unassign permission
-    PERFORM unsecure.unassign_permission('test', 1, __assignment_id, 1);
+    PERFORM unsecure.unassign_permission('test', 1, null, __assignment_id, 1);
 
     SELECT count(*) INTO __cache_after FROM auth.user_permission_cache WHERE user_id = __user_id AND tenant_id = 1;
 
@@ -281,7 +281,7 @@ BEGIN
 
     -- Assign permission to group (triggers soft invalidation)
     SELECT assignment_id INTO __assignment_id
-    FROM unsecure.assign_permission('test', 1, __group_id, null, null, 'cache_test_perm', 1);
+    FROM unsecure.assign_permission('test', 1, null, __group_id, null, null, 'cache_test_perm', 1);
 
     -- Count valid cache entries after (soft invalidation sets expiration_date = now())
     SELECT count(*) INTO __valid_after FROM auth.user_permission_cache
@@ -316,7 +316,7 @@ BEGIN
 
     -- Create assignment first
     SELECT assignment_id INTO __assignment_id
-    FROM unsecure.assign_permission('test', 1, __group_id, null, null, 'cache_test_perm', 1);
+    FROM unsecure.assign_permission('test', 1, null, __group_id, null, null, 'cache_test_perm', 1);
 
     -- Populate cache with valid expiration
     INSERT INTO auth.user_permission_cache (created_by, user_id, tenant_id, tenant_uuid, groups, permissions, expiration_date)
@@ -329,7 +329,7 @@ BEGIN
     WHERE user_id = __user_id AND tenant_id = 1 AND expiration_date > now();
 
     -- Unassign permission from group (triggers soft invalidation)
-    PERFORM unsecure.unassign_permission('test', 1, __assignment_id, 1);
+    PERFORM unsecure.unassign_permission('test', 1, null, __assignment_id, 1);
 
     -- Count valid cache entries after
     SELECT count(*) INTO __valid_after FROM auth.user_permission_cache
@@ -376,7 +376,7 @@ BEGIN
     WHERE user_id = __user_id AND tenant_id = 1 AND expiration_date > now();
 
     -- Add permission to perm_set (triggers soft invalidation)
-    PERFORM unsecure.add_perm_set_permissions('test', 1, __perm_set_id, ARRAY['cache_test_perm'], 1);
+    PERFORM unsecure.add_perm_set_permissions('test', 1, null, __perm_set_id, ARRAY['cache_test_perm'], 1);
 
     -- Count valid cache entries after
     SELECT count(*) INTO __valid_after FROM auth.user_permission_cache
@@ -415,7 +415,7 @@ BEGIN
     WHERE user_id = __user_id AND tenant_id = 1 AND expiration_date > now();
 
     -- Remove permission from perm_set (triggers soft invalidation)
-    PERFORM unsecure.delete_perm_set_permissions('test', 1, __perm_set_id, ARRAY['cache_test_perm'], 1);
+    PERFORM unsecure.delete_perm_set_permissions('test', 1, null, __perm_set_id, ARRAY['cache_test_perm'], 1);
 
     -- Count valid cache entries after
     SELECT count(*) INTO __valid_after FROM auth.user_permission_cache
@@ -447,7 +447,7 @@ BEGIN
 
     -- Create owner (system user_id=1 is allowed)
     SELECT co.__owner_id INTO __owner_id
-    FROM auth.create_owner('test', 1, __target_user_id, __group_id, 1) co;
+    FROM auth.create_owner('test', 1, null, __target_user_id, __group_id, 1) co;
 
     IF __owner_id IS NOT NULL AND EXISTS (SELECT 1 FROM auth.owner WHERE owner_id = __owner_id) THEN
         RAISE NOTICE '  PASS: create_owner worked (owner_id=%)', __owner_id;
@@ -475,7 +475,7 @@ BEGIN
     __owner_id := current_setting('test.owner_id')::bigint;
 
     -- Delete owner
-    PERFORM auth.delete_owner('test', 1, __target_user_id, __group_id, 1);
+    PERFORM auth.delete_owner('test', 1, null, __target_user_id, __group_id, 1);
 
     IF NOT EXISTS (SELECT 1 FROM auth.owner WHERE owner_id = __owner_id) THEN
         RAISE NOTICE '  PASS: delete_owner worked (owner removed)';

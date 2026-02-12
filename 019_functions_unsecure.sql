@@ -82,19 +82,19 @@ end;
 $$;
 
 -- Helper function to verify owner or permission for owner management operations
-create or replace function unsecure.verify_owner_or_permission(_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
+create or replace function unsecure.verify_owner_or_permission(_user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
-    if not auth.is_owner(_user_id, _user_group_id, _tenant_id)
-        and not auth.is_owner(_user_id, null, _tenant_id)
+    if not auth.is_owner(_user_id, _correlation_id, _user_group_id, _tenant_id)
+        and not auth.is_owner(_user_id, _correlation_id, null, _tenant_id)
     then
         if _user_group_id is not null then
-            perform auth.has_permission(_user_id
+            perform auth.has_permission(_user_id, _correlation_id
                 , 'tenants.assign_group_owner', _tenant_id);
         else
-            perform auth.has_permission(_user_id
+            perform auth.has_permission(_user_id, _correlation_id
                 , 'tenants.assign_owner', _tenant_id);
         end if;
     end if;
@@ -134,7 +134,7 @@ returning *;
 
 $$;
 
-create or replace function unsecure.delete_user_by_id(_deleted_by text, _user_id bigint, _target_user_id bigint)
+create or replace function unsecure.delete_user_by_id(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
     returns TABLE(__user_id bigint, __username text)
     language sql
 as
@@ -147,7 +147,7 @@ returning user_id, username;
 
 $$;
 
-create or replace function unsecure.create_user_event(_created_by text, _user_id bigint, _event_type_code text, _target_user_id bigint, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
+create or replace function unsecure.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
     returns TABLE(__user_event_id bigint)
     language plpgsql
 as
@@ -174,6 +174,7 @@ begin
 	end if;
 
 	return query insert into auth.user_event (created_by,
+																						correlation_id,
 																						event_type_code,
 																						requester_user_id,
 																						requester_username,
@@ -184,7 +185,7 @@ begin
 																						user_agent,
 																						origin,
 																						event_data)
-		values ( _created_by, _event_type_code, _user_id, __requester_username, _target_user_id, _target_user_oid
+		values ( _created_by, _correlation_id, _event_type_code, _user_id, __requester_username, _target_user_id, _target_user_oid
 					 , _target_username, _ip_address, _user_agent, _origin, _event_data)
 		returning user_event_id;
 end;
@@ -203,7 +204,7 @@ where token_state_code = 'valid'
 	< now();
 $$;
 
-create or replace function unsecure.create_user_group(_created_by text, _user_id bigint, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_system boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
+create or replace function unsecure.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_system boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -223,7 +224,7 @@ begin
 	return query
 		select __last_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 13001  -- group_created
 			, 'group', __last_id
 			, jsonb_build_object('group_title', _title, 'tenant_title', _tenant_id::text
@@ -240,7 +241,7 @@ create or replace function unsecure.create_user_group_as_system(_title text, _is
 as
 $$
 select ug.*
-from unsecure.create_user_group('system', 1, _title, _is_assignable, true, false, _is_system, _is_default, _tenant_id) g
+from unsecure.create_user_group('system', 1, null, _title, _is_assignable, true, false, _is_system, _is_default, _tenant_id) g
 			 inner join auth.user_group ug on ug.user_group_id = g.__user_group_id;
 
 $$;
@@ -265,7 +266,7 @@ begin
 
 	return query
 		select ugm.*
-		from unsecure.create_user_group_member('system', 1, __user_group_id, __user_id, _tenant_id) r
+		from unsecure.create_user_group_member('system', 1, null, __user_group_id, __user_id, _tenant_id) r
 					 inner join auth.user_group_member ugm on ugm.member_id = r.__user_group_member_id;
 end;
 $$;
@@ -362,7 +363,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.assign_permission(_created_by text, _user_id bigint, _user_group_id integer DEFAULT NULL::integer, _target_user_id bigint DEFAULT NULL::bigint, _perm_set_code text DEFAULT NULL::text, _perm_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function unsecure.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _target_user_id bigint DEFAULT NULL::bigint, _perm_set_code text DEFAULT NULL::text, _perm_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
@@ -443,7 +444,7 @@ begin
 		where assignment_id = __last_id;
 
 	if _user_group_id is not null then
-		perform create_journal_message(_created_by, _user_id
+		perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'group', _user_group_id
 			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
@@ -454,7 +455,7 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_created_by, _user_group_id, _tenant_id);
 	else
-		perform create_journal_message(_created_by, _user_id
+		perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'user', _target_user_id
 			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
@@ -468,7 +469,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.unassign_permission(_deleted_by text, _user_id bigint, _assignment_id bigint, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function unsecure.unassign_permission(_deleted_by text, _user_id bigint, _correlation_id text, _assignment_id bigint, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
@@ -489,7 +490,7 @@ begin
 				returning *;
 
 	if __user_group_id is not null then
-		perform create_journal_message(_deleted_by, _user_id
+		perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'group', __user_group_id
 			, jsonb_build_object('target_type', 'group', 'target_name', __user_group_id::text
@@ -499,7 +500,7 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_deleted_by, __user_group_id, _tenant_id);
 	else
-		perform create_journal_message(_deleted_by, _user_id
+		perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'user', __target_user_id
 			, jsonb_build_object('target_type', 'user', 'target_name', __target_user_id::text
@@ -513,7 +514,7 @@ end;
 
 $$;
 
-create or replace function unsecure.set_permission_as_assignable(_updated_by text, _user_id bigint, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission_assignment
+create or replace function unsecure.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
@@ -550,7 +551,7 @@ begin
 	returning full_code
 		into __permission_full_code;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 12002  -- permission_updated
 			, 'permission', __permission_id
 			, jsonb_build_object('permission_code', __permission_full_code, 'is_assignable', _is_assignable)
@@ -565,7 +566,7 @@ $$
 begin
 	return query
 		select *
-		from unsecure.assign_permission('system', 1, _user_group_id, _target_user_id, _perm_set_code,
+		from unsecure.assign_permission('system', 1, null, _user_group_id, _target_user_id, _perm_set_code,
 																		_perm_code, _tenant_id);
 end;
 
@@ -613,7 +614,7 @@ where p.node_path <@ _perm_path
 returning *;
 $$;
 
-create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
+create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -673,7 +674,7 @@ begin
 		from auth.permission
 		where permission_id = __last_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12001  -- permission_created
 			, 'permission', __last_id
 			, jsonb_build_object('permission_code', __full_code::text, 'title', _title)
@@ -687,7 +688,7 @@ create or replace function unsecure.create_permission_as_system(_title text, _pa
 as
 $$
 select *
-from unsecure.create_permission('system', 1, _title, _parent_code, _is_assignable);
+from unsecure.create_permission('system', 1, null, _title, _parent_code, _is_assignable);
 $$;
 
 create or replace function unsecure.get_all_permissions(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
@@ -728,7 +729,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_perm_set(_created_by text, _user_id bigint, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function unsecure.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
     rows 1
     language plpgsql
 as
@@ -757,7 +758,7 @@ begin
 				 inner join auth.permission p
 										on p.full_code = perm_code::ext.ltree;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
@@ -779,11 +780,11 @@ as
 $$
 
 select *
-from unsecure.create_perm_set('system', 1, _title, _is_system, _is_assignable, _permissions, _tenant_id);
+from unsecure.create_perm_set('system', 1, null, _title, _is_system, _is_assignable, _permissions, _tenant_id);
 
 $$;
 
-create or replace function unsecure.update_perm_set(_updated_by text, _user_id bigint, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function unsecure.update_perm_set(_updated_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
     rows 1
     language plpgsql
 as
@@ -802,7 +803,7 @@ begin
 	returning perm_set_id
 		into __last_id;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'is_assignable', _is_assignable)
@@ -815,7 +816,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.add_perm_set_permissions(_created_by text, _user_id bigint, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function unsecure.add_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -838,7 +839,7 @@ begin
 	where p.code is not null
 		and psp.perm_set_id is null;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -859,7 +860,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.delete_perm_set_permissions(_deleted_by text, _user_id bigint, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function unsecure.delete_perm_set_permissions(_deleted_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -883,7 +884,7 @@ begin
 																 inner join auth.perm_set ps
 																						on psp.perm_set_id = ps.perm_set_id and ps.tenant_id = _tenant_id);
 
-	perform create_journal_message(_deleted_by, _user_id
+	perform create_journal_message(_deleted_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -913,7 +914,7 @@ set last_used_provider_code = _provider_code
 where user_id = _target_user_id;
 $$;
 
-create or replace function unsecure.create_user_info(_created_by text, _user_id bigint, _username text, _email text, _display_name text, _last_provider_code text) returns SETOF auth.user_info
+create or replace function unsecure.create_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _email text, _display_name text, _last_provider_code text) returns SETOF auth.user_info
     rows 1
     language plpgsql
 as
@@ -945,7 +946,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id
+	perform create_journal_message('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -954,7 +955,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_service_user_info(_created_by text, _user_id bigint, _username text, _display_name text, _email text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint) returns SETOF auth.user_info
+create or replace function unsecure.create_service_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _display_name text, _email text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint) returns SETOF auth.user_info
     rows 1
     language plpgsql
 as
@@ -1000,7 +1001,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id
+	perform create_journal_message('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -1009,7 +1010,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.update_user_password(_updated_by text, _user_id bigint, _target_user_id bigint, _password_hash text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text)
+create or replace function unsecure.update_user_password(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _password_hash text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text)
     returns TABLE(__user_id bigint, __provider_code text, __provider_uid text)
     rows 1
     language plpgsql
@@ -1027,7 +1028,7 @@ begin
 				, provider_code
 				, uid;
 
-	perform create_journal_message('system', _user_id
+	perform create_journal_message('system', _user_id, _correlation_id
 			, 10020  -- password_changed
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -1035,7 +1036,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.add_user_to_default_groups(_created_by text, _user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function unsecure.add_user_to_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text)
     language plpgsql
 as
@@ -1069,7 +1070,7 @@ begin
 		select dg.*
 		from tmp_default_groups dg
 		loop
-			perform unsecure.create_user_group_member(_created_by, _user_id, group_data.user_group_id,
+			perform unsecure.create_user_group_member(_created_by, _user_id, _correlation_id, group_data.user_group_id,
 																								_target_user_id,
 																								_tenant_id) member;
 		end loop;
@@ -1084,7 +1085,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_api_user(_created_by text, _user_id bigint, _api_key text, _tenant_id integer DEFAULT 1) returns SETOF auth.user_info
+create or replace function unsecure.create_api_user(_created_by text, _user_id bigint, _correlation_id text, _api_key text, _tenant_id integer DEFAULT 1) returns SETOF auth.user_info
     rows 1
     language plpgsql
 as
@@ -1105,7 +1106,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id
+	perform create_journal_message('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'user_type', 'api')
@@ -1113,7 +1114,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.update_user_info_basic_data(_updated_by text, _user_id bigint, _target_user_id bigint, _username text, _display_name text, _email text DEFAULT NULL::text)
+create or replace function unsecure.update_user_info_basic_data(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _username text, _display_name text, _email text DEFAULT NULL::text)
     returns TABLE(__user_info_id bigint)
     language plpgsql
 as
@@ -1128,9 +1129,9 @@ begin
 			email             = _email
 	where user_id = _target_user_id;
 
-	perform auth.create_user_event(_updated_by, _user_id, 'update_user_info', _target_user_id);
+	perform auth.create_user_event(_updated_by, _user_id, _correlation_id, 'update_user_info', _target_user_id);
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 10002  -- user_updated
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _username, 'display_name', _display_name, 'email', _email)
@@ -1138,7 +1139,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_user_group_member(_created_by text, _user_id bigint, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function unsecure.create_user_group_member(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_member_id bigint)
     rows 1
     language plpgsql
@@ -1183,7 +1184,7 @@ begin
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 13010  -- group_member_added
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -1238,7 +1239,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_user_identity(_created_by text, _user_id bigint, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text, _password_hash text DEFAULT NULL::text, _user_data text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text, _is_active boolean DEFAULT false)
+create or replace function unsecure.create_user_identity(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text, _password_hash text DEFAULT NULL::text, _user_data text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text, _is_active boolean DEFAULT false)
     returns TABLE(__user_id bigint, __provider_code text, __provider_uid text)
     rows 1
     language plpgsql
@@ -1260,7 +1261,7 @@ begin
 					 , _password_salt, _is_active)
 		returning user_id, provider_code, uid;
 
-	perform create_journal_message('system', _user_id
+	perform create_journal_message('system', _user_id, _correlation_id
 			, 10030  -- identity_created
 			, 'user', _target_user_id
 			, jsonb_build_object('username', __user_info.username, 'provider_code', _provider_code
@@ -1269,7 +1270,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.delete_tenant(_deleted_by text, _user_id bigint, _tenant_id integer)
+create or replace function unsecure.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_id integer)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     language plpgsql
 as
@@ -1283,7 +1284,7 @@ begin
     where tenant_id = _tenant_id
     returning * into __last_item;
 
-    perform create_journal_message(_deleted_by, _user_id
+    perform create_journal_message(_deleted_by, _user_id, _correlation_id
             , 11003  -- tenant_deleted
             , 'tenant', __last_item.tenant_id
             , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
@@ -1592,7 +1593,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.update_user_identity_uid_oid(_updated_by text, _user_id bigint, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text) returns void
+create or replace function unsecure.update_user_identity_uid_oid(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text) returns void
     language plpgsql
 as
 $$
@@ -1620,7 +1621,7 @@ begin
 		set uid = _provider_uid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message('system', _user_id
+		perform create_journal_message('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -1634,7 +1635,7 @@ begin
 		set provider_oid = _provider_oid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message('system', _user_id
+		perform create_journal_message('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -1644,7 +1645,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.copy_perm_set(_created_by text, _user_id bigint, _source_perm_set_code text, _source_tenant_id integer, _target_tenant_id integer, _new_title text DEFAULT NULL::text) returns SETOF auth.perm_set
+create or replace function unsecure.copy_perm_set(_created_by text, _user_id bigint, _correlation_id text, _source_perm_set_code text, _source_tenant_id integer, _target_tenant_id integer, _new_title text DEFAULT NULL::text) returns SETOF auth.perm_set
     language plpgsql
 as
 $$
@@ -1690,7 +1691,7 @@ begin
 	from auth.perm_set_perm
 	where perm_set_id = __source_perm_set.perm_set_id;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __created_perm_set.perm_set_id
 			, jsonb_build_object('perm_set_code', __created_perm_set.code

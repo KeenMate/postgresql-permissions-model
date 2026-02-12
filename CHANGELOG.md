@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-02-12
+
+### Added
+
+#### Correlation ID Support for End-to-End Request Tracing
+Added `_correlation_id text` parameter to all auth/public functions, enabling end-to-end request tracing from backend through the entire call chain down to audit tables.
+
+**Schema changes:**
+- Added `correlation_id text` column to `auth.user_event` table
+- Added `correlation_id text` column to `public.journal` table
+- Added partial indexes on both tables (`WHERE correlation_id IS NOT NULL`)
+
+**New function:**
+- `auth.search_user_events()` - Paginated search of user events with filters (correlation_id, event_type, target_user, date range)
+
+**New permission:**
+- `authentication.read_user_events` - Required for `auth.search_user_events()`
+
+**Updated functions (~150 signatures):**
+- All `auth.*` functions with `_user_id bigint` now accept `_correlation_id text` as the next parameter
+- All `unsecure.*` functions forward `_correlation_id` to audit calls
+- `auth.has_permission()` / `auth.has_permissions()` accept `_correlation_id` after `_target_user_id`
+- `create_journal_message()` overloads forward `_correlation_id` to journal INSERT
+- `search_journal()` / `search_journal_msgs()` support filtering by `_correlation_id`
+
+**Call chain flow:**
+```
+Backend (generates correlation_id)
+  → auth.*(... _correlation_id ...)
+    → auth.has_permission(... _correlation_id ...) → journal on denial
+    → unsecure.*(... _correlation_id ...)
+      → create_journal_message(... _correlation_id ...) → public.journal
+      → unsecure.create_user_event(... _correlation_id ...) → auth.user_event
+```
+
+**Files modified:** 018, 019, 020, 021, 022, 023, 024, 025, 026, 027, 028 (function files), 013, 014 (table files)
+
+---
+
 ## [2.2.0] - 2026-02-11
 
 ### Fixed

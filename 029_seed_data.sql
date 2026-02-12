@@ -347,9 +347,12 @@ INSERT INTO const.user_event_type (code, event_id) VALUES
     ('api_key_validating', 14010)
 ON CONFLICT DO NOTHING;
 
--- Create system user
+-- Create system user, primary tenant, and seed all permissions/providers/groups
 SELECT * FROM unsecure.create_user_system();
-
--- Create primary tenant
 SELECT * FROM unsecure.create_primary_tenant();
 
+-- Reset sequence to 1000 to reserve space for system users
+ALTER SEQUENCE auth.user_info_user_id_seq RESTART WITH 1000;
+
+-- Seed permissions, providers, groups, and perm sets
+SELECT auth.seed_permission_data();

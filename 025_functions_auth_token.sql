@@ -10,7 +10,7 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.create_token(_created_by text, _user_id bigint, _target_user_id bigint, _target_user_oid text, _user_event_id integer, _token_type_code text, _token_channel_code text, _token text, _expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _token_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.create_token(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _target_user_oid text, _user_event_id integer, _token_type_code text, _token_channel_code text, _token text, _expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _token_data jsonb DEFAULT NULL::jsonb)
     returns TABLE(___token_id bigint, ___token_uid text, ___expires_at timestamp with time zone)
     language plpgsql
 as
@@ -24,7 +24,7 @@ declare
 	__target_username               text;
 begin
 	perform
-		auth.has_permission(_user_id, 'tokens.create_token');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.create_token');
 
 	if
 		_expires_at is null then
@@ -77,7 +77,7 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform create_journal_message(_created_by, _user_id
+	perform create_journal_message(_created_by, _user_id, _correlation_id
 			, 15001  -- token_created
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -91,7 +91,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -102,7 +102,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'tokens.set_as_used');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used');
 
 	select *
 	from auth.token
@@ -132,7 +132,7 @@ begin
 				, user_oid
 				, token_data;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -142,7 +142,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_used_by_token(_updated_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_used_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -161,6 +161,7 @@ begin
 		select *
 		from auth.set_token_as_used(_updated_by,
 																_user_id,
+																_correlation_id,
 																__token_uid,
 																_token,
 																_token_type,
@@ -171,7 +172,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -182,7 +183,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, 'tokens.set_as_used');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used');
 
 	select token_id, uid
 	from auth.token
@@ -212,7 +213,7 @@ begin
 				, user_oid
 				, token_data;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 15004  -- token_failed
 			, 'token', __token_id
 			, jsonb_build_object('username', _user_id::text, 'token_uid', _token_uid
@@ -223,7 +224,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_failed_by_token(_updated_by text, _user_id bigint, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_failed_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -242,6 +243,7 @@ begin
 		select *
 		from auth.set_token_as_failed(_updated_by,
 																	_user_id,
+																	_correlation_id,
 																	__token_uid,
 																	_token,
 																	_token_type,
@@ -252,7 +254,7 @@ begin
 end;
 $$;
 
-create or replace function auth.validate_token(_updated_by text, _user_id bigint, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
+create or replace function auth.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
     returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
     language plpgsql
 as
@@ -262,7 +264,7 @@ declare
 	__last_item       auth.token;
 begin
 	perform
-		auth.has_permission(_user_id, 'tokens.validate_token');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.validate_token');
 
 	select *
 	from auth.token
@@ -293,7 +295,7 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform create_journal_message(_updated_by, _user_id
+	perform create_journal_message(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used (validated)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -311,7 +313,7 @@ begin
 					 , used_token.__user_id
 					 , used_token.__user_oid
 					 , used_token.__token_data
-			from auth.set_token_as_used(_updated_by, _user_id, __last_item.uid, _token,
+			from auth.set_token_as_used(_updated_by, _user_id, _correlation_id, __last_item.uid, _token,
 																	_token_type_code, _ip_address, _user_agent,
 																	_origin) used_token;
 	else
