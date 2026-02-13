@@ -62,7 +62,6 @@ Implemented clear code ranges:
 **Added:**
 - `const.event_category` - Category definitions with ranges
 - `const.event_code` - Individual event/error code definitions
-- `const.user_event_type.event_id` - Links legacy event types to new codes
 - Backwards compatibility aliases (52xxx → 3xxxx)
 
 **Files changed:** `012_tables_const.sql`, `016_functions_error.sql`, `029_seed_data.sql`

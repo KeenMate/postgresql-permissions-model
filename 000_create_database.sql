@@ -1,17 +1,15 @@
-do
-$$
-    -- ensure user role
-    begin
-        if not exists(select * from pg_roles where rolname = 'postgresql_permissionmodel') then
-            create role postgresql_permissionmodel with password 'Password3000!!' login;
-        end if;
-    end;
-$$;
+-- Default database name; override via: psql -v db_name=other_db -f 000_create_database.sql
+\set db_name postgresql_permissionmodel
 
-SELECT pg_terminate_backend(pg_stat_activity.pid)
-FROM pg_stat_activity
-WHERE pg_stat_activity.datname = 'postgresql_permissionmodel'
-  AND pid <> pg_backend_pid();
+-- ensure user role (create if not exists, using db_name as both role name and password)
+select format('CREATE ROLE %I WITH PASSWORD %L LOGIN', :'db_name', :'db_name')
+where not exists (select from pg_roles where rolname = :'db_name')
+\gexec
 
-drop database if exists postgresql_permissionmodel;
-create database postgresql_permissionmodel with owner postgresql_permissionmodel;
+select pg_terminate_backend(pg_stat_activity.pid)
+from pg_stat_activity
+where pg_stat_activity.datname = :'db_name'
+	and pid <> pg_backend_pid();
+
+drop database if exists :"db_name";
+create database :"db_name" with owner :"db_name";

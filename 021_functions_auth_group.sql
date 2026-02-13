@@ -38,11 +38,11 @@ declare
 	__has_owner                 bool;
 	__is_member                 bool;
 begin
-	select can_members_manage_others, member_id is not null
+	select ug.can_members_manage_others, ugm.member_id is not null
 	from auth.user_group ug
-				 left join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
-	where user_group_id = _user_group_id
+				 left join auth.user_group_member ugm on ug.user_group_id = ugm.user_group_id
 		and ugm.user_id = _user_id
+	where ug.user_group_id = _user_group_id
 	into __can_members_manage_others, __is_member;
 
 	if not (__can_members_manage_others and __is_member) then
@@ -305,7 +305,7 @@ begin
 
 	delete
 	from auth.user_group_member
-	where group_id = _user_group_id
+	where user_group_id = _user_group_id
 		and user_id = _target_user_id;
 
 
@@ -328,14 +328,14 @@ begin
 
 	return query select *
 							 from auth.user_group_mapping ugm
-							 where ugm.group_id = _user_group_id;
+							 where ugm.user_group_id = _user_group_id;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
 $$;
 
 create or replace function auth.create_user_group_mapping(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _provider_code text, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
-    returns TABLE(__ug_mapping_id integer)
+    returns TABLE(__user_group_mapping_id integer, __user_group_id integer)
     rows 1
     language plpgsql
 as
@@ -363,12 +363,12 @@ begin
 		perform error.raise_52171(_user_group_id);
 	end if;
 
-	return query insert into auth.user_group_mapping (created_by, group_id, provider_code, mapped_object_id,
+	return query insert into auth.user_group_mapping (created_by, user_group_id, provider_code, mapped_object_id,
 																										mapped_object_name,
 																										mapped_role)
 		values ( _created_by, _user_group_id, _provider_code, lower(_mapped_object_id), _mapped_object_name
 					 , lower(_mapped_role))
-		returning ug_mapping_id;
+		returning user_group_mapping_id, user_group_id;
 
 
 	with affected_users as (select user_id
@@ -421,8 +421,8 @@ begin
 
 	delete
 	from auth.user_group_mapping
-	where ug_mapping_id = _user_group_mapping_id
-	returning group_id, provider_code, mapped_object_id, mapped_object_name, mapped_role
+	where user_group_mapping_id = _user_group_mapping_id
+	returning user_group_id, provider_code, mapped_object_id, mapped_object_name, mapped_role
 		into __user_group_id, __provider_code, __mapped_object_id, __mapped_object_name, __mapped_role;
 
 
@@ -549,7 +549,7 @@ begin
 
 	delete
 	from auth.user_group_member ugm
-	where ugm.group_id = _user_group_id
+	where ugm.user_group_id = _user_group_id
 		and ugm.member_type_code = 'manual';
 
 	update auth.user_group
@@ -582,13 +582,13 @@ begin
 	-- Delete all external/sync members (keep manual members intact)
 	delete
 	from auth.user_group_member ugm
-	where ugm.group_id = _user_group_id
+	where ugm.user_group_id = _user_group_id
 		and ugm.member_type_code <> 'manual';
 
 	-- Delete all mappings for this group
 	delete
 	from auth.user_group_mapping ugm
-	where ugm.group_id = _user_group_id;
+	where ugm.user_group_id = _user_group_id;
 
 	update auth.user_group
 	set updated_at  = now()
@@ -622,9 +622,9 @@ begin
 	end if;
 
 	return query
-		select ugm.member_id, ugm.group_id, ug.code, ug.title, ugm.member_type_code, ugm.mapping_id
+		select ugm.member_id, ugm.user_group_id, ug.code, ug.title, ugm.member_type_code, ugm.mapping_id
 		from auth.user_group_member ugm
-					 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+					 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
 		where ugm.user_id = _target_user_id
 		order by ug.title;
 
@@ -641,14 +641,14 @@ begin
 
 	return query
 		select ug.user_group_id,
-					 ugm.ug_mapping_id,
+					 ugm.user_group_mapping_id,
 					 ug.title,
 					 ug.code,
 					 ugm.provider_code,
 					 ugm.mapped_object_id,
 					 ugm.mapped_object_name
 		from auth.user_group ug
-					 inner join auth.user_group_mapping ugm on ug.user_group_id = ugm.group_id
+					 inner join auth.user_group_mapping ugm on ug.user_group_id = ugm.user_group_id
 		where ug.is_synced
 		order by provider_code, code;
 end;
@@ -668,10 +668,10 @@ begin
 
 	--   perform auth.has_permission(_user_id, '');
 
-	select ugm.group_id, create_missing_users_on_sync, provider_code
+	select ugm.user_group_id, create_missing_users_on_sync, provider_code
 	from auth.user_group_mapping ugm
-				 inner join auth.user_group ug on ugm.group_id = ug.user_group_id
-	where ugm.ug_mapping_id = _user_group_mapping_id
+				 inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
+	where ugm.user_group_mapping_id = _user_group_mapping_id
 	into __user_group_id, __create_missing_users_on_sync, __provider_code;
 
 	create temporary table __temp_current_members as
@@ -728,7 +728,7 @@ begin
 																								where operation = 'create'),
 
 				 created_members as materialized (
-					 insert into auth.user_group_member (created_by, group_id, user_id, mapping_id, member_type_code)
+					 insert into auth.user_group_member (created_by, user_group_id, user_id, mapping_id, member_type_code)
 						 select _run_by, __user_group_id, cu.user_id, cu.user_group_mapping_id, 'sync'
 						 from combined_create_users cu
 						 returning user_id),
@@ -837,14 +837,14 @@ begin
 						where user_group_member.member_id in
 									(select ugm.member_id
 									 from auth.user_group_member ugm
-									 where ugm.group_id = __group_row.user_group_id
+									 where ugm.user_group_id = __group_row.user_group_id
 										 and ugm.mapping_id not in (select distinct user_group_mapping_id
 																								from stage.external_group_member egm
 																								where egm.user_group_id = __group_row.user_group_id))
-						returning user_id, group_id, mapping_id)
+						returning user_id, user_group_id, mapping_id)
 			insert
 			into __temp_external_group_sync
-			select cr.group_id,
+			select cr.user_group_id,
 						 cr.mapping_id,
 						 'deleted',
 						 ui.user_id,
@@ -917,10 +917,10 @@ begin
             offset ((_page - 1) * _page_size) limit _page_size
         ),
         member_counts as (
-            select ugm.group_id, count(ugm.member_id) as member_count
+            select ugm.user_group_id, count(ugm.member_id) as member_count
             from auth.user_group_member ugm
-            where ugm.group_id in (select user_group_id from filtered_groups)
-            group by ugm.group_id
+            where ugm.user_group_id in (select user_group_id from filtered_groups)
+            group by ugm.user_group_id
         )
         select ug.user_group_id
              , ug.title
@@ -934,7 +934,7 @@ begin
              , fg.total_items
         from filtered_groups fg
                  inner join auth.user_group ug on fg.user_group_id = ug.user_group_id
-                 left join member_counts mc on ug.user_group_id = mc.group_id;
+                 left join member_counts mc on ug.user_group_id = mc.user_group_id;
 end;
 $$;
 

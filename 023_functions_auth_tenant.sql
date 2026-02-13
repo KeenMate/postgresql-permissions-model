@@ -148,9 +148,9 @@ begin
         auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
 
     return query
-        select *
+        select dt.__tenant_id, dt.__uuid, dt.__code
         from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id)
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id) dt
         where t.uuid = _tenant_uuid;
 end;
 $$;
@@ -166,9 +166,9 @@ begin
         auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
 
     return query
-        select *
+        select dt.__tenant_id, dt.__uuid, dt.__code
         from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id)
+           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id) dt
         where t.uuid = _tenant_uuid;
 end;
 $$;
@@ -189,10 +189,10 @@ begin
 
     return query
         with member_of_tenants as (
-            select tenant_id
-                 , group_id
+            select ug.tenant_id
+                 , ug.user_group_id
             from auth.user_group_member ugm
-                     inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+                     inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
             where ugm.user_id = _target_user_id)
         select distinct mt.tenant_id
              , t.uuid::text

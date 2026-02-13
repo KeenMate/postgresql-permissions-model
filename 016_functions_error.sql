@@ -123,6 +123,61 @@ begin
 end;
 $$;
 
+-- 31010: Event code is system
+create or replace function error.raise_31010(_event_id integer) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Event code (event_id: %) is a system event and cannot be modified or deleted', _event_id
+        using errcode = '31010';
+end;
+$$;
+
+-- 31011: Event code not found
+create or replace function error.raise_31011(_event_id integer) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Event code (event_id: %) does not exist', _event_id
+        using errcode = '31011';
+end;
+$$;
+
+-- 31012: Event category not empty
+create or replace function error.raise_31012(_category_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Event category (code: %) still has event codes and cannot be deleted', _category_code
+        using errcode = '31012';
+end;
+$$;
+
+-- 31013: Event ID out of range
+create or replace function error.raise_31013(_event_id integer, _category_code text, _range_start integer, _range_end integer) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Event ID % is outside the allowed range (%-%) for category "%"', _event_id, _range_start, _range_end, _category_code
+        using errcode = '31013';
+end;
+$$;
+
+-- 31014: Event category not found
+create or replace function error.raise_31014(_category_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Event category (code: %) does not exist', _category_code
+        using errcode = '31014';
+end;
+$$;
+
 /*
  * Permission Errors (32001-32999)
  */

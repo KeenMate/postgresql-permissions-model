@@ -13,6 +13,18 @@ ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 
 cd "$ROOT_DIR"
 
+# Colors (disabled if not a terminal)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    CYAN='\033[0;36m'
+    BOLD='\033[1m'
+    NC='\033[0m'
+else
+    RED='' GREEN='' YELLOW='' CYAN='' BOLD='' NC=''
+fi
+
 # Load environment
 if [ -f "debee.env" ]; then
     source debee.env
@@ -23,13 +35,21 @@ fi
 
 run_test() {
     local test_file="$1"
-    echo "=========================================="
-    echo "Running: $test_file"
-    echo "=========================================="
-    ./exec-sql.sh -f "$test_file"
-    local exit_code=$?
+    echo -e "${CYAN}==========================================${NC}"
+    echo -e "${BOLD}Running: $test_file${NC}"
+    echo -e "${CYAN}==========================================${NC}"
+    ./exec-sql.sh -f "$test_file" 2>&1 | while IFS= read -r line; do
+        if echo "$line" | grep -qE 'PASS:'; then
+            echo -e "${GREEN}${line}${NC}"
+        elif echo "$line" | grep -qE 'FAIL:|ERROR:'; then
+            echo -e "${RED}${line}${NC}"
+        else
+            echo "$line"
+        fi
+    done
+    local exit_code=${PIPESTATUS[0]}
     if [ $exit_code -ne 0 ]; then
-        echo "FAILED: $test_file (exit code: $exit_code)"
+        echo -e "${RED}FAILED: $test_file (exit code: $exit_code)${NC}"
         return 1
     fi
     return 0
@@ -60,6 +80,18 @@ case "$TEST_FILTER" in
         run_test "tests/test_disabled_locked_users.sql"
         if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
         ;;
+    group_members|delete_tenant)
+        run_test "tests/test_group_members_and_delete_tenant.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
+    event|event_code|event_management)
+        run_test "tests/test_event_code_management.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
+    language|translation|language_translation)
+        run_test "tests/test_language_translation.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
     *)
         # Try to find a matching test file
         if [ -f "tests/test_${TEST_FILTER}.sql" ]; then
@@ -78,11 +110,13 @@ case "$TEST_FILTER" in
 esac
 
 echo ""
-echo "=========================================="
-echo "Test Summary: $PASSED passed, $FAILED failed"
-echo "=========================================="
-
+echo -e "${BOLD}==========================================${NC}"
 if [ $FAILED -gt 0 ]; then
+    echo -e "${BOLD}Test Summary: ${GREEN}$PASSED passed${NC}, ${RED}$FAILED failed${NC}"
+    echo -e "${BOLD}==========================================${NC}"
     exit 1
+else
+    echo -e "${GREEN}${BOLD}Test Summary: $PASSED passed, 0 failed${NC}"
+    echo -e "${BOLD}==========================================${NC}"
+    exit 0
 fi
-exit 0

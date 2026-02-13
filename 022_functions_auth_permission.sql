@@ -369,8 +369,8 @@ begin
 				 , p.full_code::text
 				 , p.title
 		from auth.permission_assignment pa
-					 left join auth.user_group ug on pa.group_id = ug.user_group_id
-					 left join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
+					 left join auth.user_group ug on pa.user_group_id = ug.user_group_id
+					 left join auth.user_group_member ugm on ug.user_group_id = ugm.user_group_id
 
 					 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
 					 left join auth.perm_set_perm psp on psp.perm_set_id = ps.perm_set_id
@@ -499,13 +499,28 @@ begin
 	perform unsecure.create_permission_as_system('Update permissions', 'api_keys');
 	perform unsecure.create_permission_as_system('Read outbound secret', 'api_keys');
 
+	-- Permissions: Languages
+	perform unsecure.create_permission_as_system('Languages');
+	perform unsecure.create_permission_as_system('Create language', 'languages');
+	perform unsecure.create_permission_as_system('Update language', 'languages');
+	perform unsecure.create_permission_as_system('Delete language', 'languages');
+	perform unsecure.create_permission_as_system('Read languages', 'languages');
+
+	-- Permissions: Translations
+	perform unsecure.create_permission_as_system('Translations');
+	perform unsecure.create_permission_as_system('Create translation', 'translations');
+	perform unsecure.create_permission_as_system('Update translation', 'translations');
+	perform unsecure.create_permission_as_system('Delete translation', 'translations');
+	perform unsecure.create_permission_as_system('Read translations', 'translations');
+	perform unsecure.create_permission_as_system('Copy translations', 'translations');
+
 	-- Permission sets
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
-		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'api_keys']);
+		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'api_keys', 'languages', 'translations']);
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload']);
 	perform unsecure.create_perm_set_as_system('Tenant admin', true, _is_assignable := true,
-		_permissions := array ['tenants', 'journal.read_journal', 'journal.get_payload']);
+		_permissions := array ['tenants', 'journal.read_journal', 'journal.get_payload', 'languages', 'translations']);
 	perform unsecure.create_perm_set_as_system('Tenant owner', true, _is_assignable := true,
 		_permissions := array ['groups', 'tenants.update_tenant', 'tenants.assign_owner',
 			'tenants.get_users', 'journal.read_journal', 'journal.get_journal_payload']);
@@ -595,7 +610,7 @@ $$;
 
 
 create or replace function auth.get_user_assigned_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint, __group_id integer)
+    returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint, __user_group_id integer)
     language plpgsql
 as
 $$

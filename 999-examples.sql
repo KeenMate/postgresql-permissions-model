@@ -238,7 +238,7 @@ from user_info;
 select *
 from permission_assignment pa
 			 inner join effective_permissions ep on pa.perm_set_id = ep.perm_set_id
-where group_id = 6;
+where user_group_id = 6;
 
 
 select *
@@ -269,7 +269,7 @@ where tenant_id = 2;
 
 select *
 from auth.user_group ug
-			 inner join auth.user_group_member ugm on ug.user_group_id = ugm.group_id
+			 inner join auth.user_group_member ugm on ug.user_group_id = ugm.user_group_id
 			 inner join auth.user_info ui on ugm.user_id = ui.user_id;
 
 --

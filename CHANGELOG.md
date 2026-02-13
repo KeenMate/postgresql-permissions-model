@@ -5,6 +5,103 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-02-13
+
+### Added
+
+#### Language & Translation System
+Merged the standalone `postgresql-languages-model` into the permissions model. All functions now have direct access to a single language/translation system without duplicating infrastructure.
+
+**New Tables:**
+
+| Table | Description |
+|-------|-------------|
+| `const.language` | Language registry (PK: `code text`) with frontend/backend/communication flags, logical ordering, default flags, and custom_data jsonb |
+| `public.translation` | Translation storage with full-text search (tsvector + gin_trgm_ops), supports both `data_object_code` (text key) and `data_object_id` (numeric key) lookups |
+
+**New Language Functions (public schema):**
+
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `create_language()` | `languages.create_language` | Create language, auto-unsets other defaults when setting `is_default_*=true` |
+| `update_language()` | `languages.update_language` | Update language with same default enforcement |
+| `delete_language()` | `languages.delete_language` | Delete language, CASCADE removes translations |
+| `get_language()` | none | Get single language by code |
+| `get_languages()` | none | Get all languages with optional frontend/backend/communication filters, LEFT JOIN translation for display name |
+| `get_frontend_languages()` | none | Frontend languages ordered by `frontend_logical_order` |
+| `get_backend_languages()` | none | Backend languages ordered by `backend_logical_order` |
+| `get_communication_languages()` | none | Communication languages ordered by `communication_logical_order` |
+| `get_default_language()` | none | Get default language for a category |
+
+**New Translation Functions (public schema):**
+
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `create_translation()` | `translations.create_translation` | Create translation, trigger auto-calculates search fields |
+| `update_translation()` | `translations.update_translation` | Update translation value |
+| `delete_translation()` | `translations.delete_translation` | Delete translation |
+| `copy_translations()` | `translations.copy_translations` | Two-phase copy: update existing (if overwrite) then insert missing. Returns `(operation, count)` |
+| `get_group_translations()` | none | Returns `jsonb_object_agg(data_object_code, value)` for a data_group |
+| `search_translations()` | `translations.read_translations` | Paginated search with accent-insensitive matching via `normalize_text` |
+
+**Trigger Infrastructure:**
+- `helpers.calculate_ts_regconfig()` - Maps language code to PostgreSQL regconfig (en→english, de→german, fr→french, etc.)
+- `triggers.calculate_translation_fields()` - BEFORE INSERT/UPDATE trigger auto-populates `ua_search_data` (normalized) and `ts_search_data` (tsvector)
+
+**New Permissions:**
+
+| Permission Code | Description |
+|-----------------|-------------|
+| `languages.create_language` | Create new languages |
+| `languages.update_language` | Update existing languages |
+| `languages.delete_language` | Delete languages |
+| `languages.read_languages` | Read language list |
+| `translations.create_translation` | Create translations |
+| `translations.update_translation` | Update translations |
+| `translations.delete_translation` | Delete translations |
+| `translations.read_translations` | Search/read translations |
+| `translations.copy_translations` | Copy translations between languages |
+
+Added to `system_admin` and `tenant_admin` permission sets.
+
+**New Event Codes:**
+
+| Range | Category | Codes |
+|-------|----------|-------|
+| 17001-17999 | `language_event` | 17001 language_created, 17002 language_updated, 17003 language_deleted |
+| 18001-18999 | `translation_event` | 18001-18003 CRUD, 18004 translations_copied |
+| 35001-35999 | `language_error` | 35001 err_language_not_found, 35002 err_translation_not_found |
+
+**New Error Functions:**
+- `error.raise_35001(_language_code)` - Language not found
+- `error.raise_35002(_translation_id)` - Translation not found
+
+**FK Constraint:**
+- `const.event_message.language_code` → `const.language.code` - Ensures event messages reference valid languages
+
+**Seed Data:**
+- Default 'en' (English) language with all flags set
+
+**Design Decision:** `const.event_message` stays separate from `public.translation`. Event messages are templates with `{placeholder}` syntax and `is_active` versioning, tightly coupled to event codes. Translations are for plain UI text. Both share `const.language` as the language registry via FK.
+
+**New Files:**
+
+| File | Description |
+|------|-------------|
+| `030_tables_language.sql` | Tables, trigger, seed, FK, errors, events |
+| `031_functions_language.sql` | 9 language functions |
+| `032_functions_translation.sql` | 6 translation functions |
+| `tests/test_language_translation.sql` | 25 test cases |
+
+#### Test Runner Improvements
+- Colored output in `tests/run-tests.sh`: green for PASS, red for FAIL/ERROR
+- Colors auto-disable when output is piped (not a terminal)
+
+### Fixed
+- `tests/test_event_code_management.sql` - TEST 18 now cleans up journal entries before deleting event code (FK constraint prevented deletion)
+
+---
+
 ## [2.3.0] - 2026-02-12
 
 ### Added
@@ -344,7 +441,6 @@ Old 50xxx/52xxx codes have been reorganized into clear ranges:
 - `const.event_category` - Event category definitions with ranges
 - `const.event_code` - Individual event/error code definitions
 - `const.event_message` - Message templates per event_id and language_code
-- `const.user_event_type.event_id` - Links legacy event types to new event codes
 
 #### New Error Functions (30xxx series)
 Security/Auth Errors:
@@ -440,7 +536,7 @@ Consolidated migration files into modular structure:
    - Aliases are provided for backwards compatibility
 
 3. **Event Code Updates** (if querying journal):
-   - Old event codes (50xxx) mapped to new codes (10xxx) via `const.user_event_type.event_id`
+   - Old event codes (50xxx) mapped to new codes (10xxx)
    - Query `const.event_code` for new event definitions
 
 4. **Column Renames** (if accessing tables directly):
@@ -467,6 +563,8 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.4.0 | 2026-02-13 | Language & translation system, colored test output |
+| 2.3.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |
 | 2.2.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |
 | 2.1.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |
 | 2.0.0 | 2026-02-10 | Major restructure: removed inheritance, new event codes |

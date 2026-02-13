@@ -1,4 +1,4 @@
-.PHONY: test test-cache test-disabled test-correlation setup update sql
+.PHONY: test test-cache test-disabled test-correlation test-search setup update sql
 
 # Run all tests
 test:
@@ -13,6 +13,9 @@ test-disabled:
 
 test-correlation:
 	./tests/run-tests.sh correlation
+
+test-search:
+	./tests/run-tests.sh search_functions
 
 # Database operations (via debee.ps1)
 setup:

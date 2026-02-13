@@ -38,7 +38,7 @@ begin
       and user_id in (
           select user_id
           from auth.user_group_member
-          where group_id = _user_group_id
+          where user_group_id = _user_group_id
       );
 end;
 $$;
@@ -75,7 +75,7 @@ begin
       and user_id in (
           select ugm.user_id
           from auth.permission_assignment pa
-          inner join auth.user_group_member ugm on ugm.group_id = pa.group_id
+          inner join auth.user_group_member ugm on ugm.user_group_id = pa.user_group_id
           where pa.perm_set_id = _perm_set_id
       );
 end;
@@ -310,7 +310,7 @@ begin
 									, pa.assignment_id
 		from auth.permission_assignment pa
 					 inner join auth.effective_permissions ep
-											on pa.perm_set_id = ep.perm_set_id and pa.group_id = _user_group_id
+											on pa.perm_set_id = ep.perm_set_id and pa.user_group_id = _user_group_id
 		where ep.perm_set_is_assignable = true
 			and ep.permission_is_assignable = true
 		union
@@ -322,7 +322,7 @@ begin
 									, null::integer
 									, pa.assignment_id
 		from auth.permission_assignment pa
-					 inner join auth.permission p on pa.permission_id = p.permission_id and _user_group_id = pa.group_id
+					 inner join auth.permission p on pa.permission_id = p.permission_id and _user_group_id = pa.user_group_id
 					 inner join auth.permission sp
 											on sp.node_path <@ p.node_path and sp.is_assignable = true;
 
@@ -346,7 +346,7 @@ begin
 														from auth.permission_assignment pa
 																	 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
 																	 left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
-														where group_id = _user_group_id)
+														where user_group_id = _user_group_id)
 		select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
 																				p.permission_id)) as permissions
 				 , pids.perm_set_title
@@ -433,7 +433,7 @@ begin
 		end if;
 	end if;
 
-	insert into auth.permission_assignment (created_by, tenant_id, group_id, user_id, perm_set_id, permission_id)
+	insert into auth.permission_assignment (created_by, tenant_id, user_group_id, user_id, perm_set_id, permission_id)
 	values (_created_by, _tenant_id, _user_group_id, _target_user_id, __perm_set_id, __permission_id)
 	returning assignment_id
 		into __last_id;
@@ -478,7 +478,7 @@ declare
 	__target_user_id int;
 begin
 
-	select group_id, user_id
+	select user_group_id, user_id
 	from auth.permission_assignment pa
 	where pa.assignment_id = _assignment_id
 	into __user_group_id, __target_user_id;
@@ -1058,9 +1058,9 @@ begin
 	from auth.active_user_groups aug
 	where aug.tenant_id = _tenant_id
 		and aug.is_default
-		and user_group_id not in (select group_id
+		and user_group_id not in (select user_group_id
 															from auth.user_group_member ugm
-																		 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+																		 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
 															where ugm.user_id = _target_user_id
 																and ug.tenant_id = _tenant_id
 																and ug.is_default);
@@ -1180,7 +1180,7 @@ begin
 	where user_id = _target_user_id
 	into __user_upn;
 
-	return query insert into auth.user_group_member (created_by, group_id, user_id, member_type_code)
+	return query insert into auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
@@ -1211,7 +1211,7 @@ begin
 
 	return query
 		select ugm.created_at
-				 , ugm.created_at_by
+				 , ugm.created_by
 				 , ugm.member_id
 				 , ugm.member_type_code
 				 , ugm.user_id
@@ -1223,9 +1223,9 @@ begin
 				 , ugma.mapped_object_name
 				 , ugma.provider_code
 		from auth.user_group_member ugm
-					 left join auth.user_group_mapping ugma on ugma.ug_mapping_id = ugm.mapping_id
+					 left join auth.user_group_mapping ugma on ugma.user_group_mapping_id = ugm.mapping_id
 					 inner join auth.user_info ui on ui.user_id = ugm.user_id
-		where ugm.group_id = _user_group_id;
+		where ugm.user_group_id = _user_group_id;
 
 -- OMITTING UNTIL JOURNAL MESSAGES HAVE LEVELS
 -- 	perform
@@ -1322,11 +1322,11 @@ begin
       and user_id = _target_user_id
     into __provider_groups, __provider_roles;
 
-    insert into auth.user_group_member (created_by, group_id, user_id, member_type_code)
+    insert into auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
     select _created_by, ug.user_group_id, _target_user_id, 'adhoc'
     from auth.user_group ug
     where is_default
-    on conflict (group_id, user_id) do nothing;
+    on conflict (user_group_id, user_id) do nothing;
 
     -- cleanup membership of groups user is no longer part of
     with affected_deleted_group_tenants as (
@@ -1334,67 +1334,67 @@ begin
             from auth.user_group_member
                 where user_id = _target_user_id
                     and mapping_id is not null
-                    and group_id not in (
-                        select distinct ugm.group_id
+                    and user_group_id not in (
+                        select distinct ugm.user_group_id
                         from unnest(__provider_groups) g
                                  inner join auth.user_group_mapping ugm
                                             on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
                                  inner join auth.user_group u
-                                            on u.user_group_id = ugm.group_id
+                                            on u.user_group_id = ugm.user_group_id
                         union
-                        select distinct ugm.group_id
+                        select distinct ugm.user_group_id
                         from unnest(__provider_roles) r
                                  inner join auth.user_group_mapping ugm
                                             on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
                                  inner join auth.user_group u
-                                            on u.user_group_id = ugm.group_id)
-                returning group_id)
+                                            on u.user_group_id = ugm.user_group_id)
+                returning user_group_id)
        , affected_group_tenants as (
         insert
-            into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
+            into auth.user_group_member (created_by, user_id, user_group_id, mapping_id, member_type_code)
                 select distinct _created_by
                               , _target_user_id
-                              , ugm.group_id
-                              , ugm.ug_mapping_id
+                              , ugm.user_group_id
+                              , ugm.user_group_mapping_id
                               , 'adhoc'
                 from unnest(__provider_groups) g
                          inner join auth.user_group_mapping ugm
                                     on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
-                where ugm.group_id not in (
-                    select group_id
+                where ugm.user_group_id not in (
+                    select user_group_id
                     from auth.user_group_member
                     where user_id = _target_user_id)
-                returning group_id)
+                returning user_group_id)
        , affected_role_tenants as (
         insert
-            into auth.user_group_member (created_by, user_id, group_id, mapping_id, member_type_code)
+            into auth.user_group_member (created_by, user_id, user_group_id, mapping_id, member_type_code)
                 select distinct _created_by
                               , _target_user_id
-                              , ugm.group_id
-                              , ugm.ug_mapping_id
+                              , ugm.user_group_id
+                              , ugm.user_group_mapping_id
                               , 'adhoc'
                 from unnest(__provider_roles) r
                          inner join auth.user_group_mapping ugm
                                     on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
-                where ugm.group_id not in (
-                    select group_id
+                where ugm.user_group_id not in (
+                    select user_group_id
                     from auth.user_group_member
                     where user_id = _target_user_id)
-                returning group_id)
+                returning user_group_id)
        , all_group_ids as (
-        select group_id
+        select user_group_id
         from affected_deleted_group_tenants
         union
-        select group_id
+        select user_group_id
         from affected_group_tenants
         union
-        select group_id
+        select user_group_id
         from affected_role_tenants)
        , all_tenants as (
         select tenant_id
         from all_group_ids ids
                  inner join auth.user_group ug
-                            on ids.group_id = ug.user_group_id
+                            on ids.user_group_id = ug.user_group_id
         group by tenant_id)
        -- variable not really used, it's there just to avoid 'query has no destination for result data'
     select at.tenant_id
@@ -1407,7 +1407,7 @@ begin
                       , ug.user_group_id
                       , ug.code
         from auth.user_group_member ugm
-                 inner join auth.user_group ug on ug.user_group_id = ugm.group_id
+                 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
         where ugm.user_id = _target_user_id;
 end;
 $$;
@@ -1493,7 +1493,7 @@ begin
                           , ep.permission_code as full_code
             from ugs ug
                      inner join auth.permission_assignment pa
-                                on ug.user_group_id = pa.group_id
+                                on ug.user_group_id = pa.user_group_id
                      inner join auth.effective_permissions ep on pa.perm_set_id = ep.perm_set_id
             where ep.perm_set_is_assignable = true
               and ep.permission_is_assignable = true
@@ -1503,7 +1503,7 @@ begin
                           , sp.full_code
             from ugs ug
                      inner join auth.permission_assignment pa
-                                on ug.user_group_id = pa.group_id
+                                on ug.user_group_id = pa.user_group_id
                      inner join auth.permission p on pa.permission_id = p.permission_id
                      inner join auth.permission sp
                                 on sp.node_path <@ p.node_path and sp.is_assignable = true)
@@ -1705,7 +1705,7 @@ end;
 $$;
 
 create or replace function unsecure.get_user_assigned_permissions(_requested_by text, _user_id bigint, _target_user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint, __group_id integer)
+    returns TABLE(__permissions jsonb, __perm_set_title text, __perm_set_id integer, __perm_set_code text, __assignment_id bigint, __user_group_id integer)
     language plpgsql
 as
 $$
@@ -1713,7 +1713,7 @@ begin
     return query with assigments as (
         select pa.*
         from auth.permission_assignment pa
-                 left join auth.user_group_member ugm on pa.group_id = ugm.group_id
+                 left join auth.user_group_member ugm on pa.user_group_id = ugm.user_group_id
         where (ugm.user_id = _target_user_id
             or pa.user_id = _target_user_id)
           and tenant_id = _tenant_id)
@@ -1724,13 +1724,13 @@ begin
                       , ps.perm_set_id
                       , ps.code as perm_set_code
                       , a.assignment_id
-                      , a.group_id
+                      , a.user_group_id
                  from assigments a
                           left join auth.perm_set ps on a.perm_set_id = ps.perm_set_id
                           left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
                           left join auth.permission p
                                     on (coalesce(a.permission_id, psp.permission_id) = p.permission_id)
-                 group by ps.title, ps.perm_set_id, a.assignment_id, a.group_id
+                 group by ps.title, ps.perm_set_id, a.assignment_id, a.user_group_id
                  order by ps.title nulls last;
 
 

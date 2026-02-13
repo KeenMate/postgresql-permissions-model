@@ -101,7 +101,8 @@ create table const.event_code
     category_code text    not null references const.event_category(category_code),
     title         text    not null,
     description   text,
-    is_read_only  boolean not null default false
+    is_read_only  boolean not null default false,
+    is_system     boolean not null default false
 );
 
 /*
@@ -133,13 +134,6 @@ create table const.event_message
 
 create unique index uq_event_message
     on const.event_message (event_id, language_code) where is_active = true;
-
--- Keep user_event_type for backwards compatibility, but now with event_id reference
-create table const.user_event_type
-(
-    code     text    not null primary key,
-    event_id integer references const.event_code(event_id)
-);
 
 create table const.user_group_member_type
 (

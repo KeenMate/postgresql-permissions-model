@@ -119,7 +119,7 @@ declare
 begin
 	perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
 
-	__search_text := helpers.unaccent_text(_search_text);
+	__search_text := helpers.normalize_text(_search_text);
 
 	_page := case when _page is null then 1 else _page end;
 	_page_size := case when _page_size is null then 10 else least(_page_size, 100) end;
@@ -823,7 +823,7 @@ declare
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
 
-    __search_text := helpers.unaccent_text(_search_text);
+    __search_text := helpers.normalize_text(_search_text);
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 10), 100);

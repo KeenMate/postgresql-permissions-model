@@ -293,9 +293,9 @@ create table auth.user_group_mapping
 (
     created_at         timestamp with time zone default now()           not null,
     created_by         text                     default 'unknown'::text not null,
-    ug_mapping_id      integer generated always as identity
+    user_group_mapping_id integer generated always as identity
         primary key,
-    group_id           integer not null
+    user_group_id      integer not null
         references auth.user_group,
     provider_code      text    not null
         references auth.provider (code)
@@ -335,7 +335,7 @@ create table auth.permission_assignment
     tenant_id     integer
         references auth.tenant
             on delete cascade,
-    group_id      integer
+    user_group_id integer
         references auth.user_group,
     user_id       bigint
         references auth.user_info,
@@ -346,7 +346,7 @@ create table auth.permission_assignment
     constraint permission_assignment_created_by_check
         check (length(created_by) <= 250),
     constraint pa_either_object
-        check ((group_id is not null) or (user_id is not null)),
+        check ((user_group_id is not null) or (user_id is not null)),
     constraint pa_either_perm
         check ((perm_set_id is not null) or (permission_id is not null))
 );
@@ -358,8 +358,7 @@ create table auth.user_event
     correlation_id     text,
     user_event_id      bigint generated always as identity
         primary key,
-    event_type_code    text not null
-        references const.user_event_type,
+    event_type_code    text not null,
     requester_user_id  bigint
         references auth.user_info
             on delete set null,
@@ -461,7 +460,7 @@ create table auth.user_group_member
     created_by       text                     default 'unknown'::text not null,
     member_id        bigint generated always as identity
         primary key,
-    group_id         integer                     not null
+    user_group_id    integer                     not null
         references auth.user_group
             on delete cascade,
     user_id          bigint                      not null
@@ -520,19 +519,19 @@ create index ix_permission_node_path
     on auth.permission using gist (node_path);
 
 create unique index uq_user_group_mapping
-    on auth.user_group_mapping (group_id, provider_code, coalesce(mapped_object_id, ''::text), coalesce(mapped_role, ''::text));
+    on auth.user_group_mapping (user_group_id, provider_code, coalesce(mapped_object_id, ''::text), coalesce(mapped_role, ''::text));
 
 create unique index ix_owner
     on auth.owner (user_id, tenant_id, user_group_id);
 
 create unique index uq_permission_assignment
-    on auth.permission_assignment (group_id, coalesce(user_id, 0::bigint), coalesce(perm_set_id, 0), coalesce(permission_id, 0));
+    on auth.permission_assignment (user_group_id, coalesce(user_id, 0::bigint), coalesce(perm_set_id, 0), coalesce(permission_id, 0));
 
 create unique index uq_auth_permission_assignment_tenant_user
     on auth.permission_assignment (tenant_id, user_id, coalesce(perm_set_id, 0), coalesce(permission_id, 0));
 
 create unique index uq_auth_permission_assignment_tenant_group
-    on auth.permission_assignment (tenant_id, group_id, coalesce(perm_set_id, 0), coalesce(permission_id, 0));
+    on auth.permission_assignment (tenant_id, user_group_id, coalesce(perm_set_id, 0), coalesce(permission_id, 0));
 
 create index ix_user_event_data
     on auth.user_event using gin (event_data jsonb_path_ops);
@@ -550,7 +549,7 @@ create index ix_token_token_data
     on auth.token using gin (token_data jsonb_path_ops);
 
 create unique index uq_user_group_member
-    on auth.user_group_member (group_id, user_id, coalesce(mapping_id, 0));
+    on auth.user_group_member (user_group_id, user_id, coalesce(mapping_id, 0));
 
 create unique index uq_user_tenant_preference
     on auth.user_tenant_preference (user_id, tenant_id);

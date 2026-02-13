@@ -88,130 +88,135 @@ ON CONFLICT DO NOTHING;
 /*
  * Event Codes - Informational Events (10xxx)
  */
-INSERT INTO const.event_code (event_id, code, category_code, title, description) VALUES
+INSERT INTO const.event_code (event_id, code, category_code, title, description, is_system) VALUES
     -- User events (10001-10999)
-    (10001, 'user_created',           'user_event', 'User Created',           'New user account was created'),
-    (10002, 'user_updated',           'user_event', 'User Updated',           'User account was updated'),
-    (10003, 'user_deleted',           'user_event', 'User Deleted',           'User account was deleted'),
-    (10004, 'user_enabled',           'user_event', 'User Enabled',           'User account was enabled'),
-    (10005, 'user_disabled',          'user_event', 'User Disabled',          'User account was disabled'),
-    (10006, 'user_locked',            'user_event', 'User Locked',            'User account was locked'),
-    (10007, 'user_unlocked',          'user_event', 'User Unlocked',          'User account was unlocked'),
-    (10010, 'user_logged_in',         'user_event', 'User Logged In',         'User successfully logged in'),
-    (10011, 'user_logged_out',        'user_event', 'User Logged Out',        'User logged out'),
-    (10012, 'user_login_failed',      'user_event', 'User Login Failed',      'User login attempt failed'),
-    (10020, 'password_changed',       'user_event', 'Password Changed',       'User password was changed'),
-    (10021, 'password_reset_requested','user_event','Password Reset Requested','Password reset was requested'),
-    (10022, 'password_reset_completed','user_event','Password Reset Completed','Password reset was completed'),
-    (10030, 'identity_created',       'user_event', 'Identity Created',       'User identity was created'),
-    (10031, 'identity_updated',       'user_event', 'Identity Updated',       'User identity was updated'),
-    (10032, 'identity_deleted',       'user_event', 'Identity Deleted',       'User identity was deleted'),
-    (10033, 'identity_enabled',       'user_event', 'Identity Enabled',       'User identity was enabled'),
-    (10034, 'identity_disabled',      'user_event', 'Identity Disabled',      'User identity was disabled'),
-    (10040, 'email_verified',         'user_event', 'Email Verified',         'User email was verified'),
-    (10041, 'phone_verified',         'user_event', 'Phone Verified',         'User phone was verified'),
-    (10050, 'mfa_enabled',            'user_event', 'MFA Enabled',            'Multi-factor authentication was enabled'),
-    (10051, 'mfa_disabled',           'user_event', 'MFA Disabled',           'Multi-factor authentication was disabled'),
-    (10060, 'invitation_sent',        'user_event', 'Invitation Sent',        'User invitation was sent'),
-    (10061, 'invitation_accepted',    'user_event', 'Invitation Accepted',    'User invitation was accepted'),
-    (10062, 'invitation_rejected',    'user_event', 'Invitation Rejected',    'User invitation was rejected'),
-    (10070, 'external_data_updated',  'user_event', 'External Data Updated',  'User data was updated from external source'),
+    (10001, 'user_created',           'user_event', 'User Created',           'New user account was created', true),
+    (10002, 'user_updated',           'user_event', 'User Updated',           'User account was updated', true),
+    (10003, 'user_deleted',           'user_event', 'User Deleted',           'User account was deleted', true),
+    (10004, 'user_enabled',           'user_event', 'User Enabled',           'User account was enabled', true),
+    (10005, 'user_disabled',          'user_event', 'User Disabled',          'User account was disabled', true),
+    (10006, 'user_locked',            'user_event', 'User Locked',            'User account was locked', true),
+    (10007, 'user_unlocked',          'user_event', 'User Unlocked',          'User account was unlocked', true),
+    (10010, 'user_logged_in',         'user_event', 'User Logged In',         'User successfully logged in', true),
+    (10011, 'user_logged_out',        'user_event', 'User Logged Out',        'User logged out', true),
+    (10012, 'user_login_failed',      'user_event', 'User Login Failed',      'User login attempt failed', true),
+    (10020, 'password_changed',       'user_event', 'Password Changed',       'User password was changed', true),
+    (10021, 'password_reset_requested','user_event','Password Reset Requested','Password reset was requested', true),
+    (10022, 'password_reset_completed','user_event','Password Reset Completed','Password reset was completed', true),
+    (10030, 'identity_created',       'user_event', 'Identity Created',       'User identity was created', true),
+    (10031, 'identity_updated',       'user_event', 'Identity Updated',       'User identity was updated', true),
+    (10032, 'identity_deleted',       'user_event', 'Identity Deleted',       'User identity was deleted', true),
+    (10033, 'identity_enabled',       'user_event', 'Identity Enabled',       'User identity was enabled', true),
+    (10034, 'identity_disabled',      'user_event', 'Identity Disabled',      'User identity was disabled', true),
+    (10040, 'email_verified',         'user_event', 'Email Verified',         'User email was verified', true),
+    (10041, 'phone_verified',         'user_event', 'Phone Verified',         'User phone was verified', true),
+    (10050, 'mfa_enabled',            'user_event', 'MFA Enabled',            'Multi-factor authentication was enabled', true),
+    (10051, 'mfa_disabled',           'user_event', 'MFA Disabled',           'Multi-factor authentication was disabled', true),
+    (10060, 'invitation_sent',        'user_event', 'Invitation Sent',        'User invitation was sent', true),
+    (10061, 'invitation_accepted',    'user_event', 'Invitation Accepted',    'User invitation was accepted', true),
+    (10062, 'invitation_rejected',    'user_event', 'Invitation Rejected',    'User invitation was rejected', true),
+    (10070, 'external_data_updated',  'user_event', 'External Data Updated',  'User data was updated from external source', true),
 
     -- Tenant events (11001-11999)
-    (11001, 'tenant_created',         'tenant_event', 'Tenant Created',       'New tenant was created'),
-    (11002, 'tenant_updated',         'tenant_event', 'Tenant Updated',       'Tenant was updated'),
-    (11003, 'tenant_deleted',         'tenant_event', 'Tenant Deleted',       'Tenant was deleted'),
-    (11010, 'tenant_user_added',      'tenant_event', 'User Added to Tenant', 'User was added to tenant'),
-    (11011, 'tenant_user_removed',    'tenant_event', 'User Removed from Tenant', 'User was removed from tenant'),
+    (11001, 'tenant_created',         'tenant_event', 'Tenant Created',       'New tenant was created', true),
+    (11002, 'tenant_updated',         'tenant_event', 'Tenant Updated',       'Tenant was updated', true),
+    (11003, 'tenant_deleted',         'tenant_event', 'Tenant Deleted',       'Tenant was deleted', true),
+    (11010, 'tenant_user_added',      'tenant_event', 'User Added to Tenant', 'User was added to tenant', true),
+    (11011, 'tenant_user_removed',    'tenant_event', 'User Removed from Tenant', 'User was removed from tenant', true),
 
     -- Permission events (12001-12999)
-    (12001, 'permission_created',     'permission_event', 'Permission Created',     'New permission was created'),
-    (12002, 'permission_updated',     'permission_event', 'Permission Updated',     'Permission was updated'),
-    (12003, 'permission_deleted',     'permission_event', 'Permission Deleted',     'Permission was deleted'),
-    (12010, 'permission_assigned',    'permission_event', 'Permission Assigned',    'Permission was assigned'),
-    (12011, 'permission_revoked',     'permission_event', 'Permission Revoked',     'Permission was revoked'),
-    (12020, 'perm_set_created',       'permission_event', 'Permission Set Created', 'New permission set was created'),
-    (12021, 'perm_set_updated',       'permission_event', 'Permission Set Updated', 'Permission set was updated'),
-    (12022, 'perm_set_deleted',       'permission_event', 'Permission Set Deleted', 'Permission set was deleted'),
-    (12023, 'perm_set_assigned',      'permission_event', 'Permission Set Assigned','Permission set was assigned'),
-    (12024, 'perm_set_revoked',       'permission_event', 'Permission Set Revoked', 'Permission set was revoked'),
+    (12001, 'permission_created',     'permission_event', 'Permission Created',     'New permission was created', true),
+    (12002, 'permission_updated',     'permission_event', 'Permission Updated',     'Permission was updated', true),
+    (12003, 'permission_deleted',     'permission_event', 'Permission Deleted',     'Permission was deleted', true),
+    (12010, 'permission_assigned',    'permission_event', 'Permission Assigned',    'Permission was assigned', true),
+    (12011, 'permission_revoked',     'permission_event', 'Permission Revoked',     'Permission was revoked', true),
+    (12020, 'perm_set_created',       'permission_event', 'Permission Set Created', 'New permission set was created', true),
+    (12021, 'perm_set_updated',       'permission_event', 'Permission Set Updated', 'Permission set was updated', true),
+    (12022, 'perm_set_deleted',       'permission_event', 'Permission Set Deleted', 'Permission set was deleted', true),
+    (12023, 'perm_set_assigned',      'permission_event', 'Permission Set Assigned','Permission set was assigned', true),
+    (12024, 'perm_set_revoked',       'permission_event', 'Permission Set Revoked', 'Permission set was revoked', true),
 
     -- Group events (13001-13999)
-    (13001, 'group_created',          'group_event', 'Group Created',        'New group was created'),
-    (13002, 'group_updated',          'group_event', 'Group Updated',        'Group was updated'),
-    (13003, 'group_deleted',          'group_event', 'Group Deleted',        'Group was deleted'),
-    (13010, 'group_member_added',     'group_event', 'Member Added',         'Member was added to group'),
-    (13011, 'group_member_removed',   'group_event', 'Member Removed',       'Member was removed from group'),
-    (13020, 'group_mapping_created',  'group_event', 'Mapping Created',      'Group mapping was created'),
-    (13021, 'group_mapping_deleted',  'group_event', 'Mapping Deleted',      'Group mapping was deleted'),
+    (13001, 'group_created',          'group_event', 'Group Created',        'New group was created', true),
+    (13002, 'group_updated',          'group_event', 'Group Updated',        'Group was updated', true),
+    (13003, 'group_deleted',          'group_event', 'Group Deleted',        'Group was deleted', true),
+    (13010, 'group_member_added',     'group_event', 'Member Added',         'Member was added to group', true),
+    (13011, 'group_member_removed',   'group_event', 'Member Removed',       'Member was removed from group', true),
+    (13020, 'group_mapping_created',  'group_event', 'Mapping Created',      'Group mapping was created', true),
+    (13021, 'group_mapping_deleted',  'group_event', 'Mapping Deleted',      'Group mapping was deleted', true),
 
     -- API key events (14001-14999)
-    (14001, 'apikey_created',         'apikey_event', 'API Key Created',     'New API key was created'),
-    (14002, 'apikey_updated',         'apikey_event', 'API Key Updated',     'API key was updated'),
-    (14003, 'apikey_deleted',         'apikey_event', 'API Key Deleted',     'API key was deleted'),
-    (14010, 'apikey_validated',       'apikey_event', 'API Key Validated',   'API key was validated'),
-    (14011, 'apikey_validation_failed','apikey_event','API Key Validation Failed', 'API key validation failed'),
+    (14001, 'apikey_created',         'apikey_event', 'API Key Created',     'New API key was created', true),
+    (14002, 'apikey_updated',         'apikey_event', 'API Key Updated',     'API key was updated', true),
+    (14003, 'apikey_deleted',         'apikey_event', 'API Key Deleted',     'API key was deleted', true),
+    (14010, 'apikey_validated',       'apikey_event', 'API Key Validated',   'API key was validated', true),
+    (14011, 'apikey_validation_failed','apikey_event','API Key Validation Failed', 'API key validation failed', true),
 
     -- Token events (15001-15999)
-    (15001, 'token_created',          'token_event', 'Token Created',        'New token was created'),
-    (15002, 'token_used',             'token_event', 'Token Used',           'Token was used'),
-    (15003, 'token_expired',          'token_event', 'Token Expired',        'Token expired'),
-    (15004, 'token_failed',           'token_event', 'Token Failed',         'Token validation failed'),
+    (15001, 'token_created',          'token_event', 'Token Created',        'New token was created', true),
+    (15002, 'token_used',             'token_event', 'Token Used',           'Token was used', true),
+    (15003, 'token_expired',          'token_event', 'Token Expired',        'Token expired', true),
+    (15004, 'token_failed',           'token_event', 'Token Failed',         'Token validation failed', true),
 
     -- Provider events (16001-16999)
-    (16001, 'provider_created',       'provider_event', 'Provider Created',  'New provider was created'),
-    (16002, 'provider_updated',       'provider_event', 'Provider Updated',  'Provider was updated'),
-    (16003, 'provider_deleted',       'provider_event', 'Provider Deleted',  'Provider was deleted'),
-    (16004, 'provider_enabled',       'provider_event', 'Provider Enabled',  'Provider was enabled'),
-    (16005, 'provider_disabled',      'provider_event', 'Provider Disabled', 'Provider was disabled')
+    (16001, 'provider_created',       'provider_event', 'Provider Created',  'New provider was created', true),
+    (16002, 'provider_updated',       'provider_event', 'Provider Updated',  'Provider was updated', true),
+    (16003, 'provider_deleted',       'provider_event', 'Provider Deleted',  'Provider was deleted', true),
+    (16004, 'provider_enabled',       'provider_event', 'Provider Enabled',  'Provider was enabled', true),
+    (16005, 'provider_disabled',      'provider_event', 'Provider Disabled', 'Provider was disabled', true)
 ON CONFLICT DO NOTHING;
 
 /*
  * Event Codes - Errors (30xxx)
  */
-INSERT INTO const.event_code (event_id, code, category_code, title, description) VALUES
+INSERT INTO const.event_code (event_id, code, category_code, title, description, is_system) VALUES
     -- Security/auth errors (30001-30999)
-    (30001, 'err_api_key_invalid',    'security_error', 'Invalid API Key',       'API key/secret combination is not valid'),
-    (30002, 'err_token_invalid',      'security_error', 'Invalid Token',         'Token is not valid or has expired'),
-    (30003, 'err_token_wrong_user',   'security_error', 'Token Wrong User',      'Token was created for different user'),
-    (30004, 'err_token_already_used', 'security_error', 'Token Already Used',    'Token has already been used'),
-    (30005, 'err_token_not_found',    'security_error', 'Token Not Found',       'Token does not exist'),
+    (30001, 'err_api_key_invalid',    'security_error', 'Invalid API Key',       'API key/secret combination is not valid', true),
+    (30002, 'err_token_invalid',      'security_error', 'Invalid Token',         'Token is not valid or has expired', true),
+    (30003, 'err_token_wrong_user',   'security_error', 'Token Wrong User',      'Token was created for different user', true),
+    (30004, 'err_token_already_used', 'security_error', 'Token Already Used',    'Token has already been used', true),
+    (30005, 'err_token_not_found',    'security_error', 'Token Not Found',       'Token does not exist', true),
 
     -- Validation errors (31001-31999)
-    (31001, 'err_either_group_or_user',      'validation_error', 'Either Group or User Required',      'Either user group or target user id must not be null'),
-    (31002, 'err_either_perm_set_or_perm',   'validation_error', 'Either Perm Set or Perm Required',   'Either permission set code or permission code must not be null'),
-    (31003, 'err_either_perm_id_or_code',    'validation_error', 'Either Perm ID or Code Required',    'Either permission id or code must not be null'),
-    (31004, 'err_either_mapping_id_or_role', 'validation_error', 'Either Mapping ID or Role Required', 'Either mapped object id or mapped role must not be empty'),
+    (31001, 'err_either_group_or_user',      'validation_error', 'Either Group or User Required',      'Either user group or target user id must not be null', true),
+    (31002, 'err_either_perm_set_or_perm',   'validation_error', 'Either Perm Set or Perm Required',   'Either permission set code or permission code must not be null', true),
+    (31003, 'err_either_perm_id_or_code',    'validation_error', 'Either Perm ID or Code Required',    'Either permission id or code must not be null', true),
+    (31004, 'err_either_mapping_id_or_role', 'validation_error', 'Either Mapping ID or Role Required', 'Either mapped object id or mapped role must not be empty', true),
+    (31010, 'err_event_code_is_system',      'validation_error', 'System Event Code',                  'Cannot modify or delete a system event code', true),
+    (31011, 'err_event_code_not_found',      'validation_error', 'Event Code Not Found',               'Event code does not exist', true),
+    (31012, 'err_event_category_not_empty',  'validation_error', 'Event Category Not Empty',           'Event category still has event codes', true),
+    (31013, 'err_event_id_out_of_range',     'validation_error', 'Event ID Out of Range',              'Event ID is outside the category range', true),
+    (31014, 'err_event_category_not_found',  'validation_error', 'Event Category Not Found',           'Event category does not exist', true),
 
     -- Permission errors (32001-32999)
-    (32001, 'err_no_permission',             'permission_error', 'No Permission',             'User does not have required permission'),
-    (32002, 'err_permission_not_found',      'permission_error', 'Permission Not Found',      'Permission does not exist'),
-    (32003, 'err_permission_not_assignable', 'permission_error', 'Permission Not Assignable', 'Permission is not assignable'),
-    (32004, 'err_perm_set_not_found',        'permission_error', 'Permission Set Not Found',  'Permission set does not exist'),
-    (32005, 'err_perm_set_not_assignable',   'permission_error', 'Permission Set Not Assignable', 'Permission set is not assignable'),
-    (32006, 'err_perm_set_wrong_tenant',     'permission_error', 'Permission Set Wrong Tenant', 'Permission set is not defined in this tenant'),
-    (32007, 'err_parent_permission_not_found','permission_error','Parent Permission Not Found', 'Parent permission does not exist'),
-    (32008, 'err_some_perms_not_assignable', 'permission_error', 'Some Permissions Not Assignable', 'Some permissions are not assignable'),
+    (32001, 'err_no_permission',             'permission_error', 'No Permission',             'User does not have required permission', true),
+    (32002, 'err_permission_not_found',      'permission_error', 'Permission Not Found',      'Permission does not exist', true),
+    (32003, 'err_permission_not_assignable', 'permission_error', 'Permission Not Assignable', 'Permission is not assignable', true),
+    (32004, 'err_perm_set_not_found',        'permission_error', 'Permission Set Not Found',  'Permission set does not exist', true),
+    (32005, 'err_perm_set_not_assignable',   'permission_error', 'Permission Set Not Assignable', 'Permission set is not assignable', true),
+    (32006, 'err_perm_set_wrong_tenant',     'permission_error', 'Permission Set Wrong Tenant', 'Permission set is not defined in this tenant', true),
+    (32007, 'err_parent_permission_not_found','permission_error','Parent Permission Not Found', 'Parent permission does not exist', true),
+    (32008, 'err_some_perms_not_assignable', 'permission_error', 'Some Permissions Not Assignable', 'Some permissions are not assignable', true),
 
     -- User/group errors (33001-33999)
-    (33001, 'err_user_not_found',            'user_error', 'User Not Found',         'User does not exist'),
-    (33002, 'err_user_is_system',            'user_error', 'User Is System',         'User is a system user'),
-    (33003, 'err_user_not_active',           'user_error', 'User Not Active',        'User is not in active state'),
-    (33004, 'err_user_locked',               'user_error', 'User Locked',            'User is locked out'),
-    (33005, 'err_user_cannot_login',         'user_error', 'User Cannot Login',      'User is not supposed to log in'),
-    (33006, 'err_user_no_email_provider',    'user_error', 'User No Email Provider', 'User cannot be ensured for email provider'),
-    (33007, 'err_identity_already_used',     'user_error', 'Identity Already Used',  'User identity is already in use'),
-    (33008, 'err_identity_not_active',       'user_error', 'Identity Not Active',    'User identity is not in active state'),
-    (33009, 'err_identity_not_found',        'user_error', 'Identity Not Found',     'User identity does not exist'),
-    (33010, 'err_provider_not_active',       'user_error', 'Provider Not Active',    'Provider is not in active state'),
-    (33011, 'err_group_not_found',           'user_error', 'Group Not Found',        'User group does not exist'),
-    (33012, 'err_group_not_active',          'user_error', 'Group Not Active',       'User group is not active'),
-    (33013, 'err_group_not_assignable',      'user_error', 'Group Not Assignable',   'User group is not assignable or is external'),
-    (33014, 'err_group_is_system',           'user_error', 'Group Is System',        'User group is a system group'),
-    (33015, 'err_not_owner',                 'user_error', 'Not Owner',              'User is not tenant or group owner'),
+    (33001, 'err_user_not_found',            'user_error', 'User Not Found',         'User does not exist', true),
+    (33002, 'err_user_is_system',            'user_error', 'User Is System',         'User is a system user', true),
+    (33003, 'err_user_not_active',           'user_error', 'User Not Active',        'User is not in active state', true),
+    (33004, 'err_user_locked',               'user_error', 'User Locked',            'User is locked out', true),
+    (33005, 'err_user_cannot_login',         'user_error', 'User Cannot Login',      'User is not supposed to log in', true),
+    (33006, 'err_user_no_email_provider',    'user_error', 'User No Email Provider', 'User cannot be ensured for email provider', true),
+    (33007, 'err_identity_already_used',     'user_error', 'Identity Already Used',  'User identity is already in use', true),
+    (33008, 'err_identity_not_active',       'user_error', 'Identity Not Active',    'User identity is not in active state', true),
+    (33009, 'err_identity_not_found',        'user_error', 'Identity Not Found',     'User identity does not exist', true),
+    (33010, 'err_provider_not_active',       'user_error', 'Provider Not Active',    'Provider is not in active state', true),
+    (33011, 'err_group_not_found',           'user_error', 'Group Not Found',        'User group does not exist', true),
+    (33012, 'err_group_not_active',          'user_error', 'Group Not Active',       'User group is not active', true),
+    (33013, 'err_group_not_assignable',      'user_error', 'Group Not Assignable',   'User group is not assignable or is external', true),
+    (33014, 'err_group_is_system',           'user_error', 'Group Is System',        'User group is a system group', true),
+    (33015, 'err_not_owner',                 'user_error', 'Not Owner',              'User is not tenant or group owner', true),
 
     -- Tenant errors (34001-34999)
-    (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant')
+    (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true)
 ON CONFLICT DO NOTHING;
 
 /*
@@ -302,49 +307,14 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (16002, 'en', 'Provider "{provider_code}" was updated by {actor}'),
     (16003, 'en', 'Provider "{provider_code}" was deleted by {actor}'),
     (16004, 'en', 'Provider "{provider_code}" was enabled by {actor}'),
-    (16005, 'en', 'Provider "{provider_code}" was disabled by {actor}')
-ON CONFLICT DO NOTHING;
+    (16005, 'en', 'Provider "{provider_code}" was disabled by {actor}'),
 
-/*
- * User Event Types - Backwards compatibility mapping
- */
-INSERT INTO const.user_event_type (code, event_id) VALUES
-    -- Legacy codes mapped to new event_ids
-    ('login', 10010),
-    ('logout', 10011),
-    ('password_change', 10020),
-    ('password_reset', 10021),
-    ('email_verification', 10040),
-    ('account_created', 10001),
-    ('account_deleted', 10003),
-    ('account_locked', 10006),
-    ('account_unlocked', 10007),
-    ('permission_granted', 12010),
-    ('permission_revoked', 12011),
-    -- Extended event types
-    ('create_user_info', 10001),
-    ('update_user_info', 10002),
-    ('delete_user_info', 10003),
-    ('create_user_identity', 10030),
-    ('update_user_identity', 10031),
-    ('delete_user_identity', 10032),
-    ('user_logged_in', 10010),
-    ('user_logged_out', 10011),
-    ('user_invitation_sent', 10060),
-    ('user_invitation_accepted', 10061),
-    ('user_invitation_rejected', 10062),
-    ('phone_verification', 10041),
-    ('password_reset_requested', 10021),
-    ('password_changed', 10020),
-    ('create_mfa_email', 10050),
-    ('update_mfa_email', 10050),
-    ('delete_mfa_email', 10051),
-    ('create_mfa_phone', 10050),
-    ('update_mfa_phone', 10050),
-    ('delete_mfa_phone', 10051),
-    ('external_data_update', 10070),
-    ('external_data_updated', 10070),
-    ('api_key_validating', 14010)
+    -- Validation error messages (31xxx)
+    (31010, 'en', 'Cannot modify or delete system event code (event_id: {event_id})'),
+    (31011, 'en', 'Event code (event_id: {event_id}) does not exist'),
+    (31012, 'en', 'Event category "{category_code}" still has event codes and cannot be deleted'),
+    (31013, 'en', 'Event ID {event_id} is outside the allowed range ({range_start}-{range_end}) for category "{category_code}"'),
+    (31014, 'en', 'Event category "{category_code}" does not exist')
 ON CONFLICT DO NOTHING;
 
 -- Create system user, primary tenant, and seed all permissions/providers/groups

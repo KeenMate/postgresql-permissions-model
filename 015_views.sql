@@ -70,8 +70,8 @@ SELECT ug.tenant_id,
     u.mapped_object_name,
     u.mapped_role
    FROM auth.user_group ug
-     LEFT JOIN auth.user_group_member ugm ON ugm.group_id = ug.user_group_id
+     LEFT JOIN auth.user_group_member ugm ON ugm.user_group_id = ug.user_group_id
      LEFT JOIN auth.user_info ui ON ui.user_id = ugm.user_id
      JOIN auth.tenant t ON ug.tenant_id = t.tenant_id
-     LEFT JOIN auth.user_group_mapping u ON ugm.mapping_id = u.ug_mapping_id;
+     LEFT JOIN auth.user_group_mapping u ON ugm.mapping_id = u.user_group_mapping_id;
 

@@ -58,7 +58,7 @@ BEGIN
     SELECT user_group_id INTO __test_group_id FROM auth.user_group WHERE code = 'cache_test_group';
 
     -- Add user to group
-    INSERT INTO auth.user_group_member (created_by, group_id, user_id, member_type_code)
+    INSERT INTO auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
     VALUES ('test', __test_group_id, __test_user_id, 'manual')
     ON CONFLICT DO NOTHING;
 

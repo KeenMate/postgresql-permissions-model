@@ -590,6 +590,226 @@ select * from add_journal_msg_jsonb(
 );
 $$;
 
+/*
+ * Event Code Management Functions
+ * ================================
+ *
+ * CRUD functions for managing event categories, codes, and messages at runtime.
+ * System events (is_system = true) are protected from deletion.
+ * Application-specific events should use the 50000+ range.
+ */
+
+-- Create a new event category
+create or replace function public.create_event_category(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _category_code text,
+    _title text,
+    _range_start integer,
+    _range_end integer,
+    _is_error boolean default false
+) returns setof const.event_category
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    insert into const.event_category (category_code, title, range_start, range_end, is_error)
+    values (_category_code, _title, _range_start, _range_end, _is_error);
+
+    return query
+        select *
+        from const.event_category
+        where category_code = _category_code;
+end;
+$$;
+
+-- Create a new event code
+create or replace function public.create_event_code(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _event_id integer,
+    _code text,
+    _category_code text,
+    _title text,
+    _description text default null,
+    _is_read_only boolean default false
+) returns setof const.event_code
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __range_start integer;
+    __range_end integer;
+begin
+    -- Validate category exists
+    select range_start, range_end
+    into __range_start, __range_end
+    from const.event_category
+    where category_code = _category_code;
+
+    if __range_start is null then
+        perform error.raise_31014(_category_code);
+    end if;
+
+    -- Validate event_id is within the category's range
+    if _event_id < __range_start or _event_id > __range_end then
+        perform error.raise_31013(_event_id, _category_code, __range_start, __range_end);
+    end if;
+
+    -- Always insert with is_system = false (system events come from seed only)
+    insert into const.event_code (event_id, code, category_code, title, description, is_read_only, is_system)
+    values (_event_id, _code, _category_code, _title, _description, _is_read_only, false);
+
+    return query
+        select *
+        from const.event_code
+        where event_id = _event_id;
+end;
+$$;
+
+-- Create a new event message template
+create or replace function public.create_event_message(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _event_id integer,
+    _message_template text,
+    _language_code text default 'en'
+) returns setof const.event_message
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    -- Validate event_code exists
+    if not exists (select 1 from const.event_code where event_id = _event_id) then
+        perform error.raise_31011(_event_id);
+    end if;
+
+    insert into const.event_message (created_by, updated_by, event_id, language_code, message_template)
+    values (_created_by, _created_by, _event_id, _language_code, _message_template);
+
+    return query
+        select *
+        from const.event_message
+        where event_id = _event_id
+          and language_code = _language_code
+          and is_active = true;
+end;
+$$;
+
+-- Delete an event code (system events are protected)
+create or replace function public.delete_event_code(
+    _deleted_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _event_id integer
+) returns void
+    language plpgsql
+as
+$$
+declare
+    __is_system boolean;
+begin
+    -- Check event code exists and get is_system flag
+    select is_system
+    into __is_system
+    from const.event_code
+    where event_id = _event_id;
+
+    if __is_system is null then
+        perform error.raise_31011(_event_id);
+    end if;
+
+    -- Protect system events
+    if __is_system then
+        perform error.raise_31010(_event_id);
+    end if;
+
+    -- Cascade: delete related event messages
+    delete from const.event_message where event_id = _event_id;
+
+    -- Delete the event code
+    delete from const.event_code where event_id = _event_id;
+end;
+$$;
+
+-- Delete an event category (must have no event codes)
+create or replace function public.delete_event_category(
+    _deleted_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _category_code text
+) returns void
+    language plpgsql
+as
+$$
+begin
+    -- Check category exists
+    if not exists (select 1 from const.event_category where category_code = _category_code) then
+        perform error.raise_31014(_category_code);
+    end if;
+
+    -- Check no system events belong to this category
+    if exists (select 1 from const.event_code where category_code = _category_code and is_system = true) then
+        perform error.raise_31010(
+            (select event_id from const.event_code where category_code = _category_code and is_system = true limit 1)
+        );
+    end if;
+
+    -- Check no event codes reference it
+    if exists (select 1 from const.event_code where category_code = _category_code) then
+        perform error.raise_31012(_category_code);
+    end if;
+
+    -- Delete the category
+    delete from const.event_category where category_code = _category_code;
+end;
+$$;
+
+-- Delete an event message (system event messages are protected)
+create or replace function public.delete_event_message(
+    _deleted_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _event_message_id integer
+) returns void
+    language plpgsql
+as
+$$
+declare
+    __event_id integer;
+    __is_system boolean;
+begin
+    -- Get the parent event_id
+    select event_id
+    into __event_id
+    from const.event_message
+    where event_message_id = _event_message_id;
+
+    if __event_id is null then
+        perform error.raise_31011(0);
+    end if;
+
+    -- Check parent event_code is_system
+    select is_system
+    into __is_system
+    from const.event_code
+    where event_id = __event_id;
+
+    if __is_system then
+        perform error.raise_31010(__event_id);
+    end if;
+
+    -- Delete the message
+    delete from const.event_message where event_message_id = _event_message_id;
+end;
+$$;
+
 -- Legacy alias for backwards compatibility
 create or replace function public.search_journal_msgs(
     _user_id bigint,
