@@ -10,6 +10,7 @@
  * - 32001-32999: Permission errors
  * - 33001-33999: User/group errors
  * - 34001-34999: Tenant errors
+ * - 36001-36999: Token config errors
  *
  * This file is part of the PostgreSQL Permissions Model v2
  */
@@ -462,6 +463,32 @@ $$
 begin
     raise exception 'User (username: %) has no access to tenant (id: %)', _username, _tenant_id
         using errcode = '34001';
+end;
+$$;
+
+/*
+ * Token Config Errors (36001-36999)
+ */
+
+-- 36001: Token type not found
+create or replace function error.raise_36001(_token_type_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Token type (code: %) does not exist', _token_type_code
+        using errcode = '36001';
+end;
+$$;
+
+-- 36002: Token type is system
+create or replace function error.raise_36002(_token_type_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Token type (code: %) is a system token type and cannot be modified or deleted', _token_type_code
+        using errcode = '36002';
 end;
 $$;
 

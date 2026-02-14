@@ -332,3 +332,133 @@ begin
 end;
 $$;
 
+/*
+ * Token Type CRUD Functions
+ * =========================
+ */
+
+create or replace function public.get_token_types()
+    returns setof const.token_type
+    stable
+    language sql
+as
+$$
+    select * from const.token_type order by code;
+$$;
+
+create or replace function public.create_token_type(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _code text,
+    _default_expiration_in_seconds integer default null,
+    _tenant_id integer default 1
+) returns setof const.token_type
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'token_configuration.create_token_type', _tenant_id);
+
+    insert into const.token_type (code, default_expiration_in_seconds, is_system)
+    values (_code, _default_expiration_in_seconds, false);
+
+    perform create_journal_message(_created_by, _user_id, _correlation_id
+        , 19001  -- token_type_created
+        , 'token_type', 0
+        , jsonb_build_object('token_type_code', _code, 'actor', _created_by)
+        , _tenant_id);
+
+    return query
+        select *
+        from const.token_type
+        where code = _code;
+end;
+$$;
+
+create or replace function public.update_token_type(
+    _updated_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _code text,
+    _default_expiration_in_seconds integer default null,
+    _tenant_id integer default 1
+) returns setof const.token_type
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __is_system boolean;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'token_configuration.update_token_type', _tenant_id);
+
+    select is_system
+    into __is_system
+    from const.token_type
+    where code = _code;
+
+    if __is_system is null then
+        perform error.raise_36001(_code);
+    end if;
+
+    if __is_system then
+        perform error.raise_36002(_code);
+    end if;
+
+    update const.token_type
+    set default_expiration_in_seconds = _default_expiration_in_seconds
+    where code = _code;
+
+    perform create_journal_message(_updated_by, _user_id, _correlation_id
+        , 19002  -- token_type_updated
+        , 'token_type', 0
+        , jsonb_build_object('token_type_code', _code, 'actor', _updated_by)
+        , _tenant_id);
+
+    return query
+        select *
+        from const.token_type
+        where code = _code;
+end;
+$$;
+
+create or replace function public.delete_token_type(
+    _deleted_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _code text,
+    _tenant_id integer default 1
+) returns void
+    language plpgsql
+as
+$$
+declare
+    __is_system boolean;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'token_configuration.delete_token_type', _tenant_id);
+
+    select is_system
+    into __is_system
+    from const.token_type
+    where code = _code;
+
+    if __is_system is null then
+        perform error.raise_36001(_code);
+    end if;
+
+    if __is_system then
+        perform error.raise_36002(_code);
+    end if;
+
+    delete from const.token_type where code = _code;
+
+    perform create_journal_message(_deleted_by, _user_id, _correlation_id
+        , 19003  -- token_type_deleted
+        , 'token_type', 0
+        , jsonb_build_object('token_type_code', _code, 'actor', _deleted_by)
+        , _tenant_id);
+end;
+$$;
+

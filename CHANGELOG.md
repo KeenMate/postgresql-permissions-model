@@ -5,9 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.4.0] - 2026-02-13
+## [2.4.0] - 2026-02-14
 
 ### Added
+
+#### Hierarchical Short Permission Codes
+Added compact hierarchical `short_code` to permissions for wire-format optimization. Instead of sending full permission codes like `token_configuration.create_token_type` (42 chars), services can download the mapping once at startup and send short codes like `05.01` over the wire.
+
+**Schema Changes:**
+- `auth.permission` - Added `short_code text` column with unique partial index
+- `auth.user_permission_cache` - Added `short_code_permissions text[]` column
+
+**New Functions:**
+
+| Function | Description |
+|----------|-------------|
+| `unsecure.compute_short_code(_permission_id)` | Computes hierarchical short code (e.g., `03.01`) by counting sibling ordinals at each tree level |
+| `unsecure.update_permission_short_code(_perm_path)` | Batch-updates short codes for all permissions in a subtree |
+| `public.get_permissions_map()` | Returns `(permission_id, full_code, short_code, title)` for all assignable permissions - no permission check required |
+
+**Optional Custom Short Code:** `unsecure.create_permission()`, `unsecure.create_permission_as_system()`, and `auth.create_permission()` accept an optional `_short_code text` parameter. When provided, the custom value is used instead of the auto-computed hierarchical code. This allows consumers to use custom codes (e.g., random tokens like `x7f9k2`) for specific permissions.
+
+**Extended Return Types:**
+- `unsecure.recalculate_user_permissions()` - Returns `__short_code_permissions text[]` as 5th column
+- `auth.ensure_groups_and_permissions()` - Returns `__short_code_permissions text[]` as 5th column
+- `auth.get_users_groups_and_permissions()` - Returns `__short_code_permissions text[]` as 5th column
+- `auth.get_all_permissions()` - Returns `__short_code text` column
+- `auth.search_permissions()` - Returns `__short_code text` column
+- `unsecure.get_all_permissions()` - Returns `__short_code text` column
+- `auth.effective_permissions` view - Added `permission_short_code` column
+
+**Automatic Assignment:** `short_code` is computed automatically when permissions are created via `unsecure.create_permission()` (unless a custom `_short_code` is provided). Existing permissions are backfilled during seed data execution.
+
+**Design:** Server-side `has_permissions()` checks remain text-based for readability/auditability. Short codes are purely for wire-format optimization in client-server communication.
 
 #### Language & Translation System
 Merged the standalone `postgresql-languages-model` into the permissions model. All functions now have direct access to a single language/translation system without duplicating infrastructure.
@@ -97,8 +127,61 @@ Added to `system_admin` and `tenant_admin` permission sets.
 - Colored output in `tests/run-tests.sh`: green for PASS, red for FAIL/ERROR
 - Colors auto-disable when output is piped (not a terminal)
 
+#### Token Type CRUD Management
+Runtime management of `const.token_type` entries, following the same pattern as event code CRUD.
+
+**New Functions (public schema):**
+
+| Function | Permission | Description |
+|----------|-----------|-------------|
+| `create_token_type()` | `token_configuration.create_token_type` | Create custom token type with optional expiration |
+| `update_token_type()` | `token_configuration.update_token_type` | Update token type expiration (non-system only) |
+| `delete_token_type()` | `token_configuration.delete_token_type` | Delete token type (non-system only) |
+| `get_token_types()` | none | List all token types |
+
+**Schema Changes:**
+- Added `is_system boolean` column to `const.token_type` — protects seeded types from modification/deletion
+
+**New Permissions:**
+
+| Permission Code | Description |
+|-----------------|-------------|
+| `token_configuration.create_token_type` | Create new token types |
+| `token_configuration.update_token_type` | Update existing token types |
+| `token_configuration.delete_token_type` | Delete token types |
+| `token_configuration.read_token_types` | Read token type list |
+
+Added to `system_admin` permission set.
+
+**New Event Codes:**
+
+| Range | Category | Codes |
+|-------|----------|-------|
+| 19001-19999 | `token_config_event` | 19001 token_type_created, 19002 token_type_updated, 19003 token_type_deleted |
+| 36001-36999 | `token_config_error` | 36001 err_token_type_not_found, 36002 err_token_type_is_system |
+
+**New Error Functions:**
+- `error.raise_36001(_token_type_code)` — Token type not found
+- `error.raise_36002(_token_type_code)` — Token type is system
+
 ### Fixed
+
+#### Bug: Missing `validation_failed` Token State
+`auth.set_token_as_failed()` writes `'validation_failed'` to `token_state_code`, but seed data only included `'valid'`, `'used'`, `'expired'`, `'failed'`. This would cause an FK violation at runtime. Added `'validation_failed'` to `const.token_state` seed data.
+
+#### Ambiguous Column References in Auth-Layer Functions
+- `auth.can_manage_user_group` (`021_functions_auth_group.sql`) - Qualified `user_group_id` as `ug.user_group_id`; moved `ugm.user_id` filter from WHERE to JOIN ON so the LEFT JOIN works correctly (previously always returned no rows for non-members)
+- `auth.get_user_available_tenants` (`023_functions_auth_tenant.sql`) - Qualified `tenant_id` and `user_group_id` with `ug.` prefix in CTE
+
+#### Other Fixes
 - `tests/test_event_code_management.sql` - TEST 18 now cleans up journal entries before deleting event code (FK constraint prevented deletion)
+
+#### New Test Coverage
+- `tests/test_auth_group_member_tenant.sql` - 11 tests for auth-layer group member & tenant functions (`auth.create_user_group_member`, `auth.delete_user_group_member`, `auth.get_user_group_members`, `auth.get_user_assigned_groups`, `auth.get_user_available_tenants`), covering happy paths, error cases (inactive/external/nonexistent groups), and full round-trip
+- `tests/test_short_code.sql` - 16 tests for permission short codes: auto-computed hierarchical codes (format, depth, root vs child), custom `_short_code` parameter (override, pass-through via `create_permission_as_system`), unique constraint enforcement, schema validation (`effective_permissions` view, `user_permission_cache` column), return type verification (`get_permissions_map`, `get_all_permissions`), and `recalculate_user_permissions` cache population
+
+### Changed
+- **CLAUDE.md** - Added variable naming convention: `_` for parameters, `__` for return columns, `___` for local variables that clash with return columns
 
 ---
 
@@ -563,7 +646,7 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
-| 2.4.0 | 2026-02-13 | Language & translation system, colored test output |
+| 2.4.0 | 2026-02-14 | Hierarchical numeric permission codes, language & translation system, colored test output |
 | 2.3.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |
 | 2.2.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |
 | 2.1.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |

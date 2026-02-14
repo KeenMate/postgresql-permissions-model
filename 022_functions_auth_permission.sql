@@ -224,7 +224,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
+create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -240,12 +240,12 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission');
 
 	return query
-		select * from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable);
+		select * from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable, _short_code);
 end;
 $$;
 
 create or replace function auth.get_all_permissions(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
-    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean)
+    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean, __short_code text)
     language plpgsql
 as
 $$
@@ -411,6 +411,13 @@ begin
 	perform unsecure.create_permission_as_system('Validate token', 'tokens', true);
 	perform unsecure.create_permission_as_system('Set as used', 'tokens', true);
 
+	-- Permissions: Token configuration
+	perform unsecure.create_permission_as_system('Token configuration');
+	perform unsecure.create_permission_as_system('Create token type', 'token_configuration');
+	perform unsecure.create_permission_as_system('Update token type', 'token_configuration');
+	perform unsecure.create_permission_as_system('Delete token type', 'token_configuration');
+	perform unsecure.create_permission_as_system('Read token types', 'token_configuration');
+
 	-- Permissions: Permissions management
 	perform unsecure.create_permission_as_system('Permissions', null, false);
 	perform unsecure.create_permission_as_system('Create permission', 'permissions');
@@ -516,7 +523,7 @@ begin
 
 	-- Permission sets
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
-		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'api_keys', 'languages', 'translations']);
+		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'api_keys', 'languages', 'translations', 'token_configuration']);
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload']);
 	perform unsecure.create_perm_set_as_system('Tenant admin', true, _is_assignable := true,
@@ -546,7 +553,7 @@ end;
 $$;
 
 create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_groups text[] DEFAULT NULL::text[], _provider_roles text[] DEFAULT NULL::text[])
-    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[])
+    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[], __short_code_permissions text[])
     rows 1
     language plpgsql
 as
@@ -572,24 +579,19 @@ begin
              , _provider_code
              ) ug;
 
-    -- 	return query
--- 	select null::integer,
--- null::uuid,
--- array []::text[],
--- array []::text[];
-
     return query
         select up.__tenant_id
              , up.__tenant_uuid
              , up.__groups
              , up.__permissions
+             , up.__short_code_permissions
         from unsecure.recalculate_user_permissions(_created_by
                  , _target_user_id, null) up;
 end;
 $$;
 
 create or replace function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
-    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[])
+    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[], __short_code_permissions text[])
     rows 1
     language plpgsql
 as
@@ -603,6 +605,7 @@ begin
              , up.__tenant_uuid
              , up.__groups
              , up.__permissions
+             , up.__short_code_permissions
         from unsecure.recalculate_user_permissions(_requested_by
                  , _target_user_id, null) up;
 end;
@@ -638,6 +641,7 @@ create or replace function auth.search_permissions(
         __title text,
         __code text,
         __full_code text,
+        __short_code text,
         __is_assignable boolean,
         __has_children boolean,
         __total_items bigint
@@ -679,6 +683,7 @@ begin
              , p.title
              , p.code
              , p.full_code::text
+             , p.short_code
              , p.is_assignable
              , p.has_children
              , fp.total_items
@@ -752,5 +757,17 @@ begin
                  inner join auth.perm_set ps on fps.perm_set_id = ps.perm_set_id
                  left join permission_counts pc on ps.perm_set_id = pc.perm_set_id;
 end;
+$$;
+
+create or replace function public.get_permissions_map()
+    returns TABLE(__permission_id integer, __full_code text, __short_code text, __title text)
+    stable
+    language sql
+as
+$$
+    select permission_id, full_code::text, short_code, title
+    from auth.permission
+    where is_assignable = true
+    order by full_code;
 $$;
 

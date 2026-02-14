@@ -36,7 +36,8 @@ create table const.token_type
 (
     code                          text not null
         primary key,
-    default_expiration_in_seconds integer
+    default_expiration_in_seconds integer,
+    is_system                     boolean not null default false
 );
 
 create table const.token_channel
@@ -72,6 +73,7 @@ create table const.user_type
  *     13001-13999  Group events (member added, removed)
  *     14001-14999  API key events
  *     15001-15999  Token events
+ *     19001-19999  Token config events
  *
  * 30000-39999  Errors (library)
  *     30001-30999  Security/auth errors
@@ -79,6 +81,7 @@ create table const.user_type
  *     32001-32999  Permission errors
  *     33001-33999  User/group errors
  *     34001-34999  Tenant errors
+ *     36001-36999  Token config errors
  *
  * Reserved for applications:
  * --------------------------

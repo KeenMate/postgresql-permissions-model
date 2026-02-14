@@ -614,7 +614,79 @@ where p.node_path <@ _perm_path
 returning *;
 $$;
 
-create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
+create or replace function unsecure.compute_short_code(_permission_id integer) returns text
+    stable
+    language plpgsql
+as
+$$
+declare
+    __ancestors  ltree;
+    __result     text := '';
+    __depth      integer;
+    __max_depth  integer;
+    __ancestor   record;
+    __ordinal    integer;
+begin
+    -- Get the node_path for this permission
+    select node_path
+    from auth.permission
+    where permission_id = _permission_id
+    into __ancestors;
+
+    if __ancestors is null then
+        return null;
+    end if;
+
+    __max_depth := ext.nlevel(__ancestors);
+
+    for __depth in 1..__max_depth loop
+        -- Get the permission_id at this depth of the path
+        select p.permission_id, p.node_path
+        from auth.permission p
+        where p.node_path = ext.subltree(__ancestors, 0, __depth)
+        into __ancestor;
+
+        -- Count siblings with permission_id <= this one at the same depth/parent
+        if __depth = 1 then
+            -- Root level: count root permissions with id <= this one
+            select count(*)
+            from auth.permission p2
+            where ext.nlevel(p2.node_path) = 1
+              and p2.permission_id <= __ancestor.permission_id
+            into __ordinal;
+        else
+            -- Child level: count siblings under same parent with id <= this one
+            select count(*)
+            from auth.permission p2
+            where p2.node_path <@ ext.subltree(__ancestors, 0, __depth - 1)
+              and ext.nlevel(p2.node_path) = __depth
+              and p2.permission_id <= __ancestor.permission_id
+            into __ordinal;
+        end if;
+
+        if __result = '' then
+            __result := lpad(__ordinal::text, 2, '0');
+        else
+            __result := __result || '.' || lpad(__ordinal::text, 2, '0');
+        end if;
+    end loop;
+
+    return __result;
+end;
+$$;
+
+create or replace function unsecure.update_permission_short_code(_perm_path ext.ltree) returns SETOF auth.permission
+    rows 1
+    language sql
+as
+$$
+update auth.permission p
+set short_code = unsecure.compute_short_code(p.permission_id)
+where p.node_path <@ _perm_path
+returning *;
+$$;
+
+create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -669,6 +741,12 @@ begin
 	from unsecure.update_permission_full_code(__p)
 	into __full_code;
 
+	if helpers.is_not_empty_string(_short_code) then
+		update auth.permission set short_code = _short_code where permission_id = __last_id;
+	else
+		perform unsecure.update_permission_short_code(__p);
+	end if;
+
 	return query
 		select *
 		from auth.permission
@@ -682,22 +760,22 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_permission_as_system(_title text, _parent_code text DEFAULT ''::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission
+create or replace function unsecure.create_permission_as_system(_title text, _parent_code text DEFAULT ''::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text) returns SETOF auth.permission
     rows 1
     language sql
 as
 $$
 select *
-from unsecure.create_permission('system', 1, null, _title, _parent_code, _is_assignable);
+from unsecure.create_permission('system', 1, null, _title, _parent_code, _is_assignable, _short_code);
 $$;
 
 create or replace function unsecure.get_all_permissions(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean)
+    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean, __short_code text)
     language plpgsql
 as
 $$
 begin
-	return query select permission_id, is_assignable, title, code, full_code::text, has_children
+	return query select permission_id, is_assignable, title, code, full_code::text, has_children, short_code
 							 from auth.permission
 							 order by full_code;
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
@@ -1413,7 +1491,7 @@ end;
 $$;
 
 create or replace function unsecure.recalculate_user_permissions(_created_by text, _target_user_id bigint, _tenant_id integer DEFAULT NULL::integer)
-    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[])
+    returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[], __short_code_permissions text[])
     language plpgsql
 as
 $$
@@ -1455,6 +1533,7 @@ begin
                  , upc.tenant_uuid
                  , upc.groups
                  , upc.permissions
+                 , upc.short_code_permissions
             from auth.user_permission_cache upc
             where upc.tenant_id = _tenant_id
               and upc.user_id = _target_user_id;
@@ -1473,10 +1552,11 @@ begin
 
         create temporary table __temp_users_groups_permissions
         (
-            tenant_id        integer,
-            tenant_uuid      uuid,
-            group_codes      text[],
-            permission_codes text[]
+            tenant_id                integer,
+            tenant_uuid              uuid,
+            group_codes              text[],
+            permission_codes         text[],
+            short_code_permission_codes text[]
         ) on commit drop;
 
         with ugs as (
@@ -1491,6 +1571,7 @@ begin
             select distinct pa.tenant_id
                           , ug.tenant_uuid
                           , ep.permission_code as full_code
+                          , ep.permission_short_code as short_code
             from ugs ug
                      inner join auth.permission_assignment pa
                                 on ug.user_group_id = pa.user_group_id
@@ -1501,6 +1582,7 @@ begin
             select distinct pa.tenant_id
                           , ug.tenant_uuid
                           , sp.full_code
+                          , sp.short_code
             from ugs ug
                      inner join auth.permission_assignment pa
                                 on ug.user_group_id = pa.user_group_id
@@ -1511,6 +1593,7 @@ begin
             select distinct pa.tenant_id
                           , t.uuid             as tenant_uuid
                           , ep.permission_code as full_code
+                          , ep.permission_short_code as short_code
             from auth.permission_assignment pa
                      inner join auth.tenant t on pa.tenant_id = t.tenant_id
                      inner join auth.effective_permissions ep
@@ -1522,6 +1605,7 @@ begin
             select distinct pa.tenant_id
                           , t.uuid as tenant_uuid
                           , sp.full_code
+                          , sp.short_code
             from auth.permission_assignment pa
                      inner join auth.tenant t on pa.tenant_id = t.tenant_id
                      inner join auth.permission p
@@ -1533,58 +1617,66 @@ begin
             select distinct ga.tenant_id
                           , ga.tenant_uuid
                           , ga.full_code
+                          , ga.short_code
             from group_assignments ga
             union
             select ua.tenant_id
                  , ua.tenant_uuid
                  , ua.full_code
+                 , ua.short_code
             from user_assignments ua
             order by full_code)
         insert
-        into __temp_users_groups_permissions(tenant_id, tenant_uuid, group_codes, permission_codes)
+        into __temp_users_groups_permissions(tenant_id, tenant_uuid, group_codes, permission_codes, short_code_permission_codes)
         select data.tenant_id
              , data.tenant_uuid
              , coalesce(array_agg(distinct data.groups) filter ( where data.groups is not null ), array []::text[])
              , coalesce(array_agg(distinct data.perms) filter ( where data.perms is not null ), array []::text[])
+             , coalesce(array_agg(distinct data.short_code_perms) filter ( where data.short_code_perms is not null ), array []::text[])
         from (
                  select ug.tenant_id
                       , ug.tenant_uuid
                       , ug.group_code as groups
                       , null          as perms
+                      , null          as short_code_perms
                  from ugs ug
                  union
                  select up.tenant_id
                       , up.tenant_uuid
                       , null
                       , up.full_code::text
+                      , up.short_code
                  from user_permissions up) data
         group by data.tenant_id, data.tenant_uuid;
 
         __expiration_date := now() + interval '1 second' * __perm_cache_timeout_in_s;
 
         insert into auth.user_permission_cache (created_by, user_id, tenant_id, tenant_uuid, groups, permissions,
-                                                expiration_date)
+                                                short_code_permissions, expiration_date)
         select _created_by
              , _target_user_id
              , tugp.tenant_id
              , tugp.tenant_uuid
              , tugp.group_codes
              , tugp.permission_codes
+             , tugp.short_code_permission_codes
              , __expiration_date
         from __temp_users_groups_permissions tugp
         on conflict (user_id, tenant_id )
             do update
-            set updated_at      = now()
-              , updated_by      = _created_by
-              , groups          = excluded.groups
-              , permissions     = excluded.permissions
-              , expiration_date = __expiration_date;
+            set updated_at              = now()
+              , updated_by              = _created_by
+              , groups                  = excluded.groups
+              , permissions             = excluded.permissions
+              , short_code_permissions  = excluded.short_code_permissions
+              , expiration_date         = __expiration_date;
 
         return query
             select ugp.tenant_id
                  , ugp.tenant_uuid
                  , ugp.group_codes
                  , ugp.permission_codes
+                 , ugp.short_code_permission_codes
             from __temp_users_groups_permissions ugp
             where _tenant_id is null
                or ugp.tenant_id = _tenant_id

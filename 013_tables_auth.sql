@@ -131,9 +131,10 @@ create table auth.user_permission_cache
         references auth.tenant,
     tenant_uuid     uuid                        not null
         references auth.tenant (uuid),
-    groups          text[] default '{}'::text[] not null,
-    permissions     text[] default '{}'::text[] not null,
-    expiration_date timestamp with time zone    not null,
+    groups              text[] default '{}'::text[] not null,
+    permissions         text[] default '{}'::text[] not null,
+    short_code_permissions text[] default '{}'::text[] not null,
+    expiration_date     timestamp with time zone    not null,
     constraint user_permission_cache_created_by_check
         check (length(created_by) <= 250),
     constraint user_permission_cache_updated_by_check
@@ -208,6 +209,7 @@ create table auth.permission
     has_children    boolean default false not null,
     full_title      text,
     nrm_search_data text,
+    short_code      text,
     constraint permission_created_by_check
         check (length(created_by) <= 250),
     constraint permission_updated_by_check
@@ -517,6 +519,9 @@ create unique index uq_permission_full_code
 
 create index ix_permission_node_path
     on auth.permission using gist (node_path);
+
+create unique index uq_permission_short_code
+    on auth.permission (short_code) where short_code is not null;
 
 create unique index uq_user_group_mapping
     on auth.user_group_mapping (user_group_id, provider_code, coalesce(mapped_object_id, ''::text), coalesce(mapped_role, ''::text));

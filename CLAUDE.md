@@ -351,6 +351,7 @@ Test files should:
 - All timestamps use `timestamptz` for timezone awareness
 - **Schema Security Model**: `public` and `auth` always check permissions; `internal` is for trusted contexts; `unsecure` is only for security internals
 - **SQL Convention**: Always use fully qualified schema names (e.g., `auth.has_permission`, `public.__version`) to prevent search_path related errors
+- **Variable Naming Convention**: Function parameters use `_` prefix (e.g., `_user_id`), return columns use `__` prefix (e.g., `__user_id`). When a local variable would clash with a `__` return column, use `___` (triple underscore) prefix for the local variable (e.g., `___user_id`). This prevents ambiguous column/variable errors in PL/pgSQL blocks that query functions returning `__`-prefixed columns.
 - **Group Mapping Strategy**: Supports internal, external, and hybrid group membership models for flexible integration with any identity provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
 - **Extensible User Data**: `user_data` table can be modified with custom columns OR create separate tables referencing `user_info.user_id`
 - Permission caching is implemented - use `unsecure.clear_permission_cache()` when needed

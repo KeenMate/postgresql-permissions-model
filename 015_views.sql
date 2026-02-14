@@ -28,7 +28,7 @@ SELECT ug.user_group_id,
   WHERE ug.is_active;
 
 create or replace view auth.effective_permissions
-            (perm_set_id, perm_set_code, perm_set_title, perm_set_is_assignable, permission_id, permission_title, permission_code, permission_is_assignable) as
+            (perm_set_id, perm_set_code, perm_set_title, perm_set_is_assignable, permission_id, permission_title, permission_code, permission_short_code, permission_is_assignable) as
 SELECT DISTINCT ps.perm_set_id,
     ps.code AS perm_set_code,
     ps.title AS perm_set_title,
@@ -36,6 +36,7 @@ SELECT DISTINCT ps.perm_set_id,
     sp.permission_id,
     sp.title AS permission_title,
     sp.full_code AS permission_code,
+    sp.short_code AS permission_short_code,
     sp.is_assignable AS permission_is_assignable
    FROM auth.perm_set ps
      JOIN auth.perm_set_perm psp ON ps.perm_set_id = psp.perm_set_id

@@ -11,11 +11,11 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 -- Token types
-INSERT INTO const.token_type (code, default_expiration_in_seconds) VALUES
-    ('password_reset', 3600),
-    ('email_verification', 86400),
-    ('invite', 604800),
-    ('mfa', 300)
+INSERT INTO const.token_type (code, default_expiration_in_seconds, is_system) VALUES
+    ('password_reset', 3600, true),
+    ('email_verification', 86400, true),
+    ('invite', 604800, true),
+    ('mfa', 300, true)
 ON CONFLICT DO NOTHING;
 
 -- Token channels
@@ -30,7 +30,8 @@ INSERT INTO const.token_state (code) VALUES
     ('valid'),
     ('used'),
     ('expired'),
-    ('failed')
+    ('failed'),
+    ('validation_failed')
 ON CONFLICT DO NOTHING;
 
 -- User types
@@ -77,12 +78,14 @@ INSERT INTO const.event_category (category_code, title, range_start, range_end, 
     ('apikey_event',     'API Key Events',    14001, 14999, false),
     ('token_event',      'Token Events',      15001, 15999, false),
     ('provider_event',   'Provider Events',   16001, 16999, false),
+    ('token_config_event','Token Config Events',19001, 19999, false),
     -- Errors (30xxx)
     ('security_error',   'Security Errors',   30001, 30999, true),
     ('validation_error', 'Validation Errors', 31001, 31999, true),
     ('permission_error', 'Permission Errors', 32001, 32999, true),
     ('user_error',       'User/Group Errors', 33001, 33999, true),
-    ('tenant_error',     'Tenant Errors',     34001, 34999, true)
+    ('tenant_error',     'Tenant Errors',     34001, 34999, true),
+    ('token_config_error','Token Config Errors',36001, 36999, true)
 ON CONFLICT DO NOTHING;
 
 /*
@@ -163,7 +166,12 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     (16002, 'provider_updated',       'provider_event', 'Provider Updated',  'Provider was updated', true),
     (16003, 'provider_deleted',       'provider_event', 'Provider Deleted',  'Provider was deleted', true),
     (16004, 'provider_enabled',       'provider_event', 'Provider Enabled',  'Provider was enabled', true),
-    (16005, 'provider_disabled',      'provider_event', 'Provider Disabled', 'Provider was disabled', true)
+    (16005, 'provider_disabled',      'provider_event', 'Provider Disabled', 'Provider was disabled', true),
+
+    -- Token config events (19001-19999)
+    (19001, 'token_type_created',     'token_config_event', 'Token Type Created', 'New token type was created', true),
+    (19002, 'token_type_updated',     'token_config_event', 'Token Type Updated', 'Token type was updated', true),
+    (19003, 'token_type_deleted',     'token_config_event', 'Token Type Deleted', 'Token type was deleted', true)
 ON CONFLICT DO NOTHING;
 
 /*
@@ -216,7 +224,11 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     (33015, 'err_not_owner',                 'user_error', 'Not Owner',              'User is not tenant or group owner', true),
 
     -- Tenant errors (34001-34999)
-    (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true)
+    (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true),
+
+    -- Token config errors (36001-36999)
+    (36001, 'err_token_type_not_found',      'token_config_error', 'Token Type Not Found', 'Token type does not exist', true),
+    (36002, 'err_token_type_is_system',      'token_config_error', 'Token Type Is System', 'Cannot modify or delete a system token type', true)
 ON CONFLICT DO NOTHING;
 
 /*
@@ -309,6 +321,15 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (16004, 'en', 'Provider "{provider_code}" was enabled by {actor}'),
     (16005, 'en', 'Provider "{provider_code}" was disabled by {actor}'),
 
+    -- Token config events (19001-19999)
+    (19001, 'en', 'Token type "{token_type_code}" was created by {actor}'),
+    (19002, 'en', 'Token type "{token_type_code}" was updated by {actor}'),
+    (19003, 'en', 'Token type "{token_type_code}" was deleted by {actor}'),
+
+    -- Token config error messages (36xxx)
+    (36001, 'en', 'Token type "{token_type_code}" does not exist'),
+    (36002, 'en', 'Token type "{token_type_code}" is a system token type and cannot be modified or deleted'),
+
     -- Validation error messages (31xxx)
     (31010, 'en', 'Cannot modify or delete system event code (event_id: {event_id})'),
     (31011, 'en', 'Event code (event_id: {event_id}) does not exist'),
@@ -326,3 +347,7 @@ ALTER SEQUENCE auth.user_info_user_id_seq RESTART WITH 1000;
 
 -- Seed permissions, providers, groups, and perm sets
 SELECT auth.seed_permission_data();
+
+-- Backfill short_code for all permissions (in case any were created without it)
+UPDATE auth.permission SET short_code = unsecure.compute_short_code(permission_id)
+WHERE short_code IS NULL;

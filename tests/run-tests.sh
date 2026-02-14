@@ -92,6 +92,14 @@ case "$TEST_FILTER" in
         run_test "tests/test_language_translation.sql"
         if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
         ;;
+    auth_group|member|tenant_access)
+        run_test "tests/test_auth_group_member_tenant.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
+    short_code|short|permission_short_code)
+        run_test "tests/test_short_code.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
     *)
         # Try to find a matching test file
         if [ -f "tests/test_${TEST_FILTER}.sql" ]; then
