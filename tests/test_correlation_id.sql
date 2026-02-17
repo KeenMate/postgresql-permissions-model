@@ -60,7 +60,7 @@ BEGIN
     RAISE NOTICE 'TEST 1: Correlation ID flows to public.journal';
 
     -- Insert journal entry with correlation_id
-    PERFORM create_journal_message('corr_test', __user_id, __corr_id, 10001, 'user', 1::bigint,
+    PERFORM create_journal_message_for_entity('corr_test', __user_id, __corr_id, 10001, 'user', 1::bigint,
         jsonb_build_object('username', 'corr_test_user'));
 
     -- Verify it was stored
@@ -120,9 +120,9 @@ BEGIN
     RAISE NOTICE 'TEST 3: search_journal filters by correlation_id';
 
     -- Insert two journal entries: one with our correlation_id, one without
-    PERFORM create_journal_message('corr_test', __user_id, __corr_id, 10001, 'user', 1::bigint,
+    PERFORM create_journal_message_for_entity('corr_test', __user_id, __corr_id, 10001, 'user', 1::bigint,
         jsonb_build_object('username', 'corr_test_user'));
-    PERFORM create_journal_message('corr_test', __user_id, null, 10002, 'user', 1::bigint,
+    PERFORM create_journal_message_for_entity('corr_test', __user_id, null, 10002, 'user', 1::bigint,
         jsonb_build_object('username', 'corr_test_user'));
 
     -- Search with correlation_id filter
@@ -183,7 +183,7 @@ BEGIN
     RAISE NOTICE 'TEST 5: Null correlation_id is valid (backwards compatibility)';
 
     -- Insert journal entry with null correlation_id
-    PERFORM create_journal_message('corr_test', __user_id, null, 10001, 'user', 1::bigint,
+    PERFORM create_journal_message_for_entity('corr_test', __user_id, null, 10001, 'user', 1::bigint,
         jsonb_build_object('username', 'corr_null_test'));
 
     SELECT count(*) INTO __journal_count

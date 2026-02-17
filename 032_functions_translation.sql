@@ -91,7 +91,7 @@ begin
         where translation_id = _translation_id
         returning *;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18002  -- translation_updated
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id, 'value', _value)
@@ -122,7 +122,7 @@ begin
 
     delete from public.translation where translation_id = _translation_id;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18003  -- translation_deleted
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id)

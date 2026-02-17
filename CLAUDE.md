@@ -288,7 +288,7 @@ Most stored procedures should start with permission checks:
 ```sql
 -- Example procedure pattern with exception throwing
 if not auth.has_permission(_tenant_id, _user_id, 'orders.cancel_order') then
-    perform auth.throw_no_permission(_tenant_id, _user_id, 'orders.cancel_order');
+    perform internal.throw_no_permission(_user_id, 'orders.cancel_order');
 end if;
 
 -- OR use built-in exception throwing (default behavior)

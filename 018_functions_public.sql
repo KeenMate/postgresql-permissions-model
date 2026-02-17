@@ -143,8 +143,8 @@ begin
 end;
 $$;
 
--- Overload: Accept event code as text, resolve to ID
-create or replace function public.create_journal_message(
+-- Create journal entry with event code (text), resolve to ID
+create or replace function public.create_journal_message_by_code(
     _created_by text,
     _user_id bigint,
     _correlation_id text,
@@ -176,8 +176,8 @@ begin
 end;
 $$;
 
--- Convenience: Single entity key (entity_type + entity_id)
-create or replace function public.create_journal_message(
+-- Create journal entry for a single entity (entity_type + entity_id)
+create or replace function public.create_journal_message_for_entity(
     _created_by text,
     _user_id bigint,
     _correlation_id text,
@@ -198,8 +198,8 @@ select * from create_journal_message(
 );
 $$;
 
--- Convenience: Single entity with event code as text
-create or replace function public.create_journal_message(
+-- Create journal entry for a single entity with event code as text
+create or replace function public.create_journal_message_for_entity_by_code(
     _created_by text,
     _user_id bigint,
     _correlation_id text,
@@ -213,7 +213,7 @@ create or replace function public.create_journal_message(
     language sql
 as
 $$
-select * from create_journal_message(
+select * from create_journal_message_by_code(
     _created_by, _user_id, _correlation_id, _event_code,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id
@@ -323,7 +323,7 @@ begin
 		perform error.raise_52279(__token_uid);
 	end if;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __token_id
 			, jsonb_build_object('username', _target_user_id::text
@@ -443,7 +443,7 @@ begin
 
     if (_tenant_id = 1) then
         if not __can_read_global_journal then
-            perform auth.throw_no_permission(_user_id, 'journal.read_global_journal');
+            perform internal.throw_no_permission(_user_id, 'journal.read_global_journal');
         end if;
     else
         perform auth.has_permission(_user_id, _correlation_id, 'journal.read_journal', _tenant_id);

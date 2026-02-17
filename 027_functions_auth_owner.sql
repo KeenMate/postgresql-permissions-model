@@ -58,7 +58,7 @@ begin
 			values (_created_by, _tenant_id, _user_group_id, _target_user_id)
 			returning owner_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 11010  -- tenant_user_added
 			, 'tenant', _tenant_id
 			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text
@@ -81,7 +81,7 @@ begin
 		and tenant_id = _tenant_id
 		and user_group_id = _user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 11011  -- tenant_user_removed
 			, 'tenant', _tenant_id
 			, jsonb_build_object('username', _target_user_id::text, 'tenant_title', _tenant_id::text

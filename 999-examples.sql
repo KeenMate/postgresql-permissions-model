@@ -284,9 +284,9 @@ select *
 from has_permissions(1);
 
 select *
-from throw_no_permission(1, 2, 'a.b');
+from internal.throw_no_permission(2, 'a.b');
 select *
-from throw_no_permission(1, 2, array ['a.b', 'd.e.f'])
+from internal.throw_no_permission(2, array ['a.b', 'd.e.f'])
 
 select *
 from auth.create_user_group_member('System', 1, :correlation_id, 1, 3, 2);

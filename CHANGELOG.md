@@ -5,6 +5,96 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-02-14
+
+### Added
+
+#### User Events for Registration and Login
+Added audit trail events for user registration and login flows:
+- `user_registered` (10008) — new event code, fired on `auth.register_user` and `auth.ensure_user_from_provider` (new user)
+- `user_logged_in` (10010) — fired on successful `auth.get_user_by_email_for_authentication` and `auth.ensure_user_from_provider` (returning user)
+- `user_login_failed` (10012) — fired on all authentication failures (user not found, disabled, locked, identity disabled, login disabled)
+
+Added `_ip_address`, `_user_agent`, `_origin` parameters to `auth.register_user`, `auth.get_user_by_email_for_authentication`, and `auth.ensure_user_from_provider` for client metadata in audit events.
+
+### Changed
+
+#### Code Generator Compatibility: Unique Journal Function Names
+Split `public.create_journal_message` from 4 overloads sharing the same name into 4 distinctly named functions. PostgreSQL handles overloading natively, but external code generators (Elixir, C#) cannot distinguish functions that differ only by parameter types. Each overload now has a unique name that describes its purpose.
+
+**Renamed functions:**
+
+| Old Name (all `create_journal_message`) | New Name | Key Parameters | Usage |
+|---|---|---|---|
+| Overload 1 — event ID + keys | `create_journal_message` | `_event_id integer, _keys jsonb, _payload jsonb` | Unchanged — base function for arbitrary key journaling |
+| Overload 2 — event code + keys | `create_journal_message_by_code` | `_event_code text, _keys jsonb, _payload jsonb` | Resolves event code to ID, then delegates to overload 1 |
+| Overload 3 — entity shorthand | `create_journal_message_for_entity` | `_event_id integer, _entity_type text, _entity_id bigint` | Builds `{entity_type: entity_id}` keys automatically — most common pattern (~70+ call sites) |
+| Overload 4 — entity + code | `create_journal_message_for_entity_by_code` | `_event_code text, _entity_type text, _entity_id bigint` | Resolves event code, then delegates to `_by_code` |
+
+**Internal delegation chain:**
+```
+create_journal_message_for_entity_by_code → create_journal_message_by_code → create_journal_message
+create_journal_message_for_entity → create_journal_message
+```
+
+**Callers updated across 15 files:**
+
+| File | Calls | New Function |
+|------|-------|-------------|
+| `019_functions_unsecure.sql` | 22 | `create_journal_message_for_entity` |
+| `021_functions_auth_group.sql` | 13 | `create_journal_message_for_entity` |
+| `026_functions_auth_apikey.sql` | 10 | `create_journal_message_for_entity` |
+| `020_functions_auth_user.sql` | 7 | `create_journal_message_for_entity` |
+| `025_functions_auth_token.sql` | 7 | `create_journal_message_for_entity` |
+| `024_functions_auth_provider.sql` | 5 | `create_journal_message_for_entity` |
+| `023_functions_auth_tenant.sql` | 3 | `create_journal_message_for_entity` |
+| `027_functions_auth_owner.sql` | 2 | `create_journal_message_for_entity` |
+| `022_functions_auth_permission.sql` | 1 | `create_journal_message_for_entity` |
+| `032_functions_translation.sql` | 2 | `create_journal_message_for_entity` |
+| `018_functions_public.sql` | 1 | `create_journal_message_for_entity` |
+| `031_functions_language.sql` | 3 | `create_journal_message` (unchanged — uses keys jsonb pattern) |
+| `032_functions_translation.sql` | 2 | `create_journal_message` (unchanged — uses keys jsonb pattern) |
+| `018_functions_public.sql` | 1 | `create_journal_message_by_code` |
+| `tests/test_event_code_management.sql` | 1 | `create_journal_message_by_code` |
+| `tests/test_correlation_id.sql` | 4 | `create_journal_message_for_entity` |
+
+**Note:** `031_functions_language.sql` (3 calls) and `032_functions_translation.sql` (2 calls for `create_translation` and `copy_translations`) continue using `create_journal_message` — these calls pass `null::jsonb` as keys and a jsonb payload directly, matching overload 1's signature.
+
+#### Code Generator Compatibility: Moved `throw_no_permission` to `internal` Schema
+Moved all 4 overloads of `auth.throw_no_permission` → `internal.throw_no_permission`. This function is an internal helper used by `auth.has_permissions()` and a few other places to raise permission-denied exceptions. It was in the `auth` schema, which meant code generators would include it in auto-generated client code — but it should never be called directly from application code.
+
+**Moved overloads:**
+
+| Signature | Purpose |
+|-----------|---------|
+| `internal.throw_no_permission(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1)` | Primary implementation — logs denial to journal, raises exception with all failed permission codes |
+| `internal.throw_no_permission(_user_id bigint, _perm_codes text[])` | Convenience — delegates to primary with `_tenant_id := 1` |
+| `internal.throw_no_permission(_user_id bigint, _perm_code text, _tenant_id integer DEFAULT 1)` | Single permission code — wraps into array, delegates to primary |
+| `internal.throw_no_permission(_user_id bigint, _perm_code text)` | Single permission code — wraps into array, delegates to primary with `_tenant_id := 1` |
+
+**Callers updated:**
+
+| File | Context |
+|------|---------|
+| `022_functions_auth_permission.sql` | `has_permissions()` — calls `internal.throw_no_permission` on permission check failure |
+| `018_functions_public.sql` | `search_journal()` — calls `internal.throw_no_permission` for global journal access check |
+| `023_functions_auth_tenant.sql` | `assign_tenant_owner()` — calls `internal.throw_no_permission` for owner permission check |
+| `999-examples.sql` | Updated examples |
+
+**Impact:** The `internal` schema is excluded from code generation by convention (it contains business logic that's already permission-checked at a higher level). No behavior change at runtime — only the schema qualifier changes.
+
+### Fixed
+
+#### Bug: Email Registration Creates Inactive Identity
+`auth.register_user()` called `unsecure.create_user_identity()` without passing `_is_active := true`,
+so the identity defaulted to inactive. Login immediately failed with "identity disabled" error.
+The provider-based flow (`auth.ensure_user_from_provider()`) was not affected.
+
+#### Bug: Email Registration Stores Password Hash in Wrong Column
+`auth.register_user()` passed `_password_hash` as the 7th positional argument to `unsecure.create_user_identity()`, which mapped to `_provider_oid` instead of `_password_hash`. Result: `password_hash` was null and `provider_oid` contained the hash — login always failed. Fixed by passing `lower(trim(_email))` as `_provider_oid` (7th arg) and the hash as `_password_hash` (8th arg).
+
+---
+
 ## [2.4.0] - 2026-02-14
 
 ### Added
@@ -646,6 +736,7 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.5.0 | 2026-02-14 | Code generator compatibility: unique journal function names, throw_no_permission moved to internal |
 | 2.4.0 | 2026-02-14 | Hierarchical numeric permission codes, language & translation system, colored test output |
 | 2.3.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |
 | 2.2.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |

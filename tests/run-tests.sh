@@ -100,6 +100,10 @@ case "$TEST_FILTER" in
         run_test "tests/test_short_code.sql"
         if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
         ;;
+    registration|login|login_events|registration_login)
+        run_test "tests/test_registration_login_events.sql"
+        if [ $? -eq 0 ]; then ((PASSED++)); else ((FAILED++)); fi
+        ;;
     *)
         # Try to find a matching test file
         if [ -f "tests/test_${TEST_FILTER}.sql" ]; then

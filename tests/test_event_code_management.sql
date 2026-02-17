@@ -250,7 +250,7 @@ BEGIN
     RAISE NOTICE 'TEST 9: Custom event code works with create_journal_message by code name';
 
     SELECT * INTO __rec
-    FROM public.create_journal_message(
+    FROM public.create_journal_message_by_code(
         'test_ecm', 1, 'test-corr',
         'test_order_created',
         jsonb_build_object('order', '12346'),

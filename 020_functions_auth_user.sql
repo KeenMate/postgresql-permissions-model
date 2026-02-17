@@ -31,7 +31,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10004  -- user_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -63,7 +63,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10005  -- user_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -92,7 +92,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10007  -- user_unlocked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -124,7 +124,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10006  -- user_locked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -166,7 +166,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10033  -- identity_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -208,7 +208,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10034  -- identity_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -257,7 +257,7 @@ begin
 end;
 $$;
 
-create or replace function auth.register_user(_created_by text, _user_id bigint, _correlation_id text, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.register_user(_created_by text, _user_id bigint, _correlation_id text, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     rows 1
     language plpgsql
@@ -290,10 +290,14 @@ begin
 	into __new_user;
 
 	perform unsecure.create_user_identity(_created_by, _user_id, _correlation_id, __new_user.user_id
-		, 'email', lower(trim(_email)), _password_hash);
+		, 'email', lower(trim(_email)), lower(trim(_email)), _password_hash, _is_active := true);
 
 	perform
 		auth.update_user_data(_created_by, _user_id, _correlation_id, __new_user.user_id, 'email', _user_data);
+
+	perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_registered',
+		__new_user.user_id, _ip_address, _user_agent, _origin,
+		_event_data := jsonb_build_object('email', lower(trim(_email)), 'provider', 'email'));
 
 	return query
 		select __new_user.user_id
@@ -398,7 +402,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _correlation_id text, _email text)
+create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _correlation_id text, _email text, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text, __provider text, __password_hash text, __password_salt text)
     language plpgsql
 as
@@ -430,11 +434,17 @@ begin
 
 	if
 		__is_active is null then
+		perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_login_failed',
+			null, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email', 'reason', 'user_not_found'));
 		perform error.raise_52103(null, __normalized_email);
 	end if;
 
 	if
 		not __can_login then
+		perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_login_failed',
+			__target_user_id, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email', 'reason', 'login_disabled'));
 		perform error.raise_52112(__target_user_id);
 	end if;
 
@@ -443,19 +453,32 @@ begin
 
 	if
 		not __is_active then
+		perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_login_failed',
+			__target_user_id, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email', 'reason', 'user_disabled'));
 		perform error.raise_52105(__target_user_id);
 
 	end if;
 
 	if
 		not __is_identity_active then
+		perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_login_failed',
+			__target_user_id, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email', 'reason', 'identity_disabled'));
 		perform error.raise_52110(__target_user_id, 'email');
 	end if;
 
 	if
 		__is_locked then
+		perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_login_failed',
+			__target_user_id, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email', 'reason', 'user_locked'));
 		perform error.raise_52106(__normalized_email);
 	end if;
+
+	perform unsecure.create_user_event('system', _user_id, _correlation_id, 'user_logged_in',
+		__target_user_id, _ip_address, _user_agent, _origin,
+		_event_data := jsonb_build_object('email', __normalized_email, 'provider', 'email'));
 
 	return query
 		select ui.user_id
@@ -581,7 +604,7 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13003  -- group_deleted
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text)
@@ -589,7 +612,7 @@ begin
 end;
 $$;
 
-create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_uid text, _provider_oid text, _username text, _display_name text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.ensure_user_from_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_uid text, _provider_oid text, _username text, _display_name text, _email text DEFAULT NULL::text, _user_data jsonb DEFAULT NULL::jsonb, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     language plpgsql
 as
@@ -630,6 +653,10 @@ begin
 		perform
 			unsecure.create_user_identity(_created_by, _user_id, _correlation_id, __target_user_id
 				, _provider_code, _provider_uid, _provider_oid, _is_active := true);
+
+		perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_registered',
+			__target_user_id, _ip_address, _user_agent, _origin,
+			_event_data := jsonb_build_object('provider', _provider_code, 'provider_uid', _provider_uid));
 	else
 		-- update provider_oid
 		perform unsecure.update_user_identity_uid_oid(_created_by, _user_id, _correlation_id, __target_user_id
@@ -647,16 +674,25 @@ begin
 
 		if
 			not __can_login then
+			perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_login_failed',
+				__target_user_id, _ip_address, _user_agent, _origin,
+				_event_data := jsonb_build_object('provider', _provider_code, 'provider_uid', _provider_uid, 'reason', 'login_disabled'));
 			perform error.raise_52112(__target_user_id);
 		end if;
 
 		if
 			not __is_user_active then
+			perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_login_failed',
+				__target_user_id, _ip_address, _user_agent, _origin,
+				_event_data := jsonb_build_object('provider', _provider_code, 'provider_uid', _provider_uid, 'reason', 'user_disabled'));
 			perform error.raise_52105(__target_user_id);
 		end if;
 
 		if
 			not __is_identity_active then
+			perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_login_failed',
+				__target_user_id, _ip_address, _user_agent, _origin,
+				_event_data := jsonb_build_object('provider', _provider_code, 'provider_uid', _provider_uid, 'reason', 'identity_disabled'));
 			perform error.raise_52110(__target_user_id, _provider_code);
 		end if;
 	end if;
@@ -670,6 +706,10 @@ begin
 
 	perform
 		unsecure.update_last_used_provider(__target_user_id, _provider_code);
+
+	perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_logged_in',
+		__target_user_id, _ip_address, _user_agent, _origin,
+		_event_data := jsonb_build_object('provider', _provider_code, 'provider_uid', _provider_uid));
 
 	return query
 		select ui.user_id

@@ -184,7 +184,7 @@ begin
 
     if _user_id <> _target_user_id and not auth.has_permission(_user_id, _correlation_id, __necessary_permission_code)
     then
-        perform auth.throw_no_permission(_user_id, __necessary_permission_code);
+        perform internal.throw_no_permission(_user_id, __necessary_permission_code);
     end if;
 
     return query
@@ -314,7 +314,7 @@ begin
 
     if _user_id <> _target_user_id and _user_id <> 1
     then
-        perform create_journal_message('system', _user_id, _correlation_id
+        perform create_journal_message_for_entity('system', _user_id, _correlation_id
                 , 10002  -- user_updated
                 , 'user', _target_user_id
                 , jsonb_build_object('username', _target_user_id::text, 'tenant_id', __tenant_id
@@ -359,7 +359,7 @@ begin
 	returning *
 		into __last_item;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 11001  -- tenant_created
 			, 'tenant', __last_item.tenant_id
 			, jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code
@@ -431,7 +431,7 @@ begin
 		, updated_at    = now()
 	where tenant_id = _tenant_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 11002  -- tenant_updated
 			, 'tenant', _tenant_id
 			, jsonb_build_object('tenant_title', _title, 'tenant_code', _code

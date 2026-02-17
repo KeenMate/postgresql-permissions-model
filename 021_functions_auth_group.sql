@@ -107,7 +107,7 @@ begin
 				and user_group_id = _user_group_id
 			returning user_group_id;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _title, 'is_default', _is_default
@@ -139,7 +139,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (enabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'enabled')
@@ -170,7 +170,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (disabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'disabled')
@@ -201,7 +201,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (locked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'locked')
@@ -232,7 +232,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (unlocked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'unlocked')
@@ -275,7 +275,7 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13003  -- group_deleted
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text)
@@ -309,7 +309,7 @@ begin
 		and user_id = _target_user_id;
 
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13011  -- group_member_removed
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -383,7 +383,7 @@ begin
 										from affected_users);
 
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13020  -- group_mapping_created
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text
@@ -426,7 +426,7 @@ begin
 		into __user_group_id, __provider_code, __mapped_object_id, __mapped_object_name, __mapped_role;
 
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13021  -- group_mapping_deleted
 			, 'group', __user_group_id
 			, jsonb_build_object('group_title', __user_group_id::text
@@ -480,7 +480,7 @@ begin
 		, is_external = false
 	where user_group_id = _user_group_id;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as hybrid)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'set_hybrid')
@@ -561,7 +561,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as external)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_external')
@@ -601,7 +601,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as internal)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_internal')

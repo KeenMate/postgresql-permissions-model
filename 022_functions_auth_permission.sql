@@ -20,7 +20,7 @@ begin
 end;
 $$;
 
-create or replace function auth.throw_no_permission(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
@@ -30,7 +30,7 @@ begin
 end;
 $$;
 
-create or replace function auth.throw_no_permission(_user_id bigint, _perm_codes text[]) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _perm_codes text[]) returns void
     language plpgsql
 as
 $$
@@ -40,23 +40,23 @@ begin
 end;
 $$;
 
-create or replace function auth.throw_no_permission(_user_id bigint, _perm_code text, _tenant_id integer DEFAULT 1) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _perm_code text, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.throw_no_permission(_user_id, array [_perm_code], _tenant_id);
+		internal.throw_no_permission(_user_id, array [_perm_code], _tenant_id);
 end;
 $$;
 
-create or replace function auth.throw_no_permission(_user_id bigint, _perm_code text) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _perm_code text) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.throw_no_permission(_user_id, array [_perm_code], 1);
+		internal.throw_no_permission(_user_id, array [_perm_code], 1);
 end;
 $$;
 
@@ -126,7 +126,7 @@ begin
 
     if (_throw_err)
     then
-        perform create_journal_message('system', _target_user_id, _correlation_id
+        perform create_journal_message_for_entity('system', _target_user_id, _correlation_id
             , 32001  -- err_no_permission
             , 'perm', _target_user_id
             , jsonb_build_object('username', _target_user_id::text
@@ -134,7 +134,7 @@ begin
             , _tenant_id);
 
         perform
-            auth.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
+            internal.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
     end if;
 
     return false;

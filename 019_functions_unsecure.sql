@@ -224,7 +224,7 @@ begin
 	return query
 		select __last_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13001  -- group_created
 			, 'group', __last_id
 			, jsonb_build_object('group_title', _title, 'tenant_title', _tenant_id::text
@@ -444,7 +444,7 @@ begin
 		where assignment_id = __last_id;
 
 	if _user_group_id is not null then
-		perform create_journal_message(_created_by, _user_id, _correlation_id
+		perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'group', _user_group_id
 			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
@@ -455,7 +455,7 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_created_by, _user_group_id, _tenant_id);
 	else
-		perform create_journal_message(_created_by, _user_id, _correlation_id
+		perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'user', _target_user_id
 			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
@@ -490,7 +490,7 @@ begin
 				returning *;
 
 	if __user_group_id is not null then
-		perform create_journal_message(_deleted_by, _user_id, _correlation_id
+		perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'group', __user_group_id
 			, jsonb_build_object('target_type', 'group', 'target_name', __user_group_id::text
@@ -500,7 +500,7 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_deleted_by, __user_group_id, _tenant_id);
 	else
-		perform create_journal_message(_deleted_by, _user_id, _correlation_id
+		perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'user', __target_user_id
 			, jsonb_build_object('target_type', 'user', 'target_name', __target_user_id::text
@@ -551,7 +551,7 @@ begin
 	returning full_code
 		into __permission_full_code;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12002  -- permission_updated
 			, 'permission', __permission_id
 			, jsonb_build_object('permission_code', __permission_full_code, 'is_assignable', _is_assignable)
@@ -752,7 +752,7 @@ begin
 		from auth.permission
 		where permission_id = __last_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12001  -- permission_created
 			, 'permission', __last_id
 			, jsonb_build_object('permission_code', __full_code::text, 'title', _title)
@@ -836,7 +836,7 @@ begin
 				 inner join auth.permission p
 										on p.full_code = perm_code::ext.ltree;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
@@ -881,7 +881,7 @@ begin
 	returning perm_set_id
 		into __last_id;
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'is_assignable', _is_assignable)
@@ -917,7 +917,7 @@ begin
 	where p.code is not null
 		and psp.perm_set_id is null;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -962,7 +962,7 @@ begin
 																 inner join auth.perm_set ps
 																						on psp.perm_set_id = ps.perm_set_id and ps.tenant_id = _tenant_id);
 
-	perform create_journal_message(_deleted_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -1024,7 +1024,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id, _correlation_id
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -1079,7 +1079,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id, _correlation_id
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -1106,7 +1106,7 @@ begin
 				, provider_code
 				, uid;
 
-	perform create_journal_message('system', _user_id, _correlation_id
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10020  -- password_changed
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -1184,7 +1184,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message('system', _user_id, _correlation_id
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'user_type', 'api')
@@ -1209,7 +1209,7 @@ begin
 
 	perform auth.create_user_event(_updated_by, _user_id, _correlation_id, 'update_user_info', _target_user_id);
 
-	perform create_journal_message(_updated_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10002  -- user_updated
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _username, 'display_name', _display_name, 'email', _email)
@@ -1262,7 +1262,7 @@ begin
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13010  -- group_member_added
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -1339,7 +1339,7 @@ begin
 					 , _password_salt, _is_active)
 		returning user_id, provider_code, uid;
 
-	perform create_journal_message('system', _user_id, _correlation_id
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10030  -- identity_created
 			, 'user', _target_user_id
 			, jsonb_build_object('username', __user_info.username, 'provider_code', _provider_code
@@ -1362,7 +1362,7 @@ begin
     where tenant_id = _tenant_id
     returning * into __last_item;
 
-    perform create_journal_message(_deleted_by, _user_id, _correlation_id
+    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
             , 11003  -- tenant_deleted
             , 'tenant', __last_item.tenant_id
             , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
@@ -1713,7 +1713,7 @@ begin
 		set uid = _provider_uid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message('system', _user_id, _correlation_id
+		perform create_journal_message_for_entity('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -1727,7 +1727,7 @@ begin
 		set provider_oid = _provider_oid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message('system', _user_id, _correlation_id
+		perform create_journal_message_for_entity('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -1783,7 +1783,7 @@ begin
 	from auth.perm_set_perm
 	where perm_set_id = __source_perm_set.perm_set_id;
 
-	perform create_journal_message(_created_by, _user_id, _correlation_id
+	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __created_perm_set.perm_set_id
 			, jsonb_build_object('perm_set_code', __created_perm_set.code
