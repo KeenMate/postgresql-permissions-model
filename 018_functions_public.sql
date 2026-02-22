@@ -608,15 +608,16 @@ create or replace function public.create_event_category(
     _title text,
     _range_start integer,
     _range_end integer,
-    _is_error boolean default false
+    _is_error boolean default false,
+    _source text default null
 ) returns setof const.event_category
     rows 1
     language plpgsql
 as
 $$
 begin
-    insert into const.event_category (category_code, title, range_start, range_end, is_error)
-    values (_category_code, _title, _range_start, _range_end, _is_error);
+    insert into const.event_category (category_code, title, range_start, range_end, is_error, source)
+    values (_category_code, _title, _range_start, _range_end, _is_error, _source);
 
     return query
         select *
@@ -635,7 +636,8 @@ create or replace function public.create_event_code(
     _category_code text,
     _title text,
     _description text default null,
-    _is_read_only boolean default false
+    _is_read_only boolean default false,
+    _source text default null
 ) returns setof const.event_code
     rows 1
     language plpgsql
@@ -661,8 +663,8 @@ begin
     end if;
 
     -- Always insert with is_system = false (system events come from seed only)
-    insert into const.event_code (event_id, code, category_code, title, description, is_read_only, is_system)
-    values (_event_id, _code, _category_code, _title, _description, _is_read_only, false);
+    insert into const.event_code (event_id, code, category_code, title, description, is_read_only, is_system, source)
+    values (_event_id, _code, _category_code, _title, _description, _is_read_only, false, _source);
 
     return query
         select *
@@ -875,6 +877,43 @@ begin
             _page_size,
             _tenant_id
         ) sj;
+end;
+$$;
+
+/*
+ * Purge Audit Data
+ * ================
+ *
+ * Purges old journal entries and user events based on retention policy.
+ * Requires 'journal.purge_journal' permission.
+ */
+create or replace function public.purge_audit_data(
+    _deleted_by text, _user_id bigint, _correlation_id text,
+    _older_than_days integer default null
+) returns table(__journal_deleted bigint, __user_events_deleted bigint)
+    language plpgsql
+as
+$$
+declare
+    __j_deleted bigint;
+    __ue_deleted bigint;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'journal.purge_journal');
+
+    select __deleted_count from unsecure.purge_journal(_deleted_by, _user_id, _correlation_id, _older_than_days)
+    into __j_deleted;
+
+    select __deleted_count from unsecure.purge_user_events(_deleted_by, _user_id, _correlation_id, _older_than_days)
+    into __ue_deleted;
+
+    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+        , 17001  -- audit_data_purged
+        , 'system', 0
+        , jsonb_build_object('journal_deleted', __j_deleted, 'user_events_deleted', __ue_deleted,
+            'older_than_days', coalesce(_older_than_days, -1))
+        , 1);
+
+    return query select __j_deleted, __ue_deleted;
 end;
 $$;
 

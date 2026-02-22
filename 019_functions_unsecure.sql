@@ -81,6 +81,100 @@ begin
 end;
 $$;
 
+-- Helper function to invalidate cache for a list of user IDs
+-- Used by triggers that need to invalidate multiple users at once (e.g. group delete, provider delete)
+create or replace function unsecure.invalidate_users_permission_cache(_updated_by text, _user_ids bigint[], _tenant_id integer DEFAULT NULL) returns void
+    language plpgsql
+as
+$$
+begin
+    update auth.user_permission_cache
+    set expiration_date = now(),
+        updated_by = _updated_by,
+        updated_at = now()
+    where user_id = any(_user_ids)
+      and (_tenant_id is null or tenant_id = _tenant_id);
+end;
+$$;
+
+-- Helper function to invalidate cache for all users affected by a permission change
+-- Finds users via: direct assignment, perm_set membership, and group membership
+create or replace function unsecure.invalidate_permission_users_cache(_updated_by text, _permission_id integer) returns void
+    language plpgsql
+as
+$$
+begin
+    update auth.user_permission_cache
+    set expiration_date = now(),
+        updated_by = _updated_by,
+        updated_at = now()
+    where user_id in (
+        -- Users with this permission directly assigned
+        select pa.user_id
+        from auth.permission_assignment pa
+        where pa.permission_id = _permission_id
+          and pa.user_id is not null
+
+        union
+
+        -- Users in groups with this permission directly assigned
+        select ugm.user_id
+        from auth.permission_assignment pa
+        inner join auth.user_group_member ugm on ugm.user_group_id = pa.user_group_id
+        where pa.permission_id = _permission_id
+
+        union
+
+        -- Users with this permission via perm_set (direct assignment)
+        select pa.user_id
+        from auth.perm_set_perm psp
+        inner join auth.permission_assignment pa on pa.perm_set_id = psp.perm_set_id
+        where psp.permission_id = _permission_id
+          and pa.user_id is not null
+
+        union
+
+        -- Users with this permission via perm_set (group assignment)
+        select ugm.user_id
+        from auth.perm_set_perm psp
+        inner join auth.permission_assignment pa on pa.perm_set_id = psp.perm_set_id
+        inner join auth.user_group_member ugm on ugm.user_group_id = pa.user_group_id
+        where psp.permission_id = _permission_id
+    );
+end;
+$$;
+
+-- Send a notification via pg_notify on the 'permission_changes' channel
+-- Called from trigger functions and unsecure.* functions to notify backends of permission-relevant changes
+create or replace function unsecure.notify_permission_change(
+    _event       text,
+    _tenant_id   integer,
+    _target_type text,
+    _target_id   bigint,
+    _detail      jsonb DEFAULT NULL
+) returns void
+    language plpgsql
+as
+$$
+declare
+    _payload jsonb;
+begin
+    _payload := jsonb_build_object(
+        'event', _event,
+        'tenant_id', _tenant_id,
+        'target_type', _target_type,
+        'target_id', _target_id,
+        'at', now()
+    );
+
+    if _detail is not null then
+        _payload := _payload || jsonb_build_object('detail', _detail);
+    end if;
+
+    perform pg_notify('permission_changes', _payload::text);
+end;
+$$;
+
 -- Helper function to verify owner or permission for owner management operations
 create or replace function unsecure.verify_owner_or_permission(_user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
@@ -192,16 +286,29 @@ end;
 $$;
 
 create or replace function unsecure.expire_tokens(_created_by text) returns void
-    language sql
+    language plpgsql
 as
 $$
-update auth.token
-set updated_at       = now()
-	, updated_by       = _created_by
-	, token_state_code = 'expired'
-where token_state_code = 'valid'
-	and expires_at
-	< now();
+declare
+    __expired_count bigint;
+begin
+    update auth.token
+    set updated_at       = now()
+      , updated_by       = _created_by
+      , token_state_code = 'expired'
+    where token_state_code = 'valid'
+      and expires_at < now();
+
+    get diagnostics __expired_count = row_count;
+
+    if __expired_count > 0 then
+        perform create_journal_message_for_entity(_created_by, 1, null
+            , 15003  -- token_expired
+            , 'token', 0
+            , jsonb_build_object('expired_count', __expired_count, 'action', 'batch_expiration')
+            , 1);
+    end if;
+end;
 $$;
 
 create or replace function unsecure.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_system boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
@@ -551,6 +658,9 @@ begin
 	returning full_code
 		into __permission_full_code;
 
+	-- Invalidate cache for all users who have this permission (directly or via perm_sets/groups)
+	perform unsecure.invalidate_permission_users_cache(_updated_by, __permission_id);
+
 	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12002  -- permission_updated
 			, 'permission', __permission_id
@@ -686,7 +796,7 @@ where p.node_path <@ _perm_path
 returning *;
 $$;
 
-create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text) returns SETOF auth.permission
+create or replace function unsecure.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -699,8 +809,8 @@ declare
 	__full_code   ext.ltree;
 begin
 
-	insert into auth.permission(created_by, updated_by, title, is_assignable, code)
-	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title, '_'))
+	insert into auth.permission(created_by, updated_by, title, is_assignable, code, source)
+	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title, '_'), _source)
 	returning permission_id
 		into __last_id;
 
@@ -760,22 +870,22 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_permission_as_system(_title text, _parent_code text DEFAULT ''::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text) returns SETOF auth.permission
+create or replace function unsecure.create_permission_as_system(_title text, _parent_code text DEFAULT ''::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text) returns SETOF auth.permission
     rows 1
     language sql
 as
 $$
 select *
-from unsecure.create_permission('system', 1, null, _title, _parent_code, _is_assignable, _short_code);
+from unsecure.create_permission('system', 1, null, _title, _parent_code, _is_assignable, _short_code, _source);
 $$;
 
 create or replace function unsecure.get_all_permissions(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean, __short_code text)
+    returns TABLE(__permission_id integer, __is_assignable boolean, __title text, __code text, __full_code text, __has_children boolean, __short_code text, __source text)
     language plpgsql
 as
 $$
 begin
-	return query select permission_id, is_assignable, title, code, full_code::text, has_children, short_code
+	return query select permission_id, is_assignable, title, code, full_code::text, has_children, short_code, source
 							 from auth.permission
 							 order by full_code;
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
@@ -783,7 +893,7 @@ end;
 $$;
 
 create or replace function unsecure.get_perm_sets(_requested_by text, _user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__perm_set_id integer, __title text, __code text, __is_system boolean, __is_assignable boolean, __permissions jsonb)
+    returns TABLE(__perm_set_id integer, __title text, __code text, __is_system boolean, __is_assignable boolean, __permissions jsonb, __source text)
     language plpgsql
 as
 $$
@@ -796,18 +906,19 @@ begin
 				 , ps.is_assignable
 				 , jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
 																				p.permission_id))
+				 , ps.source
 		from auth.perm_set ps
 					 inner join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
 					 inner join auth.permission p on p.permission_id = psp.permission_id
 		where ps.tenant_id = _tenant_id
-		group by ps.perm_set_id, ps.title, ps.code, ps.is_system, ps.is_assignable;
+		group by ps.perm_set_id, ps.title, ps.code, ps.is_system, ps.is_assignable, ps.source;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 
 end;
 $$;
 
-create or replace function unsecure.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function unsecure.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1, _source text DEFAULT NULL::text) returns SETOF auth.perm_set
     rows 1
     language plpgsql
 as
@@ -825,8 +936,8 @@ begin
 	end if;
 
 	-- noinspection SqlInsertValues
-	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system, is_assignable)
-	values (_created_by, _created_by, _tenant_id, _title, _is_system, _is_assignable)
+	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system, is_assignable, source)
+	values (_created_by, _created_by, _tenant_id, _title, _is_system, _is_assignable, _source)
 	returning perm_set_id
 		into __last_id;
 
@@ -851,14 +962,14 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_perm_set_as_system(_title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function unsecure.create_perm_set_as_system(_title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1, _source text DEFAULT NULL::text) returns SETOF auth.perm_set
     rows 1
     language sql
 as
 $$
 
 select *
-from unsecure.create_perm_set('system', 1, null, _title, _is_system, _is_assignable, _permissions, _tenant_id);
+from unsecure.create_perm_set('system', 1, null, _title, _is_system, _is_assignable, _permissions, _tenant_id, _source);
 
 $$;
 
@@ -868,8 +979,15 @@ create or replace function unsecure.update_perm_set(_updated_by text, _user_id b
 as
 $$
 declare
-	__last_id int;
+	__last_id            int;
+	__old_is_assignable  bool;
 begin
+
+	-- Check if is_assignable is changing (needed for cache invalidation)
+	select is_assignable
+	from auth.perm_set
+	where perm_set_id = _perm_set_id
+	into __old_is_assignable;
 
 	-- noinspection SqlInsertValues
 	update perm_set
@@ -880,6 +998,11 @@ begin
 	where perm_set_id = _perm_set_id
 	returning perm_set_id
 		into __last_id;
+
+	-- If assignability changed, invalidate cache for all affected users
+	if __old_is_assignable is distinct from _is_assignable then
+		perform unsecure.invalidate_perm_set_users_permission_cache(_updated_by, _perm_set_id, _tenant_id);
+	end if;
 
 	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
@@ -1262,6 +1385,9 @@ begin
 		values (_created_by, _user_group_id, _target_user_id, 'manual')
 		returning member_id;
 
+	-- Invalidate permission cache so user picks up group permissions immediately
+	perform unsecure.clear_permission_cache(_created_by, _target_user_id, _tenant_id);
+
 	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13010  -- group_member_added
 			, 'group', _user_group_id
@@ -1401,10 +1527,10 @@ begin
     into __provider_groups, __provider_roles;
 
     insert into auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
-    select _created_by, ug.user_group_id, _target_user_id, 'adhoc'
+    select _created_by, ug.user_group_id, _target_user_id, 'manual'
     from auth.user_group ug
     where is_default
-    on conflict (user_group_id, user_id) do nothing;
+    on conflict (user_group_id, user_id, coalesce(mapping_id, 0)) do nothing;
 
     -- cleanup membership of groups user is no longer part of
     with affected_deleted_group_tenants as (
@@ -1434,7 +1560,7 @@ begin
                               , _target_user_id
                               , ugm.user_group_id
                               , ugm.user_group_mapping_id
-                              , 'adhoc'
+                              , 'external'
                 from unnest(__provider_groups) g
                          inner join auth.user_group_mapping ugm
                                     on ugm.provider_code = _provider_code and ugm.mapped_object_id = lower(g)
@@ -1450,7 +1576,7 @@ begin
                               , _target_user_id
                               , ugm.user_group_id
                               , ugm.user_group_mapping_id
-                              , 'adhoc'
+                              , 'external'
                 from unnest(__provider_roles) r
                          inner join auth.user_group_mapping ugm
                                     on ugm.provider_code = _provider_code and ugm.mapped_role = lower(r)
@@ -1770,9 +1896,10 @@ begin
 	end if;
 
 	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system,
-														is_assignable, code)
+														is_assignable, code, source)
 	values ( _created_by, _created_by, _target_tenant_id, coalesce(_new_title, __source_perm_set.title)
-				 , __source_perm_set.is_system, __source_perm_set.is_assignable, helpers.get_code(_new_title))
+				 , __source_perm_set.is_system, __source_perm_set.is_assignable, helpers.get_code(_new_title)
+				 , __source_perm_set.source)
 	returning *
 		into __created_perm_set;
 
@@ -1827,6 +1954,62 @@ begin
 
 
     -- Read operation - journal message omitted (use journal level 'all' to log reads)
+end;
+$$;
+
+create or replace function unsecure.purge_journal(
+    _deleted_by text, _user_id bigint, _correlation_id text,
+    _older_than_days integer default null
+) returns table(__deleted_count bigint)
+    language plpgsql
+as
+$$
+declare
+    __retention_days integer;
+    __count bigint;
+begin
+    __retention_days := coalesce(_older_than_days,
+        (select text_value::integer from const.sys_param
+         where group_code = 'journal' and code = 'retention_days'));
+
+    if __retention_days is null then
+        raise exception 'Retention days not specified and not configured in sys_param';
+    end if;
+
+    delete from public.journal
+    where created_at < now() - make_interval(days => __retention_days);
+
+    get diagnostics __count = row_count;
+
+    return query select __count;
+end;
+$$;
+
+create or replace function unsecure.purge_user_events(
+    _deleted_by text, _user_id bigint, _correlation_id text,
+    _older_than_days integer default null
+) returns table(__deleted_count bigint)
+    language plpgsql
+as
+$$
+declare
+    __retention_days integer;
+    __count bigint;
+begin
+    __retention_days := coalesce(_older_than_days,
+        (select text_value::integer from const.sys_param
+         where group_code = 'user_event' and code = 'retention_days'));
+
+    if __retention_days is null then
+        raise exception 'Retention days not specified and not configured in sys_param';
+    end if;
+
+    delete from auth.user_event
+    where created_at < now() - make_interval(days => __retention_days);
+
+    get diagnostics __count = row_count;
+
+    return query select __count;
 end;
 $$;
 

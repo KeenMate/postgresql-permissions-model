@@ -99,3 +99,224 @@ begin
 end;
 $$;
 
+/*
+ * Get User Audit Trail
+ * ====================
+ *
+ * Combined view of journal entries and user events for a specific user.
+ * Returns a unified, paginated timeline of all audit activity related to a user.
+ * Requires 'authentication.read_user_events' permission.
+ */
+create or replace function auth.get_user_audit_trail(
+    _user_id bigint,
+    _correlation_id text default null,
+    _target_user_id bigint default null,
+    _from timestamptz default null,
+    _to timestamptz default null,
+    _page integer default 1,
+    _page_size integer default 20
+) returns table(
+    __source text,
+    __event_id integer,
+    __event_type_code text,
+    __event_category text,
+    __message text,
+    __ip_address text,
+    __user_agent text,
+    __origin text,
+    __event_data jsonb,
+    __correlation_id text,
+    __created_at timestamptz,
+    __created_by text,
+    __total_items bigint
+)
+    stable
+    language plpgsql
+as
+$$
+declare
+    __from timestamptz;
+    __to timestamptz;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events');
+
+    __from := coalesce(_from, now() - interval '100 years');
+    __to := coalesce(_to, now() + interval '100 years');
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 20), 100);
+
+    return query
+        with combined as (
+            -- Journal entries where keys contain the target user
+            select 'journal'::text as source
+                 , j.event_id
+                 , ec.code as event_type_code
+                 , ec.category_code as event_category
+                 , format_journal_message(
+                       get_event_message_template(j.event_id),
+                       j.data_payload,
+                       j.created_by
+                   ) as message
+                 , null::text as ip_address
+                 , null::text as user_agent
+                 , null::text as origin
+                 , j.data_payload as event_data
+                 , j.correlation_id
+                 , j.created_at
+                 , j.created_by
+            from public.journal j
+            left join const.event_code ec on ec.event_id = j.event_id
+            where j.keys @> jsonb_build_object('user', _target_user_id)
+              and j.created_at between __from and __to
+
+            union all
+
+            -- User events where target_user_id matches
+            select 'user_event'::text as source
+                 , null::integer as event_id
+                 , ue.event_type_code
+                 , 'user_event'::text as event_category
+                 , null::text as message
+                 , ue.ip_address
+                 , ue.user_agent
+                 , ue.origin
+                 , ue.event_data
+                 , ue.correlation_id
+                 , ue.created_at
+                 , ue.created_by
+            from auth.user_event ue
+            where ue.target_user_id = _target_user_id
+              and ue.created_at between __from and __to
+        ),
+        counted as (
+            select *, count(1) over () as total_items
+            from combined
+            order by created_at desc
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select c.source
+             , c.event_id
+             , c.event_type_code
+             , c.event_category
+             , c.message
+             , c.ip_address
+             , c.user_agent
+             , c.origin
+             , c.event_data
+             , c.correlation_id
+             , c.created_at
+             , c.created_by
+             , c.total_items
+        from counted c
+        order by c.created_at desc;
+end;
+$$;
+
+/*
+ * Get Security Events
+ * ===================
+ *
+ * Aggregated view of security-relevant events: failed logins, lockouts,
+ * disables, and permission denials. Paginated.
+ * Requires 'authentication.read_user_events' permission.
+ */
+create or replace function auth.get_security_events(
+    _user_id bigint,
+    _correlation_id text default null,
+    _from timestamptz default null,
+    _to timestamptz default null,
+    _page integer default 1,
+    _page_size integer default 20
+) returns table(
+    __source text,
+    __event_type_code text,
+    __requester_user_id bigint,
+    __requester_username text,
+    __target_user_id bigint,
+    __target_username text,
+    __ip_address text,
+    __user_agent text,
+    __event_data jsonb,
+    __correlation_id text,
+    __created_at timestamptz,
+    __total_items bigint
+)
+    stable
+    language plpgsql
+as
+$$
+declare
+    __from timestamptz;
+    __to timestamptz;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events');
+
+    __from := coalesce(_from, now() - interval '100 years');
+    __to := coalesce(_to, now() + interval '100 years');
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 20), 100);
+
+    return query
+        with security_events as (
+            -- User events: failed logins, lockouts, disables
+            select 'user_event'::text as source
+                 , ue.event_type_code
+                 , ue.requester_user_id
+                 , ue.requester_username
+                 , ue.target_user_id
+                 , ue.target_username
+                 , ue.ip_address
+                 , ue.user_agent
+                 , ue.event_data
+                 , ue.correlation_id
+                 , ue.created_at
+            from auth.user_event ue
+            where ue.event_type_code in ('user_login_failed', 'user_locked', 'user_disabled',
+                                         'user_unlocked', 'user_enabled', 'identity_disabled',
+                                         'identity_enabled')
+              and ue.created_at between __from and __to
+
+            union all
+
+            -- Journal: permission denials
+            select 'journal'::text as source
+                 , ec.code as event_type_code
+                 , j.user_id as requester_user_id
+                 , j.created_by as requester_username
+                 , (j.keys ->> 'user')::bigint as target_user_id
+                 , null::text as target_username
+                 , null::text as ip_address
+                 , null::text as user_agent
+                 , j.data_payload as event_data
+                 , j.correlation_id
+                 , j.created_at
+            from public.journal j
+            inner join const.event_code ec on ec.event_id = j.event_id
+            where j.event_id = 32001  -- err_no_permission
+              and j.created_at between __from and __to
+        ),
+        counted as (
+            select *, count(1) over () as total_items
+            from security_events
+            order by created_at desc
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select c.source
+             , c.event_type_code
+             , c.requester_user_id
+             , c.requester_username
+             , c.target_user_id
+             , c.target_username
+             , c.ip_address
+             , c.user_agent
+             , c.event_data
+             , c.correlation_id
+             , c.created_at
+             , c.total_items
+        from counted c
+        order by c.created_at desc;
+end;
+$$;
+

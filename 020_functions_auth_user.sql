@@ -10,7 +10,8 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.enable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.enable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -36,10 +37,14 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'user_enabled', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
-create or replace function auth.disable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.disable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -68,10 +73,14 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'user_disabled', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
-create or replace function auth.unlock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.unlock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -97,10 +106,14 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'user_unlocked', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
-create or replace function auth.lock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.lock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -129,10 +142,14 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'user_locked', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
-create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
+create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -171,10 +188,14 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'identity_enabled', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
-create or replace function auth.disable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
+create or replace function auth.disable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
+    _ip_address text default null, _user_agent text default null, _origin text default null)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -213,6 +234,9 @@ begin
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
 			, 1);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'identity_disabled', _target_user_id, _ip_address, _user_agent, _origin);
 end;
 $$;
 
@@ -271,6 +295,8 @@ begin
 	perform
 		auth.has_permission(_user_id, _correlation_id, 'users.register_user');
 
+	__normalized_email := lower(trim(_email));
+
 	perform
 		auth.validate_provider_is_active('email');
 
@@ -279,7 +305,7 @@ begin
 						select
 						from auth.user_identity ui
 						where ui.provider_code = 'email'
-							and ui.uid = lower(__normalized_email)
+							and ui.uid = __normalized_email
 			) then
 		perform error.raise_52102(__normalized_email);
 	end if;

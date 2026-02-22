@@ -5,6 +5,403 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-02-22
+
+### Added
+
+#### Source Tracking for Permissions, Permission Sets, Event Codes, and Event Categories
+
+When inspecting `auth.permission` or `const.event_code` in a production system, there was no way to tell which rows came from the core permissions model vs. the application vs. a plugin. The new `source` column solves this.
+
+#### Schema Changes
+
+Added `source text default null` to four tables:
+
+| Table | Description |
+|-------|-------------|
+| `auth.permission` | Track which module defined each permission |
+| `auth.perm_set` | Track which module defined each permission set |
+| `const.event_code` | Track which module defined each event code |
+| `const.event_category` | Track which module defined each event category |
+
+All core seed data is marked `source = 'core'`. Existing applications that don't specify a source get `null` — fully non-breaking.
+
+**Files modified:** `012_tables_const.sql`, `013_tables_auth.sql`
+
+#### Function Changes — Creation Chain
+
+All permission and perm set creation functions now accept `_source text default null`, passed down through the chain:
+
+| Function | File |
+|----------|------|
+| `unsecure.create_permission()` | `019_functions_unsecure.sql` |
+| `unsecure.create_permission_as_system()` | `019_functions_unsecure.sql` |
+| `auth.create_permission()` | `022_functions_auth_permission.sql` |
+| `unsecure.create_perm_set()` | `019_functions_unsecure.sql` |
+| `unsecure.create_perm_set_as_system()` | `019_functions_unsecure.sql` |
+| `auth.create_perm_set()` | `022_functions_auth_permission.sql` |
+| `public.create_event_code()` | `018_functions_public.sql` |
+| `public.create_event_category()` | `018_functions_public.sql` |
+
+`unsecure.copy_perm_set()` propagates `source` from the source perm set to the copy.
+
+#### Function Changes — Query and Search
+
+All query/search functions now return `__source text`:
+
+| Function | File | Also added `_source` filter? |
+|----------|------|------------------------------|
+| `unsecure.get_all_permissions()` | `019_functions_unsecure.sql` | No |
+| `auth.get_all_permissions()` | `022_functions_auth_permission.sql` | No |
+| `unsecure.get_perm_sets()` | `019_functions_unsecure.sql` | No |
+| `auth.get_perm_sets()` | `022_functions_auth_permission.sql` | No |
+| `auth.search_permissions()` | `022_functions_auth_permission.sql` | Yes |
+| `auth.search_perm_sets()` | `022_functions_auth_permission.sql` | Yes |
+| `public.get_permissions_map()` | `022_functions_auth_permission.sql` | No |
+
+#### View Changes
+
+`auth.effective_permissions` — added `perm_set_source` and `permission_source` columns.
+
+**Files modified:** `015_views.sql`
+
+#### Search Trigger Changes
+
+`triggers.calculate_permission_search_values()` and `triggers.calculate_perm_set_search_values()` now include `source` in `nrm_search_data`, so full-text search picks up source values.
+
+**Files modified:** `017_functions_triggers.sql`
+
+#### Seed Data
+
+- All ~90 `create_permission_as_system()` calls in `seed_permission_data()` now pass `_source := 'core'`
+- All ~19 `create_perm_set_as_system()` calls in `seed_permission_data()` now pass `_source := 'core'`
+- All `INSERT INTO const.event_category` rows (15) now include `source = 'core'`
+- All `INSERT INTO const.event_code` rows (~80) now include `source = 'core'`
+
+**Files modified:** `022_functions_auth_permission.sql`, `029_seed_data.sql`
+
+#### Usage Examples
+
+```sql
+-- All core permissions grouped by source
+select source, count(*) from auth.permission group by source;
+
+-- Application creates its own permission
+select auth.create_permission('admin', 1, null, 'Export data', 'areas.admin',
+    _source := 'myapp');
+
+-- Search by source
+select * from auth.search_permissions(1, null, _source := 'core');
+select * from auth.search_perm_sets(1, null, _source := 'core');
+
+-- Event codes by source
+select source, count(*) from const.event_code group by source;
+```
+
+---
+
+## [2.8.0] - 2026-02-21
+
+### Added
+
+#### Audit Infrastructure Improvements
+Comprehensive improvements to the audit and logging subsystems: plugging journal gaps, adding admin action context tracking, data retention, and higher-level audit query functions.
+
+#### 1. Journal Gaps Filled
+
+**Group sync operations** — `auth.process_external_group_member_sync_by_mapping()` and `auth.process_external_group_member_sync()` performed bulk INSERT/UPDATE/DELETE on `auth.user_group_member` with zero audit trail. A scheduled sync job could add/remove dozens of users invisibly.
+
+- `process_external_group_member_sync_by_mapping()` now creates a summary journal entry (event 13030 `group_members_synced`) recording `members_created`, `users_ensured`, `provider_code`, and `user_group_mapping_id`
+- `process_external_group_member_sync()` now journals per-mapping deletions (event 13011 `group_member_removed`) with `members_deleted` count and `action: sync_cleanup` / `sync_cleanup_missing_mappings`
+
+**Token batch expiration** — `unsecure.expire_tokens()` silently expired tokens with no audit trail.
+
+- Rewritten from `language sql` to `language plpgsql` with `get diagnostics` to capture row count
+- Now journals batch expirations (event 15003 `token_expired`) with `expired_count` and `action: batch_expiration`
+
+**New event code:**
+
+| ID | Code | Category | Description |
+|----|------|----------|-------------|
+| 13030 | `group_members_synced` | `group_event` | External group members synchronized from provider |
+
+**Files modified:** `019_functions_unsecure.sql`, `021_functions_auth_group.sql`, `029_seed_data.sql`
+
+#### 2. Admin Action Context (IP/User-Agent/Origin)
+
+Six admin user management functions created journal entries but lacked IP/user-agent/origin tracking in `auth.user_event`. Each function now:
+- Accepts optional `_ip_address text`, `_user_agent text`, `_origin text` parameters (all `DEFAULT NULL` — non-breaking change)
+- Creates a `user_event` entry alongside the existing journal entry
+
+| Function | user_event type |
+|----------|----------------|
+| `auth.enable_user()` | `user_enabled` |
+| `auth.disable_user()` | `user_disabled` |
+| `auth.unlock_user()` | `user_unlocked` |
+| `auth.lock_user()` | `user_locked` |
+| `auth.enable_user_identity()` | `identity_enabled` |
+| `auth.disable_user_identity()` | `identity_disabled` |
+
+**Files modified:** `020_functions_auth_user.sql`
+
+#### 3. Data Retention & Cleanup
+
+No mechanism existed for purging old audit data — both `journal` and `user_event` grew indefinitely.
+
+**Configuration** — retention defaults added to `const.sys_param`:
+
+| group_code | code | text_value |
+|------------|------|------------|
+| `journal` | `retention_days` | `365` |
+| `user_event` | `retention_days` | `365` |
+
+**New functions:**
+
+| Function | Schema | Description |
+|----------|--------|-------------|
+| `unsecure.purge_journal()` | unsecure | Deletes journal entries older than specified/configured days |
+| `unsecure.purge_user_events()` | unsecure | Deletes user events older than specified/configured days |
+| `public.purge_audit_data()` | public | Permission-checked wrapper calling both purge functions, self-journals the purge action |
+
+- `purge_audit_data()` requires `journal.purge_journal` permission
+- If `_older_than_days` is null, reads from `const.sys_param` retention config
+- The purge itself is journaled (event 17001 `audit_data_purged`) recording `journal_deleted` and `user_events_deleted` counts
+
+**New permission:**
+
+| Permission Code | Description |
+|-----------------|-------------|
+| `journal.purge_journal` | Purge old audit data |
+
+Added to `system_admin` permission set.
+
+**New event category and code:**
+
+| ID | Code | Category | Description |
+|----|------|----------|-------------|
+| — | `maintenance_event` | — | New category (17001-17999) for system maintenance events |
+| 17001 | `audit_data_purged` | `maintenance_event` | Old audit data was purged |
+
+**Files modified:** `019_functions_unsecure.sql`, `018_functions_public.sql`, `022_functions_auth_permission.sql`, `029_seed_data.sql`
+
+#### 4. Audit Summary Query Functions
+
+Two new higher-level query functions for common audit needs:
+
+**`auth.get_user_audit_trail()`** — Combined, paginated view of all audit activity for a specific user. UNIONs journal entries (matched via `keys @> {"user": target_user_id}`) with user events (matched via `target_user_id`). Returns unified rows with `__source` ('journal' or 'user_event'), resolved messages for journal entries, and IP/user-agent/origin for user events.
+
+**`auth.get_security_events()`** — Aggregated, paginated view of security-relevant events across the system. Includes failed logins (`user_login_failed`), lockouts (`user_locked`, `user_disabled`), unlock/enable events, identity changes, and permission denials (journal event 32001). Returns source, requester/target user info, IP/user-agent, and event data.
+
+Both functions require `authentication.read_user_events` permission and support date range filtering and pagination.
+
+**Files modified:** `028_functions_auth_event.sql`
+
+#### 5. Ensure Provider Function
+
+New `auth.ensure_provider()` — idempotent provider creation following the same "ensure" pattern as `auth.ensure_user_info()`. Returns existing provider if found (no permission check), or creates a new one (requires `providers.create_provider`). Returns `__provider_id` and `__is_new` flag.
+
+**Files modified:** `024_functions_auth_provider.sql`
+
+#### 6. Composable Human Admin Permission Sets
+
+Eight new permission sets that break down the monolithic `system_admin` into composable, human-facing roles. Each set grants only the permissions needed for a specific administrative function — assign multiple sets to a user or group for composite roles.
+
+| Permission Set | Permissions | Use Case |
+|---------------|-------------|----------|
+| `User manager` | `users`, `authentication.read_user_events`, `journal.read_journal`, `journal.get_payload` | User CRUD, view user audit events |
+| `Group manager` | `groups`, `journal.read_journal`, `journal.get_payload` | Group and membership management |
+| `Permission manager` | `permissions`, `journal.read_journal`, `journal.get_payload` | Permission and perm set management |
+| `Provider manager` | `providers`, `journal.read_journal`, `journal.get_payload` | Identity provider management |
+| `Token manager` | `tokens.create_token`, `tokens.validate_token`, `tokens.set_as_used`, `token_configuration`, `journal.read_journal`, `journal.get_payload` | Token lifecycle and token type config |
+| `Api key manager` | `api_keys`, `journal.read_journal`, `journal.get_payload` | API key management |
+| `Auditor` | `journal`, `authentication.read_user_events`, `users.read_users`, `groups.get_group`, `groups.get_groups`, `tenants.read_tenants` | Read-only audit access across all entities |
+| `Full admin` | All of the above combined + `tenants`, `journal.purge_journal`, `languages`, `translations`, `authentication.create_auth_event` | Complete administrative access |
+
+All sets are `is_assignable = true` so they can be assigned to users or groups via `auth.assign_permission()`.
+
+**New group:**
+
+| Group ID | Name | Permission Set |
+|----------|------|---------------|
+| 3 | `Full admins` | `full_admin` |
+
+Add users to the "Full admins" group for complete administrative access without using the `system_admin` perm set (which is reserved for the system superuser).
+
+**Files modified:** `022_functions_auth_permission.sql`
+
+### Fixed
+
+#### Bug: Duplicate Email Check Bypassed in `auth.register_user()`
+`__normalized_email` was declared but never assigned — stayed NULL. The duplicate check `ui.uid = lower(NULL)` always evaluated to false, so registering the same email twice bypassed the friendly error and hit a raw unique constraint violation instead.
+
+Fix: added `__normalized_email := lower(trim(_email))` before the duplicate check.
+
+**Files modified:** `020_functions_auth_user.sql`
+
+#### Bug: `ON CONFLICT` Mismatch in `recalculate_user_groups()`
+`ON CONFLICT (user_group_id, user_id)` didn't match the actual unique index `uq_user_group_member (user_group_id, user_id, coalesce(mapping_id, 0))`. PostgreSQL requires an exact match. Any `has_permission` call that triggered `recalculate_user_groups` for a user already in a default group would fail with `invalid_column_reference`.
+
+Fix: changed to `ON CONFLICT (user_group_id, user_id, coalesce(mapping_id, 0))`.
+
+**Files modified:** `019_functions_unsecure.sql`
+
+---
+
+## [2.7.0] - 2026-02-21
+
+### Added
+
+#### Dedicated Service Accounts (Least-Privilege System Users)
+Previously the backend used `user_id:1` (system superuser) for all operations — registration, login, token ops, API key validation, etc. This user has a hardcoded bypass in `auth.has_permissions()` that returns `true` unconditionally. If a backend endpoint leaks this context, it has godmode over the entire system.
+
+The system now ships with purpose-specific service accounts, each with only the permissions needed for its job. The user_id range 1-999 is reserved for system/service users (sequence starts at 1000).
+
+**Service Accounts:**
+
+| ID | Username | Display Name | Purpose | Key Permissions |
+|----|----------|-------------|---------|-----------------|
+| 1 | `system` | System | Seed/migration only (keeps `has_permissions` bypass, never used at runtime) | *(bypass)* |
+| 2 | `svc_registrator` | Registrator | User registration flow | `users.register_user`, `users.add_to_default_groups`, `tokens.create_token` |
+| 3 | `svc_authenticator` | Authenticator | Login & authentication flow | `authentication.get_data`, `authentication.ensure_permissions`, `authentication.get_users_groups_and_permissions`, `authentication.create_auth_event`, `tokens.validate_token`, `tokens.set_as_used` |
+| 4 | `svc_token_manager` | Token Manager | Token lifecycle (password reset, email verification, etc.) | `tokens.create_token`, `tokens.validate_token`, `tokens.set_as_used` |
+| 5 | `svc_api_gateway` | API Gateway | API key validation at the gateway/middleware level | `api_keys.validate_api_key` |
+| 6 | `svc_group_syncer` | Group Syncer | Background external group member synchronization | `groups.get_groups`, `groups.get_members`, `groups.create_member`, `groups.delete_member`, `groups.get_mapping`, `users.register_user`, `users.add_to_default_groups` |
+| 800 | `svc_data_processor` | Data Processor | Generic app-level data processing (recommended alternative to user_id 1) | *(none — app adds its own)* |
+
+All service accounts: `user_type_code = 'service'`, `can_login = false`, `is_system = true`.
+
+**Permission Sets:**
+
+| Permission Set | Assigned To |
+|----------------|-------------|
+| `svc_registrator_permissions` | `svc_registrator` (2) |
+| `svc_authenticator_permissions` | `svc_authenticator` (3) |
+| `svc_token_permissions` | `svc_token_manager` (4) |
+| `svc_api_gateway_permissions` | `svc_api_gateway` (5) |
+| `svc_group_syncer_permissions` | `svc_group_syncer` (6) |
+| `svc_data_processor_permissions` | `svc_data_processor` (800) |
+
+**Design decisions:**
+- `svc_registrator` also gets `tokens.create_token` — registration flows typically create email/phone verification tokens
+- `svc_authenticator` also gets `tokens.validate_token` + `tokens.set_as_used` — verification link clicks go through the auth flow
+- `svc_data_processor` (ID 800) ships with an empty permission set — applications add their own permissions to it. Recommended as the default backend service account instead of `user_id:1`
+- Admin operations (enable/disable/lock users, manage groups, etc.) are done by human admins with permissions through group membership — no service account needed
+- `auth.ensure_user_from_provider()` has no permission check by design (provider validation serves as authorization), so the authenticator doesn't need extra permissions for provider login
+
+**Files modified:** `022_functions_auth_permission.sql`, `029_seed_data.sql`
+
+### Fixed
+
+#### Missing Permissions in Seed Data
+Two authentication permissions were checked by existing functions but never created in `seed_permission_data()`:
+- `authentication.ensure_permissions` — checked by `auth.ensure_groups_and_permissions()` but never seeded
+- `authentication.get_users_groups_and_permissions` — checked by `auth.get_users_groups_and_permissions()` but never seeded (only `users.get_users_groups_and_permissions` existed under a different parent)
+
+#### `system_admin` Permission Set Missing Token & Authentication Permissions
+The `system_admin` perm set didn't include `tokens` or `authentication` parent permissions. Regular System Admin group members (not user_id:1) couldn't perform token or authentication operations. Added both to the permission set.
+
+---
+
+## [2.6.0] - 2026-02-20
+
+### Added
+
+#### Real-Time Permission Change Notifications (LISTEN/NOTIFY)
+PostgreSQL pub/sub notifications for permission-relevant changes. Backends can `LISTEN permission_changes` to receive JSON notifications and push "refetch permissions" events to clients via SSE/WebSocket.
+
+**New Functions:**
+
+| Function | Schema | Description |
+|----------|--------|-------------|
+| `unsecure.notify_permission_change(_event, _tenant_id, _target_type, _target_id, _detail)` | unsecure | Builds JSON payload and calls `pg_notify('permission_changes', ...)` |
+| `unsecure.invalidate_permission_users_cache(_updated_by, _permission_id)` | unsecure | Invalidates cache for all users affected by a permission change (direct, via perm_set, via group) |
+| `unsecure.invalidate_users_permission_cache(_updated_by, _user_ids, _tenant_id)` | unsecure | Bulk cache invalidation for an array of user IDs |
+
+**Notification Payload Format:**
+```json
+{
+    "event": "group_member_added",
+    "tenant_id": 1,
+    "target_type": "user",
+    "target_id": 42,
+    "detail": { "group_id": 7 },
+    "at": "2026-02-20T14:30:00Z"
+}
+```
+
+**Notification Trigger Functions (triggers schema):**
+
+| Trigger Function | Table | Events | Notification Events |
+|-----------------|-------|--------|---------------------|
+| `triggers.notify_permission_assignment` | `auth.permission_assignment` | INSERT, DELETE | `permission_assigned`, `permission_unassigned` |
+| `triggers.notify_perm_set_perm` | `auth.perm_set_perm` | INSERT, DELETE | `perm_set_permissions_added`, `perm_set_permissions_removed` |
+| `triggers.notify_user_group_member` | `auth.user_group_member` | INSERT, DELETE | `group_member_added`, `group_member_removed` |
+| `triggers.notify_user_group` | `auth.user_group` | UPDATE, DELETE | `group_disabled`, `group_enabled`, `group_type_changed`, `group_deleted` |
+| `triggers.notify_user_group_mapping` | `auth.user_group_mapping` | INSERT, DELETE | `group_mapping_created`, `group_mapping_deleted` |
+| `triggers.notify_user_status` | `auth.user_info` | UPDATE, DELETE | `user_disabled`, `user_enabled`, `user_locked`, `user_unlocked`, `user_deleted` |
+| `triggers.notify_owner` | `auth.owner` | INSERT, DELETE | `owner_created`, `owner_deleted` |
+| `triggers.notify_provider` | `auth.provider` | UPDATE, DELETE | `provider_disabled`, `provider_enabled`, `provider_deleted` |
+| `triggers.notify_perm_set` | `auth.perm_set` | UPDATE | `perm_set_updated` |
+| `triggers.notify_permission` | `auth.permission` | UPDATE | `permission_assignability_changed` |
+| `triggers.notify_tenant` | `auth.tenant` | DELETE | `tenant_deleted` |
+| `triggers.notify_api_key` | `auth.api_key` | INSERT, DELETE | `api_key_created`, `api_key_deleted` |
+
+**Backend Integration:**
+```
+1. Maintain a dedicated LISTEN connection (not from connection pool — PgBouncer transaction mode doesn't support LISTEN)
+2. On notification: parse JSON, route by target_type (user/group/perm_set/tenant/provider/system)
+3. Send SSE/WebSocket "REFETCH_PERMISSIONS" event to affected clients
+4. Debounce: collect notifications for 100-200ms before broadcasting (bulk operations fire multiple triggers)
+```
+
+**Notification Resolution Views:**
+
+Backend receives a notification with `target_type` + `target_id`, then queries the matching view to get affected user IDs:
+
+| View | Query Pattern | Used For |
+|------|--------------|----------|
+| `auth.notify_group_users` | `WHERE user_group_id = $1` | `group_*` events, `permission_assigned` to group |
+| `auth.notify_perm_set_users` | `WHERE perm_set_id = $1` | `perm_set_*` events |
+| `auth.notify_permission_users` | `WHERE permission_id = $1` | `permission_assignability_changed` |
+| `auth.notify_provider_users` | `WHERE provider_code = $1` | `provider_disabled`, `provider_deleted` |
+| `auth.notify_tenant_users` | `WHERE tenant_id = $1` | `tenant_deleted` |
+| *(no view needed)* | user_id is in the payload | `user_*`, `owner_*`, `group_member_*` events |
+
+**Design Decisions:**
+- Notifications are trigger-based (not embedded in `auth.*` functions) to preserve db-gen compatibility
+- `auth.*` functions remain untouched — all new logic is in `triggers.*` and `unsecure.*` schemas
+- Notifications are fire-and-forget (no persistence) — if nobody is listening, messages are discarded
+- Cache invalidation is the correctness mechanism; notifications are an optimization for client freshness
+
+**New File:** `033_triggers_cache_and_notify.sql`
+
+### Fixed
+
+#### Critical: Cache Invalidation Gaps
+Multiple mutation points changed effective permissions but did NOT invalidate the permission cache, causing users to retain revoked permissions (or miss granted ones) for up to `perm_cache_timeout_in_s` seconds.
+
+**Gaps fixed via trigger functions (in `triggers` schema):**
+
+| Trigger Function | Table | Gap Fixed |
+|-----------------|-------|-----------|
+| `triggers.cache_user_group_member_delete` | `auth.user_group_member` AFTER DELETE | Removing user from group didn't clear cache — user retained group permissions |
+| `triggers.cache_user_group_status_change` | `auth.user_group` AFTER UPDATE | Disabling/enabling a group didn't invalidate members' cache |
+| `triggers.cache_user_group_before_delete` | `auth.user_group` BEFORE DELETE | Deleting a group cascade-deleted members but cached permissions persisted |
+| `triggers.cache_provider_before_delete` | `auth.provider` BEFORE DELETE | Deleting provider cascade-deleted identities but cached permissions persisted |
+| `triggers.cache_provider_status_change` | `auth.provider` AFTER UPDATE | Disabling provider didn't invalidate affected users' cache |
+
+**Gaps fixed via direct changes in `unsecure.*` functions:**
+
+| Function | Gap Fixed |
+|----------|-----------|
+| `unsecure.create_user_group_member()` | Adding user to group didn't clear cache — user didn't get group permissions until cache expired |
+| `unsecure.set_permission_as_assignable()` | Making permission non-assignable didn't invalidate affected users — they kept the permission |
+| `unsecure.update_perm_set()` | Changing perm_set `is_assignable` didn't invalidate affected users |
+
+**Impact:** All permission-relevant mutations now take effect immediately instead of being delayed by cache timeout.
+
+---
+
 ## [2.5.0] - 2026-02-14
 
 ### Added
@@ -736,6 +1133,9 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.8.0 | 2026-02-21 | Audit infrastructure, composable admin permission sets, ensure_provider, bug fixes |
+| 2.7.0 | 2026-02-21 | Dedicated service accounts with least-privilege permissions, missing permission seed fixes |
+| 2.6.0 | 2026-02-20 | Real-time LISTEN/NOTIFY notifications, cache invalidation gap fixes |
 | 2.5.0 | 2026-02-14 | Code generator compatibility: unique journal function names, throw_no_permission moved to internal |
 | 2.4.0 | 2026-02-14 | Hierarchical numeric permission codes, language & translation system, colored test output |
 | 2.3.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |

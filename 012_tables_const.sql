@@ -94,7 +94,8 @@ create table const.event_category
     title         text    not null,
     range_start   integer not null,
     range_end     integer not null,
-    is_error      boolean not null default false
+    is_error      boolean not null default false,
+    source        text    default null
 );
 
 create table const.event_code
@@ -105,7 +106,8 @@ create table const.event_code
     title         text    not null,
     description   text,
     is_read_only  boolean not null default false,
-    is_system     boolean not null default false
+    is_system     boolean not null default false,
+    source        text    default null
 );
 
 /*

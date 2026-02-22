@@ -210,6 +210,7 @@ create table auth.permission
     full_title      text,
     nrm_search_data text,
     short_code      text,
+    source          text default null,
     constraint permission_created_by_check
         check (length(created_by) <= 250),
     constraint permission_updated_by_check
@@ -232,6 +233,7 @@ create table auth.perm_set
     is_system       boolean default false not null,
     is_assignable   boolean default true  not null,
     nrm_search_data text,
+    source          text default null,
     unique (code, tenant_id),
     constraint perm_set_created_by_check
         check (length(created_by) <= 250),

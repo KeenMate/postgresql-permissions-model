@@ -15,7 +15,8 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **Permission sets** for role-based access control
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
-- **Permission caching** for performance
+- **Permission caching** for performance with automatic invalidation
+- **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
 - **Built-in search/paging** for users, groups, tenants, permissions, and permission sets
 
 ## Quick Start
@@ -99,6 +100,61 @@ select * from auth.search_permissions(1, null, _parent_code := 'users');
 - **`internal`** - For trusted contexts (no permission checks)
 - **`unsecure`** - Security system internals only
 
+### Service Accounts
+
+The system ships with dedicated service accounts (IDs 1-999 reserved) so backends never need to use the `system` superuser (user_id:1) at runtime. Each account has only the permissions required for its job.
+
+| ID | Username | Purpose |
+|----|----------|---------|
+| 1 | `system` | Seed/migration only — has `has_permissions` bypass, never used at runtime |
+| 2 | `svc_registrator` | User registration + email/phone verification token creation |
+| 3 | `svc_authenticator` | Login, permission resolution, token validation |
+| 4 | `svc_token_manager` | Full token lifecycle (password reset, email verification, etc.) |
+| 5 | `svc_api_gateway` | API key validation at gateway/middleware level |
+| 6 | `svc_group_syncer` | Background external group member synchronization |
+| 800 | `svc_data_processor` | Generic app-level processing (empty perm set — app adds its own) |
+
+All service accounts have `user_type_code = 'service'`, `can_login = false`, `is_system = true`.
+
+**Usage:** pass the appropriate service account's `user_id` instead of `1` when calling `auth.*` functions from your backend:
+```sql
+-- Before (superuser bypass — no permission check at all)
+select auth.has_permission(1, null, 'users.register_user', 1);
+
+-- After (least-privilege — actually validates the permission)
+select auth.has_permission(2, null, 'users.register_user', 1);
+```
+
+The `svc_data_processor` (ID 800) is the recommended default for application-specific operations. Add permissions to its `svc_data_processor_permissions` perm set as needed.
+
+### Human Admin Permission Sets
+
+Composable permission sets for human administrators. Each set covers a specific administrative domain — assign one or combine several for composite roles.
+
+| Permission Set | Domain | Key Permissions |
+|---------------|--------|-----------------|
+| `User manager` | User CRUD + audit | `users`, `authentication.read_user_events` |
+| `Group manager` | Groups & membership | `groups` |
+| `Permission manager` | Permissions & perm sets | `permissions` |
+| `Provider manager` | Identity providers | `providers` |
+| `Token manager` | Token lifecycle & config | `tokens.*`, `token_configuration` |
+| `Api key manager` | API key CRUD | `api_keys` |
+| `Auditor` | Read-only audit access | `journal`, `authentication.read_user_events`, read-only entity access |
+| `Full admin` | Everything combined | All admin permissions including `journal.purge_journal` |
+
+All sets include `journal.read_journal` and `journal.get_payload` for audit visibility (except Auditor which has the full `journal` parent permission).
+
+**Built-in group:** "Full admins" (group ID 3) has the `full_admin` perm set assigned. Add users to this group for complete administrative access:
+
+```sql
+-- Add user to Full admins group
+select auth.create_user_group_member('admin', 1, null, 3, _target_user_id := 1001);
+
+-- Or assign individual role perm sets to a user
+select auth.assign_permission('admin', 1, null, 1, null, 1001, null, 'user_manager');
+select auth.assign_permission('admin', 1, null, 1, null, 1001, null, 'group_manager');
+```
+
 ## Journal / Audit Logging
 
 The `public.journal` table provides comprehensive audit logging with multi-key support.
@@ -162,6 +218,103 @@ SELECT * FROM search_journal(
 | `group_event` | Group membership changes |
 | `apikey_event` | API key operations |
 | `token_event` | Token lifecycle |
+| `provider_event` | Provider lifecycle |
+| `maintenance_event` | System maintenance operations |
+
+### Audit Summary Queries
+
+Higher-level query functions for common audit needs:
+
+```sql
+-- Unified audit trail for a specific user (combines journal + user_event)
+select * from auth.get_user_audit_trail(
+    _user_id := 1,
+    _target_user_id := 1001,
+    _from := now() - interval '30 days',
+    _page := 1,
+    _page_size := 20
+);
+
+-- Security events across the system (failed logins, lockouts, permission denials)
+select * from auth.get_security_events(
+    _user_id := 1,
+    _from := now() - interval '7 days'
+);
+```
+
+### Data Retention
+
+Configurable purge mechanism for old audit data. Retention defaults are stored in `const.sys_param`:
+
+| group_code | code | default |
+|------------|------|---------|
+| `journal` | `retention_days` | `365` |
+| `user_event` | `retention_days` | `365` |
+
+```sql
+-- Purge data older than configured retention (requires journal.purge_journal permission)
+select * from public.purge_audit_data('admin', 1, null);
+
+-- Purge with explicit retention override
+select * from public.purge_audit_data('admin', 1, null, _older_than_days := 90);
+```
+
+The purge itself is journaled (event 17001 `audit_data_purged`) for accountability.
+
+## Real-Time Permission Notifications
+
+The system uses PostgreSQL's built-in LISTEN/NOTIFY to push permission change events to backends in real-time. When any permission-relevant mutation occurs (assignment, group membership, user status, etc.), a JSON notification is sent on the `permission_changes` channel.
+
+### Backend Setup
+```js
+// Dedicated connection (not from pool — PgBouncer transaction mode doesn't support LISTEN)
+await client.query('LISTEN permission_changes');
+
+client.on('notification', (msg) => {
+    const payload = JSON.parse(msg.payload);
+    // payload: { event, tenant_id, target_type, target_id, detail, at }
+    broadcastToAffectedClients(payload, { type: 'REFETCH_PERMISSIONS' });
+});
+```
+
+### Notification Events
+
+| Event | Trigger | target_type |
+|-------|---------|-------------|
+| `permission_assigned` / `permission_unassigned` | Permission or perm_set assigned to user/group | `user` or `group` |
+| `perm_set_permissions_added` / `perm_set_permissions_removed` | Permissions added/removed from a set | `perm_set` |
+| `group_member_added` / `group_member_removed` | User added/removed from group | `user` |
+| `group_disabled` / `group_enabled` / `group_deleted` | Group status change | `group` |
+| `group_mapping_created` / `group_mapping_deleted` | External group mapping change | `group` |
+| `user_disabled` / `user_locked` / `user_deleted` | User status change | `user` |
+| `owner_created` / `owner_deleted` | Ownership change | `user` |
+| `provider_disabled` / `provider_deleted` | Identity provider change | `provider` |
+| `tenant_deleted` | Tenant removal | `tenant` |
+
+### Resolving Affected Users
+
+Notifications carry IDs, not user lists. After receiving a notification, query the matching resolution view:
+
+```sql
+-- Group event → which users to notify?
+SELECT user_id FROM auth.notify_group_users WHERE user_group_id = $1;
+
+-- Perm set changed → which users to notify?
+SELECT user_id FROM auth.notify_perm_set_users WHERE perm_set_id = $1;
+
+-- Permission assignability changed → which users to notify?
+SELECT user_id FROM auth.notify_permission_users WHERE permission_id = $1;
+
+-- Provider disabled/deleted → which users to notify?
+SELECT user_id FROM auth.notify_provider_users WHERE provider_code = $1;
+
+-- Tenant deleted → which users to notify?
+SELECT user_id FROM auth.notify_tenant_users WHERE tenant_id = $1;
+```
+
+For `target_type = 'user'` events (user status changes, group member add/remove, owner changes), the `target_id` is the user_id directly — no view needed.
+
+Notifications are delivered after COMMIT (never for rolled-back transactions) and are fire-and-forget — cache invalidation handles correctness, notifications handle client freshness.
 
 ## Group Mapping Strategy
 
@@ -172,6 +325,23 @@ Supports three group types for flexible identity provider integration:
 - **Hybrid Groups**: Combination of both approaches
 
 Example: User logs in with AzureAD groups → System maps external groups to internal permissions → User gets permissions without being explicitly added as member.
+
+## Identity Providers
+
+Providers represent external authentication systems (AzureAD, Google, LDAP, email, etc.). Each provider has a `code`, `name`, and `is_active` flag.
+
+```sql
+-- Create provider (requires providers.create_provider permission)
+select * from auth.create_provider('admin', 1, null, 'google', 'Google authentication');
+
+-- Idempotent: create if missing, return existing if found
+select * from auth.ensure_provider('admin', 1, null, 'google', 'Google authentication');
+-- Returns: __provider_id, __is_new (true on first call, false on subsequent)
+
+-- Enable/disable
+select * from auth.enable_provider('admin', 1, null, 'google');
+select * from auth.disable_provider('admin', 1, null, 'google');
+```
 
 ## Documentation
 
@@ -227,6 +397,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 13001-13999 | Group Events | Group membership and mappings |
 | 14001-14999 | API Key Events | API key lifecycle and validation |
 | 15001-15999 | Token Events | Token lifecycle |
+| 17001-17999 | Maintenance Events | System maintenance operations |
 | 30001-30999 | Security Errors | Authentication and token errors |
 | 31001-31999 | Validation Errors | Missing required parameters |
 | 32001-32999 | Permission Errors | Permission not found, not assignable |
@@ -303,6 +474,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 13011 | group_member_removed | Member was removed from group |
 | 13020 | group_mapping_created | Group mapping was created |
 | 13021 | group_mapping_deleted | Group mapping was deleted |
+| 13030 | group_members_synced | External group members synchronized from provider |
 
 #### API Key Events (14001-14999)
 
@@ -322,6 +494,22 @@ The system uses structured event/error codes organized by category. Codes are st
 | 15002 | token_used | Token was used |
 | 15003 | token_expired | Token expired |
 | 15004 | token_failed | Token validation failed |
+
+#### Provider Events (16001-16999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 16001 | provider_created | New provider was created |
+| 16002 | provider_updated | Provider was updated |
+| 16003 | provider_deleted | Provider was deleted |
+| 16004 | provider_enabled | Provider was enabled |
+| 16005 | provider_disabled | Provider was disabled |
+
+#### Maintenance Events (17001-17999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 17001 | audit_data_purged | Old audit data was purged |
 
 ### Error Codes (30xxx-34xxx)
 

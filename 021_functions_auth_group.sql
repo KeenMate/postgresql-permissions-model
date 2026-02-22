@@ -303,11 +303,21 @@ begin
 	where user_id = _target_user_id
 	into __user_upn;
 
+	if exists(select from auth.user_group_member
+		where user_group_id = _user_group_id
+			and user_id = _target_user_id
+			and member_type_code in ('external', 'synced')) then
+		raise exception 'Cannot manually remove externally managed group member (type: %). Remove the mapping or sync source instead.',
+			(select member_type_code from auth.user_group_member
+				where user_group_id = _user_group_id and user_id = _target_user_id and member_type_code in ('external', 'synced') limit 1)
+			using errcode = 'restricted_operation';
+	end if;
+
 	delete
 	from auth.user_group_member
 	where user_group_id = _user_group_id
-		and user_id = _target_user_id;
-
+		and user_id = _target_user_id
+		and member_type_code = 'manual';
 
 	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13011  -- group_member_removed
@@ -331,6 +341,40 @@ begin
 							 where ugm.user_group_id = _user_group_id;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
+end;
+$$;
+
+create or replace function auth.ensure_user_group_mapping(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _provider_code text, _mapped_object_id text default null, _mapped_object_name text default null, _mapped_role text default null, _tenant_id integer default 1)
+    returns table(__user_group_mapping_id integer, __user_group_id integer, __is_new boolean)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __existing_mapping_id int;
+    __existing_group_id int;
+    __new_mapping_id int;
+    __new_group_id int;
+begin
+    select user_group_mapping_id, user_group_id
+    from auth.user_group_mapping
+    where user_group_id = _user_group_id
+      and provider_code = _provider_code
+      and coalesce(mapped_object_id, '') = coalesce(lower(_mapped_object_id), '')
+      and coalesce(mapped_role, '') = coalesce(lower(_mapped_role), '')
+    into __existing_mapping_id, __existing_group_id;
+
+    if __existing_mapping_id is not null then
+        return query select __existing_mapping_id, __existing_group_id, false;
+        return;
+    end if;
+
+    select m.__user_group_mapping_id, m.__user_group_id
+    from auth.create_user_group_mapping(_created_by, _user_id, _correlation_id,
+        _user_group_id, _provider_code, _mapped_object_id, _mapped_object_name, _mapped_role, _tenant_id) m
+    into __new_mapping_id, __new_group_id;
+
+    return query select __new_mapping_id, __new_group_id, true;
 end;
 $$;
 
@@ -729,13 +773,13 @@ begin
 
 				 created_members as materialized (
 					 insert into auth.user_group_member (created_by, user_group_id, user_id, mapping_id, member_type_code)
-						 select _run_by, __user_group_id, cu.user_id, cu.user_group_mapping_id, 'sync'
+						 select _run_by, __user_group_id, cu.user_id, cu.user_group_mapping_id, 'synced'
 						 from combined_create_users cu
 						 returning user_id),
 				 updated_members as materialized (
 					 update auth.user_group_member
-						 set member_type_code = 'sync'
-						 where mapping_id = _user_group_mapping_id and member_type_code != 'sync' and
+						 set member_type_code = 'synced'
+						 where mapping_id = _user_group_mapping_id and member_type_code != 'synced' and
 									 user_id in (select user_id from __temp_members_comparison where operation = 'update')
 						 returning user_id),
 				 combined_results as (select 'created' operation, eu.user_id
@@ -754,6 +798,15 @@ begin
 		from combined_results cr
 					 inner join auth.user_info ui on cr.user_id = ui.user_id;
 
+	perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+		, 13030  -- group_members_synced
+		, 'group', __user_group_id
+		, jsonb_build_object('user_group_mapping_id', _user_group_mapping_id,
+			'provider_code', __provider_code,
+			'members_created', (select count(*) from __temp_members_comparison where operation = 'create'),
+			'users_ensured', (select count(*) from __temp_ensured_users))
+		, 1);
+
 	drop table if exists __temp_ensure_users;
 	drop table if exists __temp_ensured_users;
 	drop table if exists __temp_current_members;
@@ -767,8 +820,9 @@ create or replace function auth.process_external_group_member_sync(_run_by text,
 as
 $$
 declare
-	__group_row  record;
-	__mapping_id int;
+	__group_row    record;
+	__mapping_id   int;
+	__deleted_count bigint;
 begin
 
 	--   perform auth.has_permission(_user_id, '');
@@ -822,6 +876,18 @@ begin
 					from deleted_users cr
 								 inner join auth.user_info ui on cr.user_id = ui.user_id;
 
+					get diagnostics __deleted_count = row_count;
+
+					if __deleted_count > 0 then
+						perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+							, 13011  -- group_member_removed
+							, 'group', __group_row.user_group_id
+							, jsonb_build_object('user_group_mapping_id', __mapping_id,
+								'action', 'sync_cleanup',
+								'members_deleted', __deleted_count)
+							, 1);
+					end if;
+
 				end loop;
 
 			-- 			create temporary table __temp_delete_members as
@@ -851,6 +917,17 @@ begin
 						 ui.username
 			from deleted_users_completely_missing cr
 						 inner join auth.user_info ui on cr.user_id = ui.user_id;
+
+			get diagnostics __deleted_count = row_count;
+
+			if __deleted_count > 0 then
+				perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+					, 13011  -- group_member_removed
+					, 'group', __group_row.user_group_id
+					, jsonb_build_object('action', 'sync_cleanup_missing_mappings',
+						'members_deleted', __deleted_count)
+					, 1);
+			end if;
 		end loop;
 
 

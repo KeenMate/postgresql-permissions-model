@@ -118,6 +118,7 @@ begin
 	return concat_ws(' ', helpers.normalize_text(_permission.title)
 		, helpers.normalize_text(_permission.code)
 		, helpers.normalize_text(_permission.full_code::text)
+		, helpers.normalize_text(_permission.source)
 		);
 end;
 $$;
@@ -142,6 +143,7 @@ $$
 begin
 	return concat_ws(' ', helpers.normalize_text(_perm_set.title)
 		, helpers.normalize_text(_perm_set.code)
+		, helpers.normalize_text(_perm_set.source)
 		);
 end;
 $$;

@@ -24,6 +24,34 @@ begin
 end;
 $$;
 
+create or replace function auth.ensure_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean default true)
+    returns table(__provider_id integer, __is_new boolean)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __existing_id int;
+    __new_id int;
+begin
+    select provider_id
+    from auth.provider
+    where code = _provider_code
+    into __existing_id;
+
+    if __existing_id is not null then
+        return query select __existing_id, false;
+        return;
+    end if;
+
+    select p.__provider_id
+    from auth.create_provider(_created_by, _user_id, _correlation_id, _provider_code, _provider_name, _is_active) p
+    into __new_id;
+
+    return query select __new_id, true;
+end;
+$$;
+
 create or replace function auth.create_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean DEFAULT true)
     returns TABLE(__provider_id integer)
     rows 1
