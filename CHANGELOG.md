@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-02-23
+
+### Added
+
+#### Range Partitioning for Audit Tables
+
+Both `public.journal` and `auth.user_event` are now range-partitioned by `created_at` (monthly). On busy systems these tables grow indefinitely; the old `DELETE WHERE created_at < threshold` purge was slow (row-by-row deletion, WAL bloat, index maintenance). Partitioning solves this with instant `DROP PARTITION` purges, automatic partition pruning on all date-filtered queries, and smaller per-partition indexes for faster inserts.
+
+#### Schema Changes
+
+| Change | Description |
+|--------|-------------|
+| `public.journal` PK | `journal_id` -> composite `(journal_id, created_at)` |
+| `public.journal` | Added `partition by range (created_at)` |
+| `auth.user_event` PK | `user_event_id` -> composite `(user_event_id, created_at)` |
+| `auth.user_event` | Added `partition by range (created_at)` |
+| `auth.token.user_event_id` FK | Dropped (partitioned tables require partition key in FK target; the FK also had `ON DELETE CASCADE` which would cascade-delete tokens when old event partitions are dropped) |
+| New index `ix_user_event_created` | `auth.user_event (created_at desc)` |
+| New index `ix_user_event_target_user` | `auth.user_event (target_user_id, created_at desc)` |
+| Default partitions | `public.journal_default`, `auth.user_event_default` (safety net) |
+| Initial partitions | 5 monthly partitions created at setup (-1 to +3 months from now) |
+
+#### New Functions
+
+| Function | Description |
+|----------|-------------|
+| `unsecure.ensure_audit_partitions(_months_ahead)` | Creates monthly partitions N months ahead for both tables. Idempotent. Reads default from `const.sys_param` (`partition.months_ahead`). |
+
+#### New Seed Data
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `partition.months_ahead` | `3` | Default number of months to pre-create partitions |
+
+### Changed
+
+#### Purge Functions Rewritten for Partition Drops
+
+`unsecure.purge_journal()` and `unsecure.purge_user_events()` now:
+1. Calculate cutoff month from retention days
+2. Find and drop partitions named `journal_YYYY_MM` / `user_event_YYYY_MM` older than cutoff
+3. Fall back to `DELETE` on the default partition for safety
+4. Call `ensure_audit_partitions()` to pre-create future months
+
+#### Search Functions Optimized for Partition Pruning
+
+`public.search_journal()` and `auth.search_user_events()` now pass `created_at` through the CTE to the join condition, enabling the planner to prune partitions on the re-join instead of scanning all partitions.
+
+**Files modified:** `013_tables_auth.sql`, `014_tables_stage.sql`, `018_functions_public.sql`, `019_functions_unsecure.sql`, `028_functions_auth_event.sql`, `029_seed_data.sql`
+
+---
+
 ## [2.9.0] - 2026-02-22
 
 ### Added

@@ -360,8 +360,7 @@ create table auth.user_event
     created_at         timestamp with time zone default now()           not null,
     created_by         text                     default 'unknown'::text not null,
     correlation_id     text,
-    user_event_id      bigint generated always as identity
-        primary key,
+    user_event_id      bigint generated always as identity,
     event_type_code    text not null,
     requester_user_id  bigint
         references auth.user_info
@@ -377,8 +376,9 @@ create table auth.user_event
     origin             text,
     event_data         jsonb,
     constraint user_event_created_by_check
-        check (length(created_by) <= 250)
-);
+        check (length(created_by) <= 250),
+    primary key (user_event_id, created_at)
+) partition by range (created_at);
 
 create table auth.token
 (
@@ -390,9 +390,7 @@ create table auth.token
         primary key,
     user_id            bigint
         references auth.user_info,
-    user_event_id      integer
-        references auth.user_event
-            on delete cascade,
+    user_event_id      integer, -- logical FK to auth.user_event (not enforced: partitioned table requires partition key in FK target)
     token_state_code   text default 'valid'::text             not null
         references const.token_state,
     token_type_code    text                                   not null
@@ -545,6 +543,41 @@ create index ix_user_event_data
 
 create index ix_user_event_correlation_id
     on auth.user_event(correlation_id) where correlation_id is not null;
+
+create index ix_user_event_created
+    on auth.user_event (created_at desc);
+
+create index ix_user_event_target_user
+    on auth.user_event (target_user_id, created_at desc);
+
+-- Default partition (safety net for unexpected created_at values)
+create table auth.user_event_default partition of auth.user_event default;
+
+-- Create initial monthly partitions for user_event
+do $$
+declare
+    _start date;
+    _end date;
+    _partition_name text;
+    _i integer;
+begin
+    for _i in -1..3 loop
+        _start := date_trunc('month', now()) + make_interval(months => _i);
+        _end := _start + interval '1 month';
+        _partition_name := 'user_event_' || to_char(_start, 'YYYY_MM');
+
+        if not exists (
+            select 1 from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'auth' and c.relname = _partition_name
+        ) then
+            execute format(
+                'create table auth.%I partition of auth.user_event for values from (%L) to (%L)',
+                _partition_name, _start, _end
+            );
+        end if;
+    end loop;
+end $$;
 
 create index ix_token_token
     on auth.token using hash (token);

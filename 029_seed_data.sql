@@ -63,6 +63,10 @@ INSERT INTO const.sys_param (group_code, code, text_value) VALUES
     ('user_event', 'retention_days', '365')
 ON CONFLICT DO NOTHING;
 
+INSERT INTO const.sys_param (group_code, code, text_value, number_value) VALUES
+    ('partition', 'months_ahead', '3', 3)
+ON CONFLICT DO NOTHING;
+
 /*
  * Event Categories
  * ================

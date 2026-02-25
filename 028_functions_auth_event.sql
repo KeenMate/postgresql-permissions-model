@@ -68,6 +68,7 @@ begin
     return query
         with filtered_rows as (
             select ue.user_event_id
+                 , ue.created_at as event_created_at
                  , count(1) over () as total_items
             from auth.user_event ue
             where (_event_type_code is null or ue.event_type_code = _event_type_code)
@@ -94,7 +95,7 @@ begin
              , ue.created_by
              , fr.total_items
         from filtered_rows fr
-        join auth.user_event ue on ue.user_event_id = fr.user_event_id
+        join auth.user_event ue on ue.user_event_id = fr.user_event_id and ue.created_at = fr.event_created_at
         order by ue.created_at desc;
 end;
 $$;

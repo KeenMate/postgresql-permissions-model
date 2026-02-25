@@ -1957,6 +1957,64 @@ begin
 end;
 $$;
 
+/*
+ * Partition Management
+ * ====================
+ *
+ * ensure_audit_partitions() creates monthly partitions for journal and user_event
+ * tables N months ahead. Called by purge functions and during initial setup.
+ */
+create or replace function unsecure.ensure_audit_partitions(
+    _months_ahead integer default null
+) returns void
+    language plpgsql
+as
+$$
+declare
+    __months integer;
+    __start date;
+    __end date;
+    __partition_name text;
+    __i integer;
+begin
+    __months := coalesce(_months_ahead,
+        (select number_value::integer from const.sys_param
+         where group_code = 'partition' and code = 'months_ahead'));
+    __months := coalesce(__months, 3);
+
+    for __i in 0..__months loop
+        __start := date_trunc('month', now()) + make_interval(months => __i);
+        __end := __start + interval '1 month';
+
+        -- journal partitions
+        __partition_name := 'journal_' || to_char(__start, 'YYYY_MM');
+        if not exists (
+            select 1 from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'public' and c.relname = __partition_name
+        ) then
+            execute format(
+                'create table public.%I partition of public.journal for values from (%L) to (%L)',
+                __partition_name, __start, __end
+            );
+        end if;
+
+        -- user_event partitions
+        __partition_name := 'user_event_' || to_char(__start, 'YYYY_MM');
+        if not exists (
+            select 1 from pg_class c
+            join pg_namespace n on n.oid = c.relnamespace
+            where n.nspname = 'auth' and c.relname = __partition_name
+        ) then
+            execute format(
+                'create table auth.%I partition of auth.user_event for values from (%L) to (%L)',
+                __partition_name, __start, __end
+            );
+        end if;
+    end loop;
+end;
+$$;
+
 create or replace function unsecure.purge_journal(
     _deleted_by text, _user_id bigint, _correlation_id text,
     _older_than_days integer default null
@@ -1966,7 +2024,12 @@ as
 $$
 declare
     __retention_days integer;
-    __count bigint;
+    __count bigint := 0;
+    __cutoff_month date;
+    __partition record;
+    __partition_month date;
+    __partition_count bigint;
+    __default_count bigint;
 begin
     __retention_days := coalesce(_older_than_days,
         (select text_value::integer from const.sys_param
@@ -1976,10 +2039,37 @@ begin
         raise exception 'Retention days not specified and not configured in sys_param';
     end if;
 
-    delete from public.journal
-    where created_at < now() - make_interval(days => __retention_days);
+    __cutoff_month := date_trunc('month', now() - make_interval(days => __retention_days));
 
-    get diagnostics __count = row_count;
+    -- Drop partitions older than cutoff month
+    for __partition in
+        select c.relname, n.nspname
+        from pg_inherits i
+        join pg_class c on c.oid = i.inhrelid
+        join pg_namespace n on n.oid = c.relnamespace
+        where i.inhparent = 'public.journal'::regclass
+          and c.relname ~ '^journal_\d{4}_\d{2}$'
+    loop
+        __partition_month := to_date(
+            substring(__partition.relname from 'journal_(\d{4}_\d{2})'), 'YYYY_MM'
+        );
+
+        if __partition_month < __cutoff_month then
+            execute format('select count(*) from %I.%I', __partition.nspname, __partition.relname) into __partition_count;
+            execute format('alter table public.journal detach partition %I.%I', __partition.nspname, __partition.relname);
+            execute format('drop table %I.%I', __partition.nspname, __partition.relname);
+            __count := __count + __partition_count;
+        end if;
+    end loop;
+
+    -- Clean up default partition (rows that landed there unexpectedly)
+    delete from public.journal_default
+    where created_at < now() - make_interval(days => __retention_days);
+    get diagnostics __default_count = row_count;
+    __count := __count + __default_count;
+
+    -- Pre-create future partitions
+    perform unsecure.ensure_audit_partitions();
 
     return query select __count;
 end;
@@ -1994,7 +2084,12 @@ as
 $$
 declare
     __retention_days integer;
-    __count bigint;
+    __count bigint := 0;
+    __cutoff_month date;
+    __partition record;
+    __partition_month date;
+    __partition_count bigint;
+    __default_count bigint;
 begin
     __retention_days := coalesce(_older_than_days,
         (select text_value::integer from const.sys_param
@@ -2004,10 +2099,37 @@ begin
         raise exception 'Retention days not specified and not configured in sys_param';
     end if;
 
-    delete from auth.user_event
-    where created_at < now() - make_interval(days => __retention_days);
+    __cutoff_month := date_trunc('month', now() - make_interval(days => __retention_days));
 
-    get diagnostics __count = row_count;
+    -- Drop partitions older than cutoff month
+    for __partition in
+        select c.relname, n.nspname
+        from pg_inherits i
+        join pg_class c on c.oid = i.inhrelid
+        join pg_namespace n on n.oid = c.relnamespace
+        where i.inhparent = 'auth.user_event'::regclass
+          and c.relname ~ '^user_event_\d{4}_\d{2}$'
+    loop
+        __partition_month := to_date(
+            substring(__partition.relname from 'user_event_(\d{4}_\d{2})'), 'YYYY_MM'
+        );
+
+        if __partition_month < __cutoff_month then
+            execute format('select count(*) from %I.%I', __partition.nspname, __partition.relname) into __partition_count;
+            execute format('alter table auth.user_event detach partition %I.%I', __partition.nspname, __partition.relname);
+            execute format('drop table %I.%I', __partition.nspname, __partition.relname);
+            __count := __count + __partition_count;
+        end if;
+    end loop;
+
+    -- Clean up default partition (rows that landed there unexpectedly)
+    delete from auth.user_event_default
+    where created_at < now() - make_interval(days => __retention_days);
+    get diagnostics __default_count = row_count;
+    __count := __count + __default_count;
+
+    -- Pre-create future partitions
+    perform unsecure.ensure_audit_partitions();
 
     return query select __count;
 end;

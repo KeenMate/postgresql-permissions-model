@@ -454,6 +454,7 @@ begin
     return query
         with filtered_rows as (
             select j.journal_id
+                 , j.created_at as journal_created_at
                  , count(1) over () as total_items
             from journal j
             left join const.event_code ec on ec.event_id = j.event_id
@@ -487,7 +488,7 @@ begin
              , j.correlation_id
              , fr.total_items
         from filtered_rows fr
-        inner join journal j on fr.journal_id = j.journal_id
+        inner join journal j on fr.journal_id = j.journal_id and j.created_at = fr.journal_created_at
         left join const.event_code ec on ec.event_id = j.event_id
         order by j.created_at desc;
 end;

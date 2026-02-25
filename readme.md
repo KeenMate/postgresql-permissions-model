@@ -93,7 +93,8 @@ select * from auth.search_permissions(1, null, _parent_code := 'users');
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
 - **`auth.api_key`** - Service authentication with technical users
-- **`public.journal`** - Audit logging with multi-key support
+- **`public.journal`** - Audit logging with multi-key support (range-partitioned by month)
+- **`auth.user_event`** - Security event audit trail (range-partitioned by month)
 
 ### Schema Security Model
 - **`public`** & **`auth`** - Always validate permissions
@@ -242,21 +243,32 @@ select * from auth.get_security_events(
 );
 ```
 
-### Data Retention
+### Partitioning & Data Retention
 
-Configurable purge mechanism for old audit data. Retention defaults are stored in `const.sys_param`:
+Both `public.journal` and `auth.user_event` are range-partitioned by `created_at` (monthly). This enables:
 
-| group_code | code | default |
-|------------|------|---------|
-| `journal` | `retention_days` | `365` |
-| `user_event` | `retention_days` | `365` |
+- **Partition pruning** — date-filtered queries only scan relevant monthly partitions
+- **Instant purge** — old partitions are detached and dropped instead of row-by-row `DELETE`
+- **INSERT performance** — writes target the current month's partition (smaller indexes)
+
+Configuration in `const.sys_param`:
+
+| group_code | code | default | description |
+|------------|------|---------|-------------|
+| `journal` | `retention_days` | `365` | How long to keep journal entries |
+| `user_event` | `retention_days` | `365` | How long to keep user events |
+| `partition` | `months_ahead` | `3` | How many future monthly partitions to pre-create |
 
 ```sql
 -- Purge data older than configured retention (requires journal.purge_journal permission)
+-- Drops old partitions + cleans default partition + pre-creates future partitions
 select * from public.purge_audit_data('admin', 1, null);
 
 -- Purge with explicit retention override
 select * from public.purge_audit_data('admin', 1, null, _older_than_days := 90);
+
+-- Pre-create future partitions manually (also called automatically by purge)
+select unsecure.ensure_audit_partitions(3);
 ```
 
 The purge itself is journaled (event 17001 `audit_data_purged`) for accountability.
