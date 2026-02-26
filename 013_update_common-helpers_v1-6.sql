@@ -65,5 +65,44 @@ select coalesce(
 );
 $$;
 
+/*
+ * Storage Mode Helpers
+ * ====================
+ *
+ * Check storage mode for journal and user_event from const.sys_param.
+ * Used by create_journal_message() and create_user_event() to control
+ * whether data is stored locally in PostgreSQL, sent via pg_notify, or both.
+ *
+ * Modes:
+ * - 'local'  : INSERT into PostgreSQL only (default)
+ * - 'notify' : Fire pg_notify only, skip INSERT
+ * - 'both'   : INSERT + fire pg_notify
+ */
+create or replace function helpers.should_store_locally(_group_code text)
+    returns boolean
+    stable
+    language sql
+as
+$$
+select coalesce(
+    (select text_value from const.sys_param
+     where group_code = _group_code and code = 'storage_mode'),
+    'local'
+) in ('local', 'both');
+$$;
+
+create or replace function helpers.should_notify_storage(_group_code text)
+    returns boolean
+    stable
+    language sql
+as
+$$
+select coalesce(
+    (select text_value from const.sys_param
+     where group_code = _group_code and code = 'storage_mode'),
+    'local'
+) in ('notify', 'both');
+$$;
+
 select *
 from stop_version_update('1.6', _component := 'common_helpers');

@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0] - 2026-02-26
+
+### Added
+
+#### Storage Mode Switch — Offload Journal & User Events via pg_notify
+
+Journal messages and user events can now be routed to an external system (e.g., ClickHouse) via PostgreSQL's LISTEN/NOTIFY instead of (or in addition to) being stored locally. This is controlled independently for each subsystem via `const.sys_param`.
+
+**New sys_param entries:**
+
+| group_code | code | default | values |
+|------------|------|---------|--------|
+| `journal` | `storage_mode` | `local` | `local`, `notify`, `both` |
+| `user_event` | `storage_mode` | `local` | `local`, `notify`, `both` |
+
+**Storage modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `local` | INSERT into PostgreSQL only (current default, no behavior change) |
+| `notify` | Fire `pg_notify` only, skip INSERT — data goes to external listener |
+| `both` | INSERT into PostgreSQL AND fire `pg_notify` |
+
+**New functions:**
+
+| Function | Description |
+|----------|-------------|
+| `helpers.should_store_locally(_group_code)` | Returns true when storage_mode is `local` or `both` |
+| `helpers.should_notify_storage(_group_code)` | Returns true when storage_mode is `notify` or `both` |
+| `unsecure.notify_journal_event(...)` | Sends journal entry as JSON on `journal_events` channel |
+| `unsecure.notify_user_event(...)` | Sends user event as JSON on `user_events` channel |
+
+**Modified functions:**
+
+- `public.create_journal_message()` — checks storage mode, fires notify if needed, skips INSERT in `notify` mode
+- `unsecure.create_user_event()` — same pattern
+
+**Notify channels:** `journal_events`, `user_events` (separate from existing `permission_changes`)
+
+**Payload truncation:** pg_notify has an 8000 byte limit. If a payload exceeds ~7900 bytes, `data_payload`/`request_context` (or `event_data`/`request_context` for user events) are stripped and `"truncated": true` is added. Most payloads are well under 1KB.
+
+**Note:** When mode is `notify`, search/query functions (`search_journal`, `get_journal_entry`, `search_user_events`, `get_user_audit_trail`, `get_security_events`) return empty results since data is not in PostgreSQL. The app should query the external store directly.
+
 ## [2.11.0] - 2026-02-26
 
 ### Changed

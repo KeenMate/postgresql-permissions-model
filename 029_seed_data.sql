@@ -60,7 +60,9 @@ ON CONFLICT DO NOTHING;
 INSERT INTO const.sys_param (group_code, code, text_value) VALUES
     ('journal', 'level', 'update'),  -- 'all', 'update', or 'none'
     ('journal', 'retention_days', '365'),
-    ('user_event', 'retention_days', '365')
+    ('journal', 'storage_mode', 'local'),        -- 'local', 'notify', or 'both'
+    ('user_event', 'retention_days', '365'),
+    ('user_event', 'storage_mode', 'local')       -- 'local', 'notify', or 'both'
 ON CONFLICT DO NOTHING;
 
 INSERT INTO const.sys_param (group_code, code, text_value, number_value) VALUES

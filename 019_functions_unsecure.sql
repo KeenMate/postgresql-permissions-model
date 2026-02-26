@@ -175,6 +175,94 @@ begin
 end;
 $$;
 
+-- Send a notification via pg_notify on the 'journal_events' channel
+-- Called from public.create_journal_message() when storage_mode is 'notify' or 'both'
+-- Payload is truncated if it exceeds ~7900 bytes (pg_notify 8000 byte limit)
+create or replace function unsecure.notify_journal_event(
+    _created_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _event_id        integer,
+    _keys            jsonb default null,
+    _payload         jsonb default null,
+    _tenant_id       integer default 1,
+    _request_context jsonb default null
+) returns void
+    language plpgsql
+as
+$$
+declare
+    _notify_payload jsonb;
+begin
+    _notify_payload := jsonb_build_object(
+        'type', 'journal',
+        'event_id', _event_id,
+        'tenant_id', _tenant_id,
+        'user_id', _user_id,
+        'created_by', _created_by,
+        'correlation_id', _correlation_id,
+        'keys', _keys,
+        'data_payload', _payload,
+        'request_context', _request_context,
+        'at', now()
+    );
+
+    -- pg_notify has 8000 byte limit; strip large fields if payload is too big
+    if length(_notify_payload::text) > 7900 then
+        _notify_payload := _notify_payload - 'data_payload' - 'request_context';
+        _notify_payload := _notify_payload || jsonb_build_object('truncated', true);
+    end if;
+
+    perform pg_notify('journal_events', _notify_payload::text);
+end;
+$$;
+
+-- Send a notification via pg_notify on the 'user_events' channel
+-- Called from unsecure.create_user_event() when storage_mode is 'notify' or 'both'
+-- Payload is truncated if it exceeds ~7900 bytes (pg_notify 8000 byte limit)
+create or replace function unsecure.notify_user_event(
+    _created_by          text,
+    _user_id             bigint,
+    _correlation_id      text,
+    _event_type_code     text,
+    _target_user_id      bigint,
+    _requester_username  text,
+    _target_user_oid     text default null,
+    _target_username     text default null,
+    _request_context     jsonb default null,
+    _event_data          jsonb default null
+) returns void
+    language plpgsql
+as
+$$
+declare
+    _notify_payload jsonb;
+begin
+    _notify_payload := jsonb_build_object(
+        'type', 'user_event',
+        'event_type_code', _event_type_code,
+        'user_id', _user_id,
+        'created_by', _created_by,
+        'correlation_id', _correlation_id,
+        'requester_username', _requester_username,
+        'target_user_id', _target_user_id,
+        'target_user_oid', _target_user_oid,
+        'target_username', _target_username,
+        'request_context', _request_context,
+        'event_data', _event_data,
+        'at', now()
+    );
+
+    -- pg_notify has 8000 byte limit; strip large fields if payload is too big
+    if length(_notify_payload::text) > 7900 then
+        _notify_payload := _notify_payload - 'event_data' - 'request_context';
+        _notify_payload := _notify_payload || jsonb_build_object('truncated', true);
+    end if;
+
+    perform pg_notify('user_events', _notify_payload::text);
+end;
+$$;
+
 -- Helper function to verify owner or permission for owner management operations
 create or replace function unsecure.verify_owner_or_permission(_user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
@@ -265,6 +353,19 @@ begin
 		from auth.user_info ui
 		where ui.user_id = _target_user_id
 		into _target_username;
+	end if;
+
+	-- Notify if storage mode requires it
+	if helpers.should_notify_storage('user_event') then
+		perform unsecure.notify_user_event(
+			_created_by, _user_id, _correlation_id, _event_type_code,
+			_target_user_id, __requester_username, _target_user_oid,
+			_target_username, _request_context, _event_data);
+	end if;
+
+	-- Only INSERT if storage mode is 'local' or 'both'
+	if not helpers.should_store_locally('user_event') then
+		return;
 	end if;
 
 	return query insert into auth.user_event (created_by,

@@ -275,13 +275,7 @@ Both `public.journal` and `auth.user_event` are range-partitioned by `created_at
 - **Instant purge** — old partitions are detached and dropped instead of row-by-row `DELETE`
 - **INSERT performance** — writes target the current month's partition (smaller indexes)
 
-Configuration in `const.sys_param`:
-
-| group_code | code | default | description |
-|------------|------|---------|-------------|
-| `journal` | `retention_days` | `365` | How long to keep journal entries |
-| `user_event` | `retention_days` | `365` | How long to keep user events |
-| `partition` | `months_ahead` | `3` | How many future monthly partitions to pre-create |
+Configuration in `const.sys_param` (see [System Parameters](#system-parameters) for the full reference):
 
 ```sql
 -- Purge data older than configured retention (requires journal.purge_journal permission)
@@ -296,6 +290,72 @@ select unsecure.ensure_audit_partitions(3);
 ```
 
 The purge itself is journaled (event 17001 `audit_data_purged`) for accountability.
+
+### Storage Modes (Offloading to External Systems)
+
+For large deployments where storing all journal/event data in PostgreSQL is unnecessary, the system supports offloading data to an external store (e.g., ClickHouse) via PostgreSQL's LISTEN/NOTIFY. Storage mode is controlled independently for journal and user events:
+
+| Mode | Behavior |
+|------|----------|
+| `local` | INSERT into PostgreSQL only (default — no behavior change) |
+| `notify` | Fire `pg_notify` only, skip INSERT — an external listener captures the data |
+| `both` | INSERT into PostgreSQL AND fire `pg_notify` |
+
+```sql
+-- Switch journal to notify-only (stop storing in PostgreSQL)
+select auth.update_sys_param(1, 'journal', 'storage_mode', 'notify');
+
+-- Switch user events to both (store locally + notify external)
+select auth.update_sys_param(1, 'user_event', 'storage_mode', 'both');
+
+-- Read current storage mode
+select (auth.get_sys_param('journal', 'storage_mode')).text_value;
+```
+
+**Backend listener setup:**
+```js
+// Dedicated connection (not from pool — PgBouncer transaction mode doesn't support LISTEN)
+await client.query('LISTEN journal_events');
+await client.query('LISTEN user_events');
+
+client.on('notification', (msg) => {
+    const event = JSON.parse(msg.payload);
+    if (event.truncated) {
+        // Large fields were stripped — handle accordingly
+    }
+    clickhouse.insert(msg.channel, event);
+});
+```
+
+**Notify channels:** `journal_events` and `user_events` (separate from `permission_changes`)
+
+**Payload truncation:** pg_notify has an 8000 byte limit. If a payload exceeds ~7900 bytes, large fields (`data_payload`/`request_context` for journal, `event_data`/`request_context` for user events) are stripped and `"truncated": true` is added.
+
+**Note:** When mode is `notify`, search/query functions (`search_journal`, `get_journal_entry`, `search_user_events`, etc.) return empty results since data is not stored in PostgreSQL. The application should query the external store directly for audit data.
+
+## System Parameters
+
+Runtime configuration is stored in `const.sys_param` and managed via `auth.get_sys_param()` / `auth.update_sys_param()`. The setter is restricted to user_id = 1 (system user) — intended for app startup.
+
+```sql
+-- Read a parameter
+select (auth.get_sys_param('journal', 'level')).text_value;
+
+-- Update a parameter (system user only)
+select auth.update_sys_param(1, 'journal', 'level', 'all');
+```
+
+### Parameter Reference
+
+| group_code | code | default | type | description |
+|------------|------|---------|------|-------------|
+| `journal` | `level` | `update` | text | Journal logging verbosity. `all` = log everything including reads, `update` = state-changing operations only, `none` = disable journaling |
+| `journal` | `retention_days` | `365` | text (cast to int) | How many days of journal entries to keep. Used by `purge_audit_data()` |
+| `journal` | `storage_mode` | `local` | text | Where journal data goes. `local` = INSERT only, `notify` = pg_notify only, `both` = INSERT + pg_notify |
+| `user_event` | `retention_days` | `365` | text (cast to int) | How many days of user events to keep. Used by `purge_audit_data()` |
+| `user_event` | `storage_mode` | `local` | text | Where user event data goes. Same modes as journal |
+| `partition` | `months_ahead` | `3` | number | How many future monthly partitions to pre-create for journal and user_event tables |
+| `auth` | `perm_cache_timeout_in_s` | `300` (fallback) | number | Permission cache TTL in seconds. Not seeded — uses hardcoded fallback if missing |
 
 ## Real-Time Permission Notifications
 

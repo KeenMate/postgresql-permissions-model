@@ -35,6 +35,66 @@ returning *;
 $$;
 
 /*
+ * System Parameter CRUD
+ * =====================
+ *
+ * Generic get/update for const.sys_param entries.
+ * The setter is restricted to user_id = 1 (system user) — intended for app
+ * startup configuration before any human users are active.
+ */
+
+-- Get a single sys_param value. Returns NULL if not found.
+create or replace function auth.get_sys_param(
+    _group_code text,
+    _code       text
+) returns const.sys_param
+    stable
+    language sql
+as
+$$
+select *
+from const.sys_param
+where group_code = _group_code
+  and code = _code;
+$$;
+
+-- Upsert a sys_param entry. Only user_id = 1 (system) is allowed to call this.
+-- Intended for app startup to push runtime configuration into the database.
+-- Raises exception if called by any other user.
+create or replace function auth.update_sys_param(
+    _user_id      bigint,
+    _group_code   text,
+    _code         text,
+    _text_value   text    default null,
+    _number_value bigint  default null,
+    _bool_value   boolean default null
+) returns const.sys_param
+    language plpgsql
+as
+$$
+declare
+    __result const.sys_param;
+begin
+    if _user_id is distinct from 1 then
+        raise exception 'Only the system user (user_id=1) can modify sys_param'
+            using errcode = '42501';  -- insufficient_privilege
+    end if;
+
+    insert into const.sys_param (group_code, code, text_value, number_value, bool_value, created_by, updated_by)
+    values (_group_code, _code, _text_value, _number_value, _bool_value, 'system', 'system')
+    on conflict (group_code, code) do update
+        set text_value   = excluded.text_value,
+            number_value = excluded.number_value,
+            bool_value   = excluded.bool_value,
+            updated_by   = 'system',
+            updated_at   = now()
+    returning * into __result;
+
+    return __result;
+end;
+$$;
+
+/*
  * Journal Functions
  * =================
  *
@@ -117,6 +177,10 @@ $$;
 
 -- Core function: Create journal entry with event ID
 -- Respects journal level setting from const.sys_param (journal.level)
+-- Respects storage_mode setting from const.sys_param (journal.storage_mode):
+--   'local'  - INSERT only (default)
+--   'notify' - pg_notify only, skip INSERT
+--   'both'   - INSERT + pg_notify
 create or replace function public.create_journal_message(
     _created_by text,
     _user_id bigint,
@@ -134,6 +198,18 @@ $$
 begin
     -- Check if we should log based on journal level and event type
     if not helpers.should_log_journal(helpers.is_event_read_only(_event_id)) then
+        return;
+    end if;
+
+    -- Notify if storage mode requires it
+    if helpers.should_notify_storage('journal') then
+        perform unsecure.notify_journal_event(
+            _created_by, _user_id, _correlation_id, _event_id,
+            _keys, _payload, _tenant_id, _request_context);
+    end if;
+
+    -- Only INSERT if storage mode is 'local' or 'both'
+    if not helpers.should_store_locally('journal') then
         return;
     end if;
 
