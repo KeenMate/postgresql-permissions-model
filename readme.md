@@ -107,7 +107,7 @@ The system ships with dedicated service accounts (IDs 1-999 reserved) so backend
 
 | ID | Username | Purpose |
 |----|----------|---------|
-| 1 | `system` | Seed/migration only — has `has_permissions` bypass, never used at runtime |
+| 1 | `system` | Seed/migration — has `has_permissions` bypass, should not be used at runtime |
 | 2 | `svc_registrator` | User registration + email/phone verification token creation |
 | 3 | `svc_authenticator` | Login, permission resolution, token validation |
 | 4 | `svc_token_manager` | Full token lifecycle (password reset, email verification, etc.) |
@@ -158,7 +158,7 @@ select auth.assign_permission('admin', 1, null, 1, null, 1001, null, 'group_mana
 
 ## Journal / Audit Logging
 
-The `public.journal` table provides comprehensive audit logging with multi-key support.
+The `public.journal` table provides comprehensive audit logging with multi-key support. The journal is shared across all modules — the permissions system logs its own events here, and applications can register custom event codes and create their own journal entries alongside the core ones.
 
 ### Creating Journal Entries
 
@@ -449,7 +449,8 @@ select * from auth.disable_provider('admin', 1, null, 'google');
 ## Integration
 
 ### With Application Libraries
-The separate `keen-auth-permissions` library provides application-level wrappers around these SQL functions.
+- [`keen-auth-permissions`](https://github.com/KeenMate/keen-auth-permissions) — Elixir library with application-level wrappers around these SQL functions
+- C# library — planned
 
 ### Direct SQL Integration
 Always use fully qualified schema names to avoid search_path issues:
