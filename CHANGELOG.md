@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-02-26
+
+### Changed
+
+#### Request Context Consolidation
+
+Replaced three separate text parameters (`_ip_address`, `_user_agent`, `_origin`) with a single `_request_context jsonb` parameter across all functions that accept request metadata. The same replacement applies to the corresponding table columns. This makes the system extensible — callers can pass any context fields (e.g., `device_id`, `geo_location`, `session_id`) without modifying function signatures.
+
+#### Schema Changes
+
+| Table | Change |
+|-------|--------|
+| `auth.user_event` | Replaced `ip_address text`, `user_agent text`, `origin text` columns with `request_context jsonb` |
+| `auth.token` | Replaced `ip_address text`, `user_agent text`, `origin text` columns with `request_context jsonb` |
+| `public.journal` | Added `request_context jsonb` column |
+
+#### Function Signature Changes (22 functions)
+
+All functions that previously accepted `_ip_address text, _user_agent text, _origin text` now accept `_request_context jsonb` instead:
+
+**Core event functions:**
+- `unsecure.create_user_event` — `_request_context jsonb default null` replaces three text params
+- `auth.create_user_event` — same replacement, pass-through to unsecure
+
+**User management (10 functions):**
+- `auth.enable_user`, `auth.disable_user`, `auth.unlock_user`, `auth.lock_user`
+- `auth.enable_user_identity`, `auth.disable_user_identity`
+- `auth.update_user_password` (required, no default)
+- `auth.register_user`
+- `auth.get_user_by_email_for_authentication`
+- `auth.ensure_user_from_provider`
+
+**Token functions (6 functions):**
+- `auth.set_token_as_used`, `auth.set_token_as_used_by_token`
+- `auth.set_token_as_failed`, `auth.set_token_as_failed_by_token`
+- `auth.validate_token`
+- `public.validate_token`
+
+**API key validation:**
+- `auth.validate_api_key`
+
+**Query/reporting return types updated:**
+- `auth.search_user_events` — returns `__request_context jsonb` instead of three text columns
+- `auth.get_user_audit_trail` — same replacement
+- `auth.get_security_events` — same replacement
+
+#### Journal Functions Extended
+
+All journal creation functions now accept an optional `_request_context jsonb` parameter and store it in the new `public.journal.request_context` column:
+
+- `public.create_journal_message`
+- `public.create_journal_message_by_code`
+- `public.create_journal_message_for_entity`
+- `public.create_journal_message_for_entity_by_code`
+- `public.get_journal_entry` — return type includes `__request_context jsonb`
+
+#### Calling Convention
+
+```sql
+-- Standard usage
+select auth.enable_user('admin', 1, 'corr-123', 42,
+    _request_context := '{"ip_address": "192.168.1.1", "user_agent": "Mozilla/5.0", "origin": "https://app.example.com"}'::jsonb);
+
+-- With custom fields (the whole point of this refactor)
+select auth.register_user('admin', 1, 'corr-123', 'user@example.com', '$hash$', 'User Name',
+    _request_context := jsonb_build_object(
+        'ip_address', '192.168.1.1',
+        'user_agent', 'Mozilla/5.0',
+        'device_id', 'abc-123',
+        'geo_location', 'Prague, CZ'
+    ));
+
+-- Without context (optional — defaults to null)
+select auth.enable_user('admin', 1, 'corr-123', 42);
+```
+
+### Breaking Changes
+
+- **Column renames on `auth.user_event` and `auth.token`**: `ip_address`, `user_agent`, `origin` columns replaced by `request_context jsonb`. Queries that read these columns must be updated.
+- **Function signatures**: All 22 functions listed above have changed parameter lists. Callers passing positional arguments for the old three-param pattern must switch to the new `_request_context` parameter.
+- **Return type changes**: `auth.search_user_events`, `auth.get_user_audit_trail`, `auth.get_security_events` now return `__request_context jsonb` instead of separate text columns.
+
+**Files modified:** `013_tables_auth.sql`, `014_tables_stage.sql`, `018_functions_public.sql`, `019_functions_unsecure.sql`, `020_functions_auth_user.sql`, `025_functions_auth_token.sql`, `026_functions_auth_apikey.sql`, `028_functions_auth_event.sql`, `tests/test_registration_login_events.sql`
+
+---
+
 ## [2.10.0] - 2026-02-23
 
 ### Added

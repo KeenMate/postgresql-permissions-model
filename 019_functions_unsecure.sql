@@ -241,7 +241,7 @@ returning user_id, username;
 
 $$;
 
-create or replace function unsecure.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
+create or replace function unsecure.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _request_context jsonb DEFAULT NULL::jsonb, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
     returns TABLE(__user_event_id bigint)
     language plpgsql
 as
@@ -275,12 +275,10 @@ begin
 																						target_user_id,
 																						target_user_oid,
 																						target_username,
-																						ip_address,
-																						user_agent,
-																						origin,
+																						request_context,
 																						event_data)
 		values ( _created_by, _correlation_id, _event_type_code, _user_id, __requester_username, _target_user_id, _target_user_oid
-					 , _target_username, _ip_address, _user_agent, _origin, _event_data)
+					 , _target_username, _request_context, _event_data)
 		returning user_event_id;
 end;
 $$;

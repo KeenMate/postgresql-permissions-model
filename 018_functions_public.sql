@@ -124,7 +124,8 @@ create or replace function public.create_journal_message(
     _event_id integer,
     _keys jsonb default null,
     _payload jsonb default null,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _request_context jsonb default null
 ) returns setof journal
     rows 1
     language plpgsql
@@ -137,8 +138,8 @@ begin
     end if;
 
     return query
-        insert into journal (created_by, user_id, correlation_id, event_id, keys, data_payload, tenant_id)
-        values (_created_by, _user_id, _correlation_id, _event_id, _keys, _payload, _tenant_id)
+        insert into journal (created_by, user_id, correlation_id, event_id, keys, data_payload, tenant_id, request_context)
+        values (_created_by, _user_id, _correlation_id, _event_id, _keys, _payload, _tenant_id, _request_context)
         returning *;
 end;
 $$;
@@ -151,7 +152,8 @@ create or replace function public.create_journal_message_by_code(
     _event_code text,
     _keys jsonb default null,
     _payload jsonb default null,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _request_context jsonb default null
 ) returns setof journal
     rows 1
     language plpgsql
@@ -171,7 +173,7 @@ begin
 
     return query
         select * from create_journal_message(
-            _created_by, _user_id, _correlation_id, __event_id, _keys, _payload, _tenant_id
+            _created_by, _user_id, _correlation_id, __event_id, _keys, _payload, _tenant_id, _request_context
         );
 end;
 $$;
@@ -185,7 +187,8 @@ create or replace function public.create_journal_message_for_entity(
     _entity_type text,
     _entity_id bigint,
     _payload jsonb default null,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _request_context jsonb default null
 ) returns setof journal
     rows 1
     language sql
@@ -194,7 +197,7 @@ $$
 select * from create_journal_message(
     _created_by, _user_id, _correlation_id, _event_id,
     jsonb_build_object(_entity_type, _entity_id),
-    _payload, _tenant_id
+    _payload, _tenant_id, _request_context
 );
 $$;
 
@@ -207,7 +210,8 @@ create or replace function public.create_journal_message_for_entity_by_code(
     _entity_type text,
     _entity_id bigint,
     _payload jsonb default null,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _request_context jsonb default null
 ) returns setof journal
     rows 1
     language sql
@@ -216,7 +220,7 @@ $$
 select * from create_journal_message_by_code(
     _created_by, _user_id, _correlation_id, _event_code,
     jsonb_build_object(_entity_type, _entity_id),
-    _payload, _tenant_id
+    _payload, _tenant_id, _request_context
 );
 $$;
 
@@ -229,6 +233,7 @@ create or replace function public.get_journal_entry(_user_id bigint, _correlatio
         __message text,
         __keys jsonb,
         __payload jsonb,
+        __request_context jsonb,
         __created_at timestamptz,
         __created_by text,
         __correlation_id text
@@ -253,6 +258,7 @@ begin
                )
              , j.keys
              , j.data_payload
+             , j.request_context
              , j.created_at
              , j.created_by
              , j.correlation_id
@@ -282,7 +288,7 @@ begin
 end;
 $$;
 
-create or replace function public.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
+create or replace function public.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type text, _request_context jsonb, _set_as_used boolean DEFAULT false)
     returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
     language plpgsql
 as
@@ -326,9 +332,9 @@ begin
 	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __token_id
-			, jsonb_build_object('username', _target_user_id::text
-				, 'ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin)
-			, 1);
+			, jsonb_build_object('username', _target_user_id::text)
+			, 1
+			, _request_context);
 
 
 	if
@@ -342,8 +348,7 @@ begin
 					 , used_token.__user_oid
 					 , used_token.__token_data
 			from auth.set_token_as_used(_updated_by, _user_id, _correlation_id, __token_uid, _token,
-																	_token_type, _ip_address, _user_agent,
-																	_origin) used_token;
+																	_token_type, _request_context) used_token;
 	else
 		return query
 			select token_id, uid, token_state_code, used_at, user_id, user_oid, token_data

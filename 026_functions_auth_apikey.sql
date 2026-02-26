@@ -399,7 +399,7 @@ begin
 end;
 $$;
 
-create or replace function auth.validate_api_key(_requested_by text, _user_id bigint, _correlation_id text, _api_key text, _api_secret text, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+create or replace function auth.validate_api_key(_requested_by text, _user_id bigint, _correlation_id text, _api_key text, _api_secret text, _request_context jsonb DEFAULT NULL::jsonb, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __username text, __user_display_name text, __permission_full_codes text[])
     rows 1
     language plpgsql
@@ -422,9 +422,9 @@ begin
 	if __api_user_id is null then
 
 		perform auth.create_user_event(_requested_by, _user_id, _correlation_id,
-																	 'api_key_validating', __api_user_id, _ip_address,
-																	 _user_agent, _origin,
-																	 _event_data := jsonb_build_object('is_successful', false));
+			'api_key_validating', __api_user_id,
+			_request_context := _request_context,
+			_event_data := jsonb_build_object('is_successful', false));
 
 		perform error.raise_52301(_api_key);
 	end if;
@@ -450,9 +450,9 @@ begin
 		group by ui.user_id, ui.username, ui.display_name;
 
 	perform auth.create_user_event(_requested_by, _user_id, _correlation_id,
-																 'api_key_validating', __api_user_id, _ip_address,
-																 _user_agent, _origin,
-																 _event_data := jsonb_build_object('is_successful', true));
+		'api_key_validating', __api_user_id,
+		_request_context := _request_context,
+		_event_data := jsonb_build_object('is_successful', true));
 
 end;
 $$;

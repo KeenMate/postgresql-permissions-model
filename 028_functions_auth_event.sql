@@ -10,7 +10,7 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _ip_address text DEFAULT NULL::text, _user_agent text DEFAULT NULL::text, _origin text DEFAULT NULL::text, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
+create or replace function auth.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _request_context jsonb DEFAULT NULL::jsonb, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
     returns TABLE(___user_event_id bigint)
     language plpgsql
 as
@@ -19,8 +19,8 @@ begin
 	return query
 		select __user_event_id
 		from unsecure.create_user_event(_created_by, _user_id, _correlation_id, _event_type_code,
-																		_target_user_id, _ip_address,
-																		_user_agent, _origin, _event_data, _target_user_oid, _target_username);
+																		_target_user_id, _request_context,
+																		_event_data, _target_user_oid, _target_username);
 end;
 $$;
 
@@ -49,9 +49,7 @@ create or replace function auth.search_user_events(
         __target_user_id bigint,
         __target_username text,
         __target_user_oid text,
-        __ip_address text,
-        __user_agent text,
-        __origin text,
+        __request_context jsonb,
         __event_data jsonb,
         __correlation_id text,
         __created_at timestamptz,
@@ -86,9 +84,7 @@ begin
              , ue.target_user_id
              , ue.target_username
              , ue.target_user_oid
-             , ue.ip_address
-             , ue.user_agent
-             , ue.origin
+             , ue.request_context
              , ue.event_data
              , ue.correlation_id
              , ue.created_at
@@ -122,9 +118,7 @@ create or replace function auth.get_user_audit_trail(
     __event_type_code text,
     __event_category text,
     __message text,
-    __ip_address text,
-    __user_agent text,
-    __origin text,
+    __request_context jsonb,
     __event_data jsonb,
     __correlation_id text,
     __created_at timestamptz,
@@ -159,9 +153,7 @@ begin
                        j.data_payload,
                        j.created_by
                    ) as message
-                 , null::text as ip_address
-                 , null::text as user_agent
-                 , null::text as origin
+                 , j.request_context
                  , j.data_payload as event_data
                  , j.correlation_id
                  , j.created_at
@@ -179,9 +171,7 @@ begin
                  , ue.event_type_code
                  , 'user_event'::text as event_category
                  , null::text as message
-                 , ue.ip_address
-                 , ue.user_agent
-                 , ue.origin
+                 , ue.request_context
                  , ue.event_data
                  , ue.correlation_id
                  , ue.created_at
@@ -201,9 +191,7 @@ begin
              , c.event_type_code
              , c.event_category
              , c.message
-             , c.ip_address
-             , c.user_agent
-             , c.origin
+             , c.request_context
              , c.event_data
              , c.correlation_id
              , c.created_at
@@ -236,8 +224,7 @@ create or replace function auth.get_security_events(
     __requester_username text,
     __target_user_id bigint,
     __target_username text,
-    __ip_address text,
-    __user_agent text,
+    __request_context jsonb,
     __event_data jsonb,
     __correlation_id text,
     __created_at timestamptz,
@@ -268,8 +255,7 @@ begin
                  , ue.requester_username
                  , ue.target_user_id
                  , ue.target_username
-                 , ue.ip_address
-                 , ue.user_agent
+                 , ue.request_context
                  , ue.event_data
                  , ue.correlation_id
                  , ue.created_at
@@ -288,8 +274,7 @@ begin
                  , j.created_by as requester_username
                  , (j.keys ->> 'user')::bigint as target_user_id
                  , null::text as target_username
-                 , null::text as ip_address
-                 , null::text as user_agent
+                 , j.request_context
                  , j.data_payload as event_data
                  , j.correlation_id
                  , j.created_at
@@ -310,8 +295,7 @@ begin
              , c.requester_username
              , c.target_user_id
              , c.target_username
-             , c.ip_address
-             , c.user_agent
+             , c.request_context
              , c.event_data
              , c.correlation_id
              , c.created_at

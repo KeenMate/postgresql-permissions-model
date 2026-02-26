@@ -91,7 +91,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -120,7 +120,7 @@ begin
 
 	return query
 		update auth.token
-			set updated_by = _updated_by, updated_at = now(), token_state_code = 'used', used_at = now(), ip_address = _ip_address, user_agent = _user_agent, origin = _origin
+			set updated_by = _updated_by, updated_at = now(), token_state_code = 'used', used_at = now(), request_context = _request_context
 			where
 				(helpers.is_empty_string(_token_uid) or _token_uid = uid)
 					and token = _token
@@ -136,13 +136,13 @@ begin
 			, 15002  -- token_used
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
-				, 'token_uid', __last_item.uid, 'ip_address', _ip_address
-				, 'user_agent', _user_agent, 'origin', _origin)
-			, 1);
+				, 'token_uid', __last_item.uid)
+			, 1
+			, _request_context);
 end;
 $$;
 
-create or replace function auth.set_token_as_used_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_used_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _request_context jsonb)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -165,14 +165,12 @@ begin
 																__token_uid,
 																_token,
 																_token_type,
-																_ip_address,
-																_user_agent,
-																_origin
+																_request_context
 				 );
 end;
 $$;
 
-create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -201,7 +199,7 @@ begin
 
 	return query
 		update auth.token
-			set updated_by = _updated_by, updated_at = now(), token_state_code = 'validation_failed', used_at = now(), ip_address = _ip_address, user_agent = _user_agent, origin = _origin
+			set updated_by = _updated_by, updated_at = now(), token_state_code = 'validation_failed', used_at = now(), request_context = _request_context
 			where
 					(helpers.is_empty_string(_token_uid) or _token_uid = uid)
 					and token = _token
@@ -217,14 +215,14 @@ begin
 			, 15004  -- token_failed
 			, 'token', __token_id
 			, jsonb_build_object('username', _user_id::text, 'token_uid', _token_uid
-				, 'reason', 'validation_failed', 'ip_address', _ip_address
-				, 'user_agent', _user_agent, 'origin', _origin)
-			, 1);
+				, 'reason', 'validation_failed')
+			, 1
+			, _request_context);
 
 end;
 $$;
 
-create or replace function auth.set_token_as_failed_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _ip_address text, _user_agent text, _origin text)
+create or replace function auth.set_token_as_failed_by_token(_updated_by text, _user_id bigint, _correlation_id text, _token text, _token_type text, _request_context jsonb)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -247,14 +245,12 @@ begin
 																	__token_uid,
 																	_token,
 																	_token_type,
-																	_ip_address,
-																	_user_agent,
-																	_origin
+																	_request_context
 				 );
 end;
 $$;
 
-create or replace function auth.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _ip_address text, _user_agent text, _origin text, _set_as_used boolean DEFAULT false)
+create or replace function auth.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _request_context jsonb, _set_as_used boolean DEFAULT false)
     returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
     language plpgsql
 as
@@ -299,9 +295,9 @@ begin
 			, 15002  -- token_used (validated)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
-				, 'token_uid', __last_item.uid, 'action', 'validated'
-				, 'ip_address', _ip_address, 'user_agent', _user_agent, 'origin', _origin)
-			, 1);
+				, 'token_uid', __last_item.uid, 'action', 'validated')
+			, 1
+			, _request_context);
 
 	if
 		_set_as_used then
@@ -314,8 +310,7 @@ begin
 					 , used_token.__user_oid
 					 , used_token.__token_data
 			from auth.set_token_as_used(_updated_by, _user_id, _correlation_id, __last_item.uid, _token,
-																	_token_type_code, _ip_address, _user_agent,
-																	_origin) used_token;
+																	_token_type_code, _request_context) used_token;
 	else
 		return query
 			select __last_item.token_id,

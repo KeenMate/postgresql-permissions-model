@@ -93,8 +93,8 @@ select * from auth.search_permissions(1, null, _parent_code := 'users');
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
 - **`auth.api_key`** - Service authentication with technical users
-- **`public.journal`** - Audit logging with multi-key support (range-partitioned by month)
-- **`auth.user_event`** - Security event audit trail (range-partitioned by month)
+- **`public.journal`** - Audit logging with multi-key support, request context tracking (range-partitioned by month)
+- **`auth.user_event`** - Security event audit trail with request context tracking (range-partitioned by month)
 
 ### Schema Security Model
 - **`public`** & **`auth`** - Always validate permissions
@@ -164,7 +164,7 @@ The `public.journal` table provides comprehensive audit logging with multi-key s
 
 ```sql
 -- Using event code name (recommended)
-SELECT * FROM create_journal_message(
+select * from create_journal_message(
     'admin',           -- created_by
     1,                 -- user_id
     'user_created',    -- event code (text)
@@ -173,15 +173,18 @@ SELECT * FROM create_journal_message(
 );
 
 -- Single entity convenience
-SELECT * FROM create_journal_message(
+select * from create_journal_message(
     'admin', 1, 'group_created', 'Group created',
     'group', 456  -- entity_type, entity_id
 );
 
--- Using helper for multiple keys
-SELECT * FROM create_journal_message(
-    'admin', 1, 'permission_assigned', 'Permission granted',
-    _keys := journal_keys('user', '123', 'group', '456', 'permission', '789')
+-- With request context (stored in journal.request_context column)
+select * from create_journal_message_for_entity(
+    'admin', 1, 'corr-123',
+    10001, 'user', 123,
+    '{"username": "john"}'::jsonb,
+    1,
+    _request_context := '{"ip_address": "192.168.1.1", "user_agent": "Mozilla/5.0"}'::jsonb
 );
 ```
 
@@ -241,6 +244,27 @@ select * from auth.get_security_events(
     _user_id := 1,
     _from := now() - interval '7 days'
 );
+```
+
+### Request Context
+
+All security-relevant functions (user management, token operations, API key validation) accept an optional `_request_context jsonb` parameter. This stores caller metadata (IP address, user agent, origin, device ID, etc.) alongside the event and journal records without requiring schema changes when new fields are needed.
+
+```sql
+-- Pass request context to any security function
+select auth.enable_user('admin', 1, 'corr-123', 42,
+    _request_context := jsonb_build_object(
+        'ip_address', '192.168.1.1',
+        'user_agent', 'Mozilla/5.0',
+        'origin', 'https://app.example.com',
+        'device_id', 'abc-123'
+    ));
+
+-- Context is stored on auth.user_event.request_context, auth.token.request_context,
+-- and public.journal.request_context — queryable with standard jsonb operators
+select request_context ->> 'ip_address' as ip
+from auth.user_event
+where target_user_id = 42;
 ```
 
 ### Partitioning & Data Retention

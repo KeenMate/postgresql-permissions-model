@@ -371,9 +371,7 @@ create table auth.user_event
     requester_username text,
     target_user_oid    text,
     target_username    text,
-    ip_address         text,
-    user_agent         text,
-    origin             text,
+    request_context    jsonb,
     event_data         jsonb,
     constraint user_event_created_by_check
         check (length(created_by) <= 250),
@@ -403,9 +401,7 @@ create table auth.token
     token              text                                   not null,
     expires_at         timestamp with time zone               not null,
     used_at            timestamp with time zone,
-    ip_address         text,
-    user_agent         text,
-    origin             text,
+    request_context    jsonb,
     token_data         jsonb,
     constraint token_created_by_check
         check (length(created_by) <= 250),

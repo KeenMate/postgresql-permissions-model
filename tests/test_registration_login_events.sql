@@ -6,7 +6,7 @@
  * - user_registered event (10008) fired on auth.register_user and auth.ensure_user_from_provider
  * - user_logged_in event (10010) fired on successful authentication
  * - user_login_failed event (10012) fired on all authentication failures
- * - _ip_address, _user_agent, _origin parameters passed through to user_event
+ * - _request_context jsonb parameter passed through to user_event
  * - Password hash stored in correct column (not provider_oid)
  *
  * NOTE on failure event tests:
@@ -153,33 +153,31 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 5: register_user event contains ip_address, user_agent, origin
+-- TEST 5: register_user event contains request_context
 -- ============================================================================
 DO $$
 DECLARE
     __result record;
-    __ip text;
-    __ua text;
-    __origin text;
+    __ctx jsonb;
     __corr_id text := 'reg-test-meta-' || gen_random_uuid()::text;
 BEGIN
-    RAISE NOTICE 'TEST 5: register_user passes ip_address, user_agent, origin to event';
+    RAISE NOTICE 'TEST 5: register_user passes request_context to event';
 
     SELECT * INTO __result
     FROM auth.register_user('reg_test', 1, __corr_id, 'regtest_meta@test.com', '$hash$meta', 'RegTest Meta',
-        _ip_address := '192.168.1.1', _user_agent := 'TestBrowser/1.0', _origin := 'https://test.com');
+        _request_context := '{"ip_address": "192.168.1.1", "user_agent": "TestBrowser/1.0", "origin": "https://test.com"}'::jsonb);
 
-    SELECT ue.ip_address, ue.user_agent, ue.origin
-    INTO __ip, __ua, __origin
+    SELECT ue.request_context
+    INTO __ctx
     FROM auth.user_event ue
     WHERE event_type_code = 'user_registered'
       AND target_user_id = __result.__user_id
       AND correlation_id = __corr_id;
 
-    IF __ip = '192.168.1.1' AND __ua = 'TestBrowser/1.0' AND __origin = 'https://test.com' THEN
-        RAISE NOTICE '  PASS: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+    IF __ctx->>'ip_address' = '192.168.1.1' AND __ctx->>'user_agent' = 'TestBrowser/1.0' AND __ctx->>'origin' = 'https://test.com' THEN
+        RAISE NOTICE '  PASS: request_context=%', __ctx;
     ELSE
-        RAISE EXCEPTION '  FAIL: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+        RAISE EXCEPTION '  FAIL: request_context=%', __ctx;
     END IF;
 END $$;
 
@@ -236,30 +234,28 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 8: Login passes ip_address, user_agent, origin to success event
+-- TEST 8: Login passes request_context to success event
 -- ============================================================================
 DO $$
 DECLARE
-    __ip text;
-    __ua text;
-    __origin text;
+    __ctx jsonb;
     __corr_id text := 'login-meta-' || gen_random_uuid()::text;
 BEGIN
-    RAISE NOTICE 'TEST 8: login passes client metadata to user_logged_in event';
+    RAISE NOTICE 'TEST 8: login passes request_context to user_logged_in event';
 
     PERFORM auth.get_user_by_email_for_authentication(1, __corr_id, 'regtest_user1@test.com',
-        _ip_address := '10.0.0.1', _user_agent := 'LoginAgent/2.0', _origin := 'https://app.test.com');
+        _request_context := '{"ip_address": "10.0.0.1", "user_agent": "LoginAgent/2.0", "origin": "https://app.test.com"}'::jsonb);
 
-    SELECT ue.ip_address, ue.user_agent, ue.origin
-    INTO __ip, __ua, __origin
+    SELECT ue.request_context
+    INTO __ctx
     FROM auth.user_event ue
     WHERE event_type_code = 'user_logged_in'
       AND correlation_id = __corr_id;
 
-    IF __ip = '10.0.0.1' AND __ua = 'LoginAgent/2.0' AND __origin = 'https://app.test.com' THEN
-        RAISE NOTICE '  PASS: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+    IF __ctx->>'ip_address' = '10.0.0.1' AND __ctx->>'user_agent' = 'LoginAgent/2.0' AND __ctx->>'origin' = 'https://app.test.com' THEN
+        RAISE NOTICE '  PASS: request_context=%', __ctx;
     ELSE
-        RAISE EXCEPTION '  FAIL: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+        RAISE EXCEPTION '  FAIL: request_context=%', __ctx;
     END IF;
 END $$;
 
@@ -581,58 +577,54 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 20: ensure_user_from_provider passes client metadata to events
+-- TEST 20: ensure_user_from_provider passes request_context to events
 -- ============================================================================
 DO $$
 DECLARE
-    __ip text;
-    __ua text;
-    __origin text;
+    __ctx jsonb;
     __corr_id text := 'provider-meta-' || gen_random_uuid()::text;
 BEGIN
-    RAISE NOTICE 'TEST 20: ensure_user_from_provider passes client metadata to events';
+    RAISE NOTICE 'TEST 20: ensure_user_from_provider passes request_context to events';
 
     PERFORM auth.ensure_user_from_provider('reg_test', 1, __corr_id, 'aad', 'regtest_aad_uid_1', 'regtest_aad_oid_1',
         'regtest_aad_user', 'RegTest AAD User', 'regtest_aad@test.com',
-        _ip_address := '172.16.0.1', _user_agent := 'ProviderAgent/3.0', _origin := 'https://aad.test.com');
+        _request_context := '{"ip_address": "172.16.0.1", "user_agent": "ProviderAgent/3.0", "origin": "https://aad.test.com"}'::jsonb);
 
-    SELECT ue.ip_address, ue.user_agent, ue.origin
-    INTO __ip, __ua, __origin
+    SELECT ue.request_context
+    INTO __ctx
     FROM auth.user_event ue
     WHERE event_type_code = 'user_logged_in'
       AND correlation_id = __corr_id;
 
-    IF __ip = '172.16.0.1' AND __ua = 'ProviderAgent/3.0' AND __origin = 'https://aad.test.com' THEN
-        RAISE NOTICE '  PASS: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+    IF __ctx->>'ip_address' = '172.16.0.1' AND __ctx->>'user_agent' = 'ProviderAgent/3.0' AND __ctx->>'origin' = 'https://aad.test.com' THEN
+        RAISE NOTICE '  PASS: request_context=%', __ctx;
     ELSE
-        RAISE EXCEPTION '  FAIL: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+        RAISE EXCEPTION '  FAIL: request_context=%', __ctx;
     END IF;
 END $$;
 
 -- ============================================================================
--- TEST 21: NULL ip/user_agent/origin stored as NULL (backwards compatibility)
+-- TEST 21: NULL request_context stored as NULL (backwards compatibility)
 -- ============================================================================
 DO $$
 DECLARE
-    __ip text;
-    __ua text;
-    __origin text;
+    __ctx jsonb;
     __corr_id text := 'login-null-meta-' || gen_random_uuid()::text;
 BEGIN
-    RAISE NOTICE 'TEST 21: NULL ip/user_agent/origin stored as NULL (backwards compat)';
+    RAISE NOTICE 'TEST 21: NULL request_context stored as NULL (backwards compat)';
 
     PERFORM auth.get_user_by_email_for_authentication(1, __corr_id, 'regtest_user1@test.com');
 
-    SELECT ue.ip_address, ue.user_agent, ue.origin
-    INTO __ip, __ua, __origin
+    SELECT ue.request_context
+    INTO __ctx
     FROM auth.user_event ue
     WHERE event_type_code = 'user_logged_in'
       AND correlation_id = __corr_id;
 
-    IF __ip IS NULL AND __ua IS NULL AND __origin IS NULL THEN
-        RAISE NOTICE '  PASS: All metadata fields are NULL when not provided';
+    IF __ctx IS NULL THEN
+        RAISE NOTICE '  PASS: request_context is NULL when not provided';
     ELSE
-        RAISE EXCEPTION '  FAIL: ip=%, user_agent=%, origin=%', __ip, __ua, __origin;
+        RAISE EXCEPTION '  FAIL: request_context=%', __ctx;
     END IF;
 END $$;
 
@@ -669,7 +661,7 @@ BEGIN
     RAISE NOTICE '  2.  user_registered message template exists';
     RAISE NOTICE '  3.  auth.register_user fires user_registered event';
     RAISE NOTICE '  4.  Password hash stored in correct column';
-    RAISE NOTICE '  5.  register_user passes ip/ua/origin to event';
+    RAISE NOTICE '  5.  register_user passes request_context to event';
     RAISE NOTICE '  6.  register_user event_data contains email and provider';
     RAISE NOTICE '  7.  get_user_by_email_for_authentication fires user_logged_in';
     RAISE NOTICE '  8.  login passes client metadata to success event';
@@ -685,6 +677,6 @@ BEGIN
     RAISE NOTICE '  18. ensure_user_from_provider raises 33005 on login disabled';
     RAISE NOTICE '  19. ensure_user_from_provider raises 33008 on identity disabled';
     RAISE NOTICE '  20. ensure_user_from_provider passes client metadata to events';
-    RAISE NOTICE '  21. NULL metadata backwards compatibility';
+    RAISE NOTICE '  21. NULL request_context backwards compatibility';
     RAISE NOTICE '';
 END $$;

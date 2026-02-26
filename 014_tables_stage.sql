@@ -57,6 +57,7 @@ create table public.journal
     user_id        bigint references auth.user_info on delete set null,
     keys           jsonb,
     data_payload   jsonb,
+    request_context jsonb,
     constraint journal_created_by_check check (length(created_by) <= 250),
     primary key (journal_id, created_at)
 ) partition by range (created_at);
