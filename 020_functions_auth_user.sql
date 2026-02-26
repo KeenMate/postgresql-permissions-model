@@ -400,7 +400,6 @@ begin
 		select uid.user_identity_id
 				 , uid.provider_code
 				 , uid.uid
-				 , uid.uid
 				 , uid.user_id
 				 , uid.provider_groups
 				 , uid.provider_roles

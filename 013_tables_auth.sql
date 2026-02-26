@@ -546,6 +546,9 @@ create index ix_user_event_created
 create index ix_user_event_target_user
     on auth.user_event (target_user_id, created_at desc);
 
+create index ix_user_event_request_context
+    on auth.user_event using gin (request_context) where request_context is not null;
+
 -- Default partition (safety net for unexpected created_at values)
 create table auth.user_event_default partition of auth.user_event default;
 

@@ -1,4 +1,20 @@
-.PHONY: test test-cache test-disabled test-correlation test-search setup update sql
+.PHONY: help test test-cache test-disabled test-correlation test-search setup update sql
+
+# Show available targets
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Tests:"
+	@echo "  test              Run all tests"
+	@echo "  test-cache        Run cache invalidation tests"
+	@echo "  test-disabled     Run disabled user tests"
+	@echo "  test-correlation  Run correlation tests"
+	@echo "  test-search       Run search function tests"
+	@echo ""
+	@echo "Database:"
+	@echo "  setup             Full database setup (recreate + restore + update)"
+	@echo "  update            Run database migrations"
+	@echo "  sql               Open interactive psql session"
 
 # Run all tests
 test:

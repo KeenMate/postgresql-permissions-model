@@ -419,6 +419,7 @@ create or replace function public.search_journal(
     _event_category text default null,
     _keys_criteria jsonb default null,
     _payload_criteria jsonb default null,
+    _request_context_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 10,
     _tenant_id integer default 1
@@ -431,6 +432,7 @@ create or replace function public.search_journal(
         __user_id bigint,
         __message text,
         __keys jsonb,
+        __request_context jsonb,
         __created_at timestamptz,
         __created_by text,
         __correlation_id text,
@@ -471,6 +473,7 @@ begin
               and (_event_category is null or ec.category_code = _event_category)
               and (_keys_criteria is null or j.keys @> _keys_criteria)
               and (_payload_criteria is null or j.data_payload @> _payload_criteria)
+              and (_request_context_criteria is null or j.request_context @> _request_context_criteria)
               and (_correlation_id is null or j.correlation_id = _correlation_id)
               and j.created_at between coalesce(_from, now() - interval '100 years')
                                    and coalesce(_to, now() + interval '100 years')
@@ -488,6 +491,7 @@ begin
                    j.created_by
                )
              , j.keys
+             , j.request_context
              , j.created_at
              , j.created_by
              , j.correlation_id

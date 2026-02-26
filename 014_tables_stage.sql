@@ -80,6 +80,9 @@ create index ix_journal_created
 create index ix_journal_correlation_id
     on public.journal(correlation_id) where correlation_id is not null;
 
+create index ix_journal_request_context
+    on public.journal using gin (request_context) where request_context is not null;
+
 -- Default partition (safety net for unexpected created_at values)
 create table public.journal_default partition of public.journal default;
 
