@@ -4,10 +4,14 @@ param (
 	# Parameter help description
 	[string]$Environment,
 	[Parameter(Mandatory = $true)]
-	[ValidateSet("restoreDatabase", "recreateDatabase", "updateDatabase", "preUpdateScripts", "postUpdateScripts", "prepareVersionTable", "fullService")]
+	[ValidateSet("restoreDatabase", "recreateDatabase", "updateDatabase", "preUpdateScripts", "postUpdateScripts", "prepareVersionTable", "execSql", "runTests", "fullService")]
 	[string[]]$Operations = @("fullService"),
 	[int]$UpdateStartNumber = -1,
-	[int]$UpdateEndNumber = -1
+	[int]$UpdateEndNumber = -1,
+	[string]$SqlFile,
+	[string]$Sql,
+	[string]$TestFilter = "all",
+	[switch]$TestVerbose
 )
 
 function Prompt-User {
@@ -441,7 +445,593 @@ function Prepare-VersionTable {
 	}
 }
 
+function Exec-Sql {
+	param (
+		[string]$File,
+		[string]$Command
+	)
 
+	Set-CurrentDatabase -databaseName $Env:DBDESTDB
+
+	if (-not [string]::IsNullOrEmpty($File)) {
+		Write-Host "Executing SQL file: $File"
+		& $Env:DBPSQLFILE -f "$File"
+	}
+	elseif (-not [string]::IsNullOrEmpty($Command)) {
+		Write-Host "Executing SQL command"
+		& $Env:DBPSQLFILE -c "$Command"
+	}
+	else {
+		Write-Host "Opening interactive psql session against $Env:DBDESTDB ..."
+		& $Env:DBPSQLFILE
+	}
+}
+
+function Read-TestManifest {
+	param (
+		[Parameter(Mandatory)]
+		[string]$SuiteDir
+	)
+
+	$folderName = Split-Path $SuiteDir -Leaf
+	# Default name: humanize folder name (strip test_ prefix, title case)
+	$displayName = $folderName
+	if ($displayName.StartsWith("test_")) {
+		$displayName = $displayName.Substring(5)
+	}
+	$displayName = (Get-Culture).TextInfo.ToTitleCase($displayName.Replace("_", " "))
+
+	$manifest = @{
+		Name = $displayName
+		Description = ""
+		AlwaysCleanup = $true
+		Isolation = "none"
+		Setup = @()
+	}
+
+	$manifestFile = Join-Path $SuiteDir "test.json"
+	if (Test-Path $manifestFile) {
+		try {
+			$data = Get-Content $manifestFile -Raw | ConvertFrom-Json
+			if ($data.name) { $manifest.Name = $data.name }
+			if ($data.description) { $manifest.Description = $data.description }
+			if ($null -ne $data.always_cleanup) { $manifest.AlwaysCleanup = [bool]$data.always_cleanup }
+			if ($data.isolation) {
+				$validIsolations = @("none", "transaction", "database")
+				if ($data.isolation -in $validIsolations) {
+					$manifest.Isolation = $data.isolation
+				}
+				else {
+					Write-Warning "Unknown isolation mode '$($data.isolation)', using 'none'"
+				}
+			}
+			if ($null -ne $data.setup) {
+				if ($data.setup -is [array]) {
+					$manifest.Setup = @($data.setup)
+				}
+				else {
+					Write-Warning "'setup' in test.json must be a list, ignoring"
+				}
+			}
+		}
+		catch {
+			Write-Warning "Failed to read ${manifestFile}: $_"
+		}
+	}
+
+	return $manifest
+}
+
+function Invoke-TestSqlFile {
+	param (
+		[Parameter(Mandatory)]
+		[string]$FilePath,
+		[switch]$Verbose
+	)
+
+	$result = @{
+		Name = Split-Path $FilePath -Leaf
+		Passed = $true
+		PassCount = 0
+		FailCount = 0
+		Error = $false
+	}
+
+	$output = & $Env:DBPSQLFILE -f "$FilePath" 2>&1 | Out-String
+	$exitCode = $LASTEXITCODE
+
+	# psql nonzero exit code = automatic FAIL
+	if ($exitCode -ne 0) {
+		$result.Error = $true
+		$result.Passed = $false
+	}
+
+	# Count PASS/FAIL occurrences
+	$result.PassCount = ([regex]::Matches($output, "PASS")).Count
+	$result.FailCount = ([regex]::Matches($output, "FAIL")).Count
+
+	if ($result.FailCount -gt 0 -or $result.Error) {
+		$result.Passed = $false
+	}
+
+	# Colorize and print output
+	$lines = $output -split "`n"
+	if ($Verbose) {
+		foreach ($line in $lines) {
+			if ($line -match "PASS") {
+				Write-Host "  $line" -ForegroundColor Green
+			}
+			elseif ($line -match "FAIL") {
+				Write-Host "  $line" -ForegroundColor Red
+			}
+			else {
+				Write-Host "  $line"
+			}
+		}
+	}
+	elseif (-not $result.Passed) {
+		# Silent mode: only print FAIL lines and error context
+		foreach ($line in $lines) {
+			if ($line -match "FAIL") {
+				Write-Host "  $line" -ForegroundColor Red
+			}
+			elseif ($line -match "ERROR|error") {
+				Write-Host "  $line" -ForegroundColor Red
+			}
+		}
+	}
+
+	return $result
+}
+
+function Invoke-SuiteTransaction {
+	param (
+		[Parameter(Mandatory)]
+		[string]$SuiteDir,
+		[Parameter(Mandatory)]
+		[hashtable]$Manifest,
+		[Parameter(Mandatory)]
+		[array]$MainFiles,
+		[array]$CleanupFiles = @(),
+		[switch]$Verbose
+	)
+
+	$suiteResult = @{
+		Name = $Manifest.Name
+		Passed = $true
+		PassCount = 0
+		FailCount = 0
+		Error = $false
+		IsSuite = $true
+	}
+
+	$testsDir = "tests"
+
+	# Build wrapper SQL
+	$wrapperLines = @("\set ON_ERROR_STOP on", "BEGIN;")
+
+	# Add shared setup files
+	foreach ($setupPath in $Manifest.Setup) {
+		$resolved = Join-Path $testsDir $setupPath
+		if (Test-Path $resolved) {
+			$posixPath = $resolved -replace '\\', '/'
+			$wrapperLines += "\echo '>>>DEBEE_FILE: $setupPath<<<'"
+			$wrapperLines += "\i '$posixPath'"
+		}
+		else {
+			Write-Warning "Shared setup file not found: $setupPath"
+		}
+	}
+
+	# Add main files
+	foreach ($f in $MainFiles) {
+		$posixPath = $f.FullName -replace '\\', '/'
+		$wrapperLines += "\echo '>>>DEBEE_FILE: $($f.Name)<<<'"
+		$wrapperLines += "\i '$posixPath'"
+	}
+
+	$wrapperLines += "ROLLBACK;"
+
+	# Write temp file
+	$tmpFile = [System.IO.Path]::Combine($SuiteDir, "_debee_txn_wrapper_$([System.IO.Path]::GetRandomFileName()).sql")
+	try {
+		$wrapperLines -join "`n" | Set-Content -Path $tmpFile -Encoding UTF8
+
+		# Run via psql
+		$output = & $Env:DBPSQLFILE -f "$tmpFile" 2>&1 | Out-String
+		$exitCode = $LASTEXITCODE
+
+		if ($exitCode -ne 0) {
+			$suiteResult.Error = $true
+		}
+
+		# Parse output by >>>DEBEE_FILE: ...<<< markers
+		$currentFile = "(preamble)"
+		$fileOutputs = [ordered]@{}
+		$lines = $output -split "`n"
+
+		foreach ($line in $lines) {
+			if ($line -match '>>>DEBEE_FILE: (.+)<<<') {
+				$currentFile = $matches[1]
+				if (-not $fileOutputs.Contains($currentFile)) {
+					$fileOutputs[$currentFile] = @()
+				}
+			}
+			else {
+				if (-not $fileOutputs.Contains($currentFile)) {
+					$fileOutputs[$currentFile] = @()
+				}
+				$fileOutputs[$currentFile] += $line
+			}
+		}
+
+		# Print and count per section
+		foreach ($sectionName in $fileOutputs.Keys) {
+			$sectionText = $fileOutputs[$sectionName] -join "`n"
+			$sectionPassCount = ([regex]::Matches($sectionText, "PASS")).Count
+			$sectionFailCount = ([regex]::Matches($sectionText, "FAIL")).Count
+			$suiteResult.PassCount += $sectionPassCount
+			$suiteResult.FailCount += $sectionFailCount
+
+			$sectionHasFailures = $sectionFailCount -gt 0
+
+			if ($Verbose) {
+				if ($sectionName -ne "(preamble)") {
+					Write-Host "`n  -- $sectionName --"
+				}
+				foreach ($line in $fileOutputs[$sectionName]) {
+					if ($line -match "PASS") {
+						Write-Host "  $line" -ForegroundColor Green
+					}
+					elseif ($line -match "FAIL") {
+						Write-Host "  $line" -ForegroundColor Red
+					}
+					else {
+						Write-Host "  $line"
+					}
+				}
+			}
+			elseif ($sectionHasFailures) {
+				if ($sectionName -ne "(preamble)") {
+					Write-Host "`n  -- $sectionName --"
+				}
+				foreach ($line in $fileOutputs[$sectionName]) {
+					if ($line -match "FAIL") {
+						Write-Host "  $line" -ForegroundColor Red
+					}
+					elseif ($line -match "ERROR|error") {
+						Write-Host "  $line" -ForegroundColor Red
+					}
+				}
+			}
+		}
+	}
+	finally {
+		if (Test-Path $tmpFile) {
+			Remove-Item $tmpFile -Force
+		}
+	}
+
+	# Run cleanup files individually after rollback
+	if ($CleanupFiles.Count -gt 0 -and ($Manifest.AlwaysCleanup -or -not $suiteResult.Error)) {
+		foreach ($f in $CleanupFiles) {
+			if ($Verbose) {
+				Write-Host "`n  -- $($f.Name) (cleanup) --"
+			}
+			$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+			if (-not $cleanupResult.Passed -and -not $Verbose) {
+				Write-Host "`n  -- $($f.Name) (cleanup) --"
+			}
+			if (-not $cleanupResult.Passed) {
+				Write-Warning "Cleanup file $($f.Name) had issues (non-fatal)"
+			}
+		}
+	}
+
+	$suiteResult.Passed = ($suiteResult.FailCount -eq 0) -and (-not $suiteResult.Error)
+	return $suiteResult
+}
+
+function Invoke-FlatTest {
+	param (
+		[Parameter(Mandatory)]
+		[System.IO.FileInfo]$TestFile,
+		[switch]$Verbose
+	)
+
+	if ($Verbose) {
+		Write-Host "`n--- $($TestFile.Name) ---"
+	}
+	$result = Invoke-TestSqlFile -FilePath $TestFile.FullName -Verbose:$Verbose
+	if (-not $Verbose -and -not $result.Passed) {
+		Write-Host "`n--- $($TestFile.Name) --- " -NoNewline
+		Write-Host "FAILED" -ForegroundColor Red
+	}
+	$result.IsSuite = $false
+	return $result
+}
+
+function Invoke-SuiteTest {
+	param (
+		[Parameter(Mandatory)]
+		[string]$SuiteDir,
+		[switch]$Verbose
+	)
+
+	$manifest = Read-TestManifest -SuiteDir $SuiteDir
+
+	$suiteResult = @{
+		Name = $manifest.Name
+		Passed = $true
+		PassCount = 0
+		FailCount = 0
+		Error = $false
+		IsSuite = $true
+	}
+
+	$suiteHeaderPrinted = $false
+	if ($Verbose) {
+		Write-Host "`n=== Suite: $($manifest.Name) ==="
+		if ($manifest.Description) {
+			Write-Host $manifest.Description
+		}
+		$suiteHeaderPrinted = $true
+	}
+
+	# Discover SQL files matching NNN_*.sql
+	$allFiles = Get-ChildItem -Path $SuiteDir -File | Sort-Object Name
+	$mainFiles = @()
+	$cleanupFiles = @()
+
+	foreach ($f in $allFiles) {
+		if ($f.Name -match '^\d{3}_.*\.sql$') {
+			$prefix = [int]($f.Name.Substring(0, 3))
+			if ($prefix -ge 900 -and $prefix -le 999) {
+				$cleanupFiles += $f
+			}
+			else {
+				$mainFiles += $f
+			}
+		}
+		elseif ($f.Name -ne "test.json") {
+			Write-Warning "Skipping non-matching file in suite: $($f.Name)"
+		}
+	}
+
+	# Branch on isolation mode
+	if ($manifest.Isolation -eq "transaction") {
+		$suiteResult = Invoke-SuiteTransaction -SuiteDir $SuiteDir -Manifest $manifest -MainFiles $mainFiles -CleanupFiles $cleanupFiles -Verbose:$Verbose
+	}
+	elseif ($manifest.Isolation -eq "database") {
+		# Recreate + restore database before suite
+		Write-Host "  [database isolation] Recreating database..."
+		Recreate-Database
+		if ($Env:DBBACKUPFILE) {
+			Write-Host "  [database isolation] Restoring database..."
+			Restore-Database
+		}
+		Set-CurrentDatabase -databaseName $Env:DBDESTDB
+
+		# Run shared setup files individually
+		$testsDir = "tests"
+		foreach ($setupPath in $manifest.Setup) {
+			$resolved = Join-Path $testsDir $setupPath
+			if (Test-Path $resolved) {
+				if ($Verbose) { Write-Host "`n  -- $setupPath (shared setup) --" }
+				Invoke-TestSqlFile -FilePath $resolved -Verbose:$Verbose | Out-Null
+			}
+			else {
+				Write-Warning "Shared setup file not found: $setupPath"
+			}
+		}
+
+		# Run main files individually
+		$mainFailed = $false
+		foreach ($f in $mainFiles) {
+			if ($Verbose) { Write-Host "`n  -- $($f.Name) --" }
+			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+			$suiteResult.PassCount += $fileResult.PassCount
+			$suiteResult.FailCount += $fileResult.FailCount
+			if (-not $fileResult.Passed) {
+				if (-not $suiteHeaderPrinted) {
+					Write-Host "`n=== Suite: $($manifest.Name) ==="
+					$suiteHeaderPrinted = $true
+				}
+				if (-not $Verbose) { Write-Host "`n  -- $($f.Name) --" }
+				$mainFailed = $true
+				break
+			}
+		}
+
+		if ($cleanupFiles.Count -gt 0 -and ($manifest.AlwaysCleanup -or -not $mainFailed)) {
+			foreach ($f in $cleanupFiles) {
+				if ($Verbose) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
+				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+				if (-not $cleanupResult.Passed -and -not $Verbose) {
+					Write-Host "`n  -- $($f.Name) (cleanup) --"
+				}
+				if (-not $cleanupResult.Passed) {
+					Write-Warning "Cleanup file $($f.Name) had issues (non-fatal)"
+				}
+			}
+		}
+
+		$suiteResult.Passed = (-not $mainFailed) -and ($suiteResult.FailCount -eq 0)
+	}
+	else {
+		# "none" — current behavior with shared setup
+		$testsDir = "tests"
+		foreach ($setupPath in $manifest.Setup) {
+			$resolved = Join-Path $testsDir $setupPath
+			if (Test-Path $resolved) {
+				if ($Verbose) { Write-Host "`n  -- $setupPath (shared setup) --" }
+				Invoke-TestSqlFile -FilePath $resolved -Verbose:$Verbose | Out-Null
+			}
+			else {
+				Write-Warning "Shared setup file not found: $setupPath"
+			}
+		}
+
+		# Run main phase (stop on first failure)
+		$mainFailed = $false
+		foreach ($f in $mainFiles) {
+			if ($Verbose) { Write-Host "`n  -- $($f.Name) --" }
+			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+			$suiteResult.PassCount += $fileResult.PassCount
+			$suiteResult.FailCount += $fileResult.FailCount
+
+			if (-not $fileResult.Passed) {
+				if (-not $suiteHeaderPrinted) {
+					Write-Host "`n=== Suite: $($manifest.Name) ==="
+					$suiteHeaderPrinted = $true
+				}
+				if (-not $Verbose) { Write-Host "`n  -- $($f.Name) --" }
+				$mainFailed = $true
+				break
+			}
+		}
+
+		# Run cleanup phase
+		if ($cleanupFiles.Count -gt 0 -and ($manifest.AlwaysCleanup -or -not $mainFailed)) {
+			foreach ($f in $cleanupFiles) {
+				if ($Verbose) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
+				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+				if (-not $cleanupResult.Passed -and -not $Verbose) {
+					Write-Host "`n  -- $($f.Name) (cleanup) --"
+				}
+				if (-not $cleanupResult.Passed) {
+					Write-Warning "Cleanup file $($f.Name) had issues (non-fatal)"
+				}
+			}
+		}
+
+		$suiteResult.Passed = (-not $mainFailed) -and ($suiteResult.FailCount -eq 0)
+	}
+
+	$status = if ($suiteResult.Passed) { "PASSED" } else { "FAILED" }
+	if ($suiteResult.Passed) {
+		if ($Verbose) {
+			Write-Host "`nSuite $($manifest.Name): $status" -ForegroundColor Green
+		}
+	}
+	else {
+		if (-not $suiteHeaderPrinted) {
+			Write-Host "`n=== Suite: $($manifest.Name) ==="
+		}
+		Write-Host "`nSuite $($manifest.Name): $status" -ForegroundColor Red
+	}
+
+	return $suiteResult
+}
+
+function Run-Tests {
+	param (
+		[string]$Filter = "all",
+		[switch]$Verbose
+	)
+
+	$testsDir = "tests"
+
+	if (-not (Test-Path $testsDir)) {
+		Write-Warning "Tests directory not found: $testsDir"
+		return
+	}
+
+	Set-CurrentDatabase -databaseName $Env:DBDESTDB
+
+	# Discover test items: flat test_*.sql files + test_*/ directories
+	$testItems = @()
+
+	$allEntries = Get-ChildItem -Path $testsDir | Sort-Object Name
+	foreach ($entry in $allEntries) {
+		if ($entry.PSIsContainer -and $entry.Name -like "test_*") {
+			$testItems += @{ Type = "suite"; Path = $entry.FullName; Name = $entry.Name }
+		}
+		elseif (-not $entry.PSIsContainer -and $entry.Name -like "test_*.sql") {
+			$testItems += @{ Type = "file"; Path = $entry; Name = $entry.Name }
+		}
+	}
+
+	# Apply global ordering from tests/tests.json
+	$testsJsonPath = Join-Path $testsDir "tests.json"
+	if (Test-Path $testsJsonPath) {
+		try {
+			$testsConfig = Get-Content $testsJsonPath -Raw | ConvertFrom-Json
+			if ($testsConfig.order) {
+				$ordered = @()
+				$remaining = [System.Collections.ArrayList]@($testItems)
+				foreach ($name in $testsConfig.order) {
+					for ($i = 0; $i -lt $remaining.Count; $i++) {
+						if ($remaining[$i].Name -eq $name) {
+							$ordered += $remaining[$i]
+							$remaining.RemoveAt($i)
+							break
+						}
+					}
+				}
+				$testItems = $ordered + @($remaining)
+			}
+		}
+		catch {
+			Write-Warning "Failed to read ${testsJsonPath}: $_"
+		}
+	}
+
+	# Apply filter
+	if ($Filter -ne "all") {
+		$testItems = $testItems | Where-Object { $_.Name -match $Filter }
+	}
+
+	if ($testItems.Count -eq 0) {
+		Write-Warning "No test items found matching filter: $Filter"
+		return
+	}
+
+	$fileCount = ($testItems | Where-Object { $_.Type -eq "file" }).Count
+	$suiteCount = ($testItems | Where-Object { $_.Type -eq "suite" }).Count
+	if ($Verbose) {
+		Write-Host "Running $($testItems.Count) test item(s) ($fileCount file(s), $suiteCount suite(s))..."
+	}
+
+	$results = @()
+
+	foreach ($item in $testItems) {
+		if ($item.Type -eq "file") {
+			$results += Invoke-FlatTest -TestFile $item.Path -Verbose:$Verbose
+		}
+		else {
+			$results += Invoke-SuiteTest -SuiteDir $item.Path -Verbose:$Verbose
+		}
+	}
+
+	# Summary
+	$totalPass = ($results | ForEach-Object { $_.PassCount } | Measure-Object -Sum).Sum
+	$totalFail = ($results | ForEach-Object { $_.FailCount } | Measure-Object -Sum).Sum
+	$errorOnly = ($results | Where-Object { $_.Error -and $_.FailCount -eq 0 }).Count
+
+	$suitePassed = ($results | Where-Object { $_.IsSuite -and $_.Passed }).Count
+	$suiteFailed = ($results | Where-Object { $_.IsSuite -and -not $_.Passed }).Count
+	$filePassed = ($results | Where-Object { -not $_.IsSuite -and $_.Passed }).Count
+	$fileFailed = ($results | Where-Object { -not $_.IsSuite -and -not $_.Passed }).Count
+
+	Write-Host "`n=== Test Summary ==="
+	Write-Host "PASSED: $totalPass" -ForegroundColor Green
+	if ($totalFail -gt 0 -or $errorOnly -gt 0) {
+		$failMsg = "FAILED: $totalFail"
+		if ($errorOnly -gt 0) { $failMsg += " (+$errorOnly error(s))" }
+		Write-Host $failMsg -ForegroundColor Red
+	}
+	else {
+		Write-Host "FAILED: $totalFail"
+	}
+	Write-Host "Total:  $($totalPass + $totalFail)"
+	if ($suiteCount -gt 0) {
+		Write-Host "Suites: $suitePassed passed, $suiteFailed failed"
+	}
+	if ($fileCount -gt 0) {
+		Write-Host "Files:  $filePassed passed, $fileFailed failed"
+	}
+}
 
 # Define the path to the environment file
 if (-not [string]::IsNullOrWhiteSpace($Environment)) {
@@ -494,6 +1084,14 @@ foreach ($o in $Operations) {
   "prepareVersionTable" {
 			Write-Host "Performing prepare version table operation..."
 			Prepare-VersionTable
+  }
+  "execSql" {
+			Write-Host "Performing exec SQL operation..."
+			Exec-Sql -File $SqlFile -Command $Sql
+  }
+  "runTests" {
+			Write-Host "Performing run tests operation..."
+			Run-Tests -Filter $TestFilter -Verbose:$TestVerbose
   }
   "fullService" {
 			Write-Host "Performing full service operation for us, lazy boys..."

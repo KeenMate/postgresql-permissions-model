@@ -1631,6 +1631,19 @@ begin
     where is_default
     on conflict (user_group_id, user_id, coalesce(mapping_id, 0)) do nothing;
 
+    -- Skip mapping resolution when provider does not allow group mapping
+    if _provider_code is not null
+       and not coalesce((select allows_group_mapping from auth.provider where code = _provider_code), false) then
+        return query
+            select distinct ug.tenant_id
+                          , ug.user_group_id
+                          , ug.code
+            from auth.user_group_member ugm
+                     inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
+            where ugm.user_id = _target_user_id;
+        return;
+    end if;
+
     -- cleanup membership of groups user is no longer part of
     with affected_deleted_group_tenants as (
         delete

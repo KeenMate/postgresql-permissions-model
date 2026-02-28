@@ -10,6 +10,10 @@ ENVIRONMENT=""
 OPERATIONS=("fullService")
 UPDATE_START_NUMBER=-1
 UPDATE_END_NUMBER=-1
+SQL_FILE=""
+SQL_COMMAND=""
+TEST_FILTER="all"
+TEST_VERBOSE=false
 
 # Color output
 RED='\033[0;31m'
@@ -428,6 +432,703 @@ prepare_version_table() {
     return 0
 }
 
+# Execute SQL
+exec_sql() {
+    local sql_file="$1"
+    local sql_command="$2"
+
+    set_current_database "$DBDESTDB"
+
+    if [[ -n "$sql_file" ]]; then
+        print_info "Executing SQL file: $sql_file"
+        $DBPSQLFILE -f "$sql_file"
+    elif [[ -n "$sql_command" ]]; then
+        print_info "Executing SQL command"
+        $DBPSQLFILE -c "$sql_command"
+    else
+        print_info "Opening interactive psql session against $DBDESTDB ..."
+        $DBPSQLFILE
+    fi
+}
+
+# Global variables for test result passing (bash convention)
+_TEST_RESULT_PASSED=true
+_TEST_RESULT_PASS_COUNT=0
+_TEST_RESULT_FAIL_COUNT=0
+_TEST_RESULT_ERROR=false
+
+# Read test manifest from suite directory
+read_test_manifest() {
+    local suite_dir="$1"
+    local folder_name
+    folder_name=$(basename "$suite_dir")
+
+    # Default name: humanize folder name (strip test_ prefix, title case words)
+    local display_name="$folder_name"
+    if [[ "$display_name" == test_* ]]; then
+        display_name="${display_name#test_}"
+    fi
+    # Title case: replace underscores with spaces, capitalize each word
+    display_name=$(echo "$display_name" | tr '_' ' ' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1')
+
+    _MANIFEST_NAME="$display_name"
+    _MANIFEST_DESCRIPTION=""
+    _MANIFEST_ALWAYS_CLEANUP=true
+    _MANIFEST_ISOLATION="none"
+    _MANIFEST_SETUP=()
+
+    local manifest_file="$suite_dir/test.json"
+    if [[ -f "$manifest_file" ]]; then
+        # Use python3 one-liner to parse JSON (python already required by project)
+        local json_data
+        if json_data=$(python3 -c "
+import json, sys
+with open('$manifest_file') as f:
+    d = json.load(f)
+print(d.get('name', ''))
+print(d.get('description', ''))
+print(d.get('always_cleanup', True))
+iso = d.get('isolation', 'none')
+if iso not in ('none', 'transaction', 'database'):
+    print('WARNING_UNKNOWN_ISOLATION:' + iso, file=sys.stderr)
+    iso = 'none'
+print(iso)
+setup = d.get('setup', [])
+if isinstance(setup, list):
+    print('|'.join(setup))
+else:
+    print('')
+" 2>/dev/null); then
+            local name desc cleanup isolation setup_str
+            name=$(echo "$json_data" | sed -n '1p')
+            desc=$(echo "$json_data" | sed -n '2p')
+            cleanup=$(echo "$json_data" | sed -n '3p')
+            isolation=$(echo "$json_data" | sed -n '4p')
+            setup_str=$(echo "$json_data" | sed -n '5p')
+            [[ -n "$name" ]] && _MANIFEST_NAME="$name"
+            [[ -n "$desc" ]] && _MANIFEST_DESCRIPTION="$desc"
+            if [[ "$cleanup" == "False" || "$cleanup" == "false" ]]; then
+                _MANIFEST_ALWAYS_CLEANUP=false
+            fi
+            [[ -n "$isolation" ]] && _MANIFEST_ISOLATION="$isolation"
+            if [[ -n "$setup_str" ]]; then
+                IFS='|' read -ra _MANIFEST_SETUP <<< "$setup_str"
+            fi
+        else
+            print_warning "Failed to read $manifest_file"
+        fi
+    fi
+}
+
+# Run a single SQL test file via psql, sets global _TEST_RESULT_* variables
+invoke_test_sql_file() {
+    local file_path="$1"
+
+    _TEST_RESULT_PASSED=true
+    _TEST_RESULT_PASS_COUNT=0
+    _TEST_RESULT_FAIL_COUNT=0
+    _TEST_RESULT_ERROR=false
+
+    local output exit_code
+    set +e
+    output=$($DBPSQLFILE -f "$file_path" 2>&1)
+    exit_code=$?
+    set -e
+
+    # psql nonzero exit code = automatic FAIL
+    if [[ $exit_code -ne 0 ]]; then
+        _TEST_RESULT_ERROR=true
+        _TEST_RESULT_PASSED=false
+    fi
+
+    # Count PASS/FAIL occurrences
+    _TEST_RESULT_PASS_COUNT=$(echo "$output" | grep -c "PASS" || true)
+    _TEST_RESULT_FAIL_COUNT=$(echo "$output" | grep -c "FAIL" || true)
+
+    if [[ $_TEST_RESULT_FAIL_COUNT -gt 0 ]] || [[ "$_TEST_RESULT_ERROR" == true ]]; then
+        _TEST_RESULT_PASSED=false
+    fi
+
+    # Colorize and print output
+    if [[ "$TEST_VERBOSE" == true ]]; then
+        while IFS= read -r line; do
+            if [[ "$line" == *"PASS"* ]]; then
+                echo -e "  ${GREEN}${line}${NC}"
+            elif [[ "$line" == *"FAIL"* ]]; then
+                echo -e "  ${RED}${line}${NC}"
+            else
+                echo "  $line"
+            fi
+        done <<< "$output"
+    elif [[ "$_TEST_RESULT_PASSED" == false ]]; then
+        # Silent mode: only print FAIL lines and error context
+        while IFS= read -r line; do
+            if [[ "$line" == *"FAIL"* ]]; then
+                echo -e "  ${RED}${line}${NC}"
+            elif [[ "$line" == *"ERROR"* ]] || [[ "$line" == *"error"* ]]; then
+                echo -e "  ${RED}${line}${NC}"
+            fi
+        done <<< "$output"
+    fi
+}
+
+# Run a suite in transaction isolation mode
+# Expects: _TXN_MAIN_FILES=() _TXN_CLEANUP_FILES=() set by caller
+invoke_suite_transaction() {
+    local suite_dir="$1"
+    local tests_dir="tests"
+
+    _SUITE_PASSED=true
+    _SUITE_PASS_COUNT=0
+    _SUITE_FAIL_COUNT=0
+
+    # Build wrapper SQL file
+    local tmp_file="$suite_dir/_debee_txn_wrapper_$$.sql"
+    {
+        echo "\\set ON_ERROR_STOP on"
+        echo "BEGIN;"
+
+        # Shared setup files
+        for setup_path in "${_MANIFEST_SETUP[@]}"; do
+            local resolved="$tests_dir/$setup_path"
+            if [[ -f "$resolved" ]]; then
+                echo "\\echo '>>>DEBEE_FILE: $setup_path<<<'"
+                echo "\\i '$resolved'"
+            else
+                print_warning "Shared setup file not found: $setup_path"
+            fi
+        done
+
+        # Main files
+        for f in "${_TXN_MAIN_FILES[@]}"; do
+            [[ -z "$f" ]] && continue
+            local fname
+            fname=$(basename "$f")
+            echo "\\echo '>>>DEBEE_FILE: $fname<<<'"
+            echo "\\i '$f'"
+        done
+
+        echo "ROLLBACK;"
+    } > "$tmp_file"
+
+    # Run via psql
+    local output exit_code
+    set +e
+    output=$($DBPSQLFILE -f "$tmp_file" 2>&1)
+    exit_code=$?
+    set -e
+
+    # Remove temp file immediately
+    rm -f "$tmp_file"
+
+    local has_error=false
+    if [[ $exit_code -ne 0 ]]; then
+        has_error=true
+    fi
+
+    # Parse output by >>>DEBEE_FILE: ...<<< markers
+    local current_file="(preamble)"
+    declare -A file_outputs
+    declare -a file_order=()
+
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^\>\>\>DEBEE_FILE:\ (.+)\<\<\<$ ]]; then
+            current_file="${BASH_REMATCH[1]}"
+            if [[ -z "${file_outputs[$current_file]+x}" ]]; then
+                file_outputs["$current_file"]=""
+                file_order+=("$current_file")
+            fi
+        else
+            if [[ -z "${file_outputs[$current_file]+x}" ]]; then
+                file_outputs["$current_file"]=""
+                file_order+=("$current_file")
+            fi
+            file_outputs["$current_file"]+="$line"$'\n'
+        fi
+    done <<< "$output"
+
+    # Print and count per section
+    for section_name in "${file_order[@]}"; do
+        local section_pass section_fail
+        section_pass=$(echo "${file_outputs[$section_name]}" | grep -c "PASS" || true)
+        section_fail=$(echo "${file_outputs[$section_name]}" | grep -c "FAIL" || true)
+        _SUITE_PASS_COUNT=$((_SUITE_PASS_COUNT + section_pass))
+        _SUITE_FAIL_COUNT=$((_SUITE_FAIL_COUNT + section_fail))
+
+        if [[ "$TEST_VERBOSE" == true ]]; then
+            if [[ "$section_name" != "(preamble)" ]]; then
+                echo ""
+                print_info "  -- $section_name --"
+            fi
+
+            while IFS= read -r line; do
+                if [[ "$line" == *"PASS"* ]]; then
+                    echo -e "  ${GREEN}${line}${NC}"
+                elif [[ "$line" == *"FAIL"* ]]; then
+                    echo -e "  ${RED}${line}${NC}"
+                else
+                    echo "  $line"
+                fi
+            done <<< "${file_outputs[$section_name]}"
+        elif [[ $section_fail -gt 0 ]]; then
+            if [[ "$section_name" != "(preamble)" ]]; then
+                echo ""
+                print_info "  -- $section_name --"
+            fi
+
+            while IFS= read -r line; do
+                if [[ "$line" == *"FAIL"* ]]; then
+                    echo -e "  ${RED}${line}${NC}"
+                elif [[ "$line" == *"ERROR"* ]] || [[ "$line" == *"error"* ]]; then
+                    echo -e "  ${RED}${line}${NC}"
+                fi
+            done <<< "${file_outputs[$section_name]}"
+        fi
+    done
+
+    # Run cleanup files individually after rollback
+    if [[ ${#_TXN_CLEANUP_FILES[@]} -gt 0 ]] && { [[ "$_MANIFEST_ALWAYS_CLEANUP" == true ]] || [[ "$has_error" == false ]]; }; then
+        for f in "${_TXN_CLEANUP_FILES[@]}"; do
+            [[ -z "$f" ]] && continue
+            if [[ "$TEST_VERBOSE" == true ]]; then
+                echo ""
+                print_info "  -- $(basename "$f") (cleanup) --"
+            fi
+            invoke_test_sql_file "$f"
+            if [[ "$_TEST_RESULT_PASSED" == false ]] && [[ "$TEST_VERBOSE" == false ]]; then
+                echo ""
+                print_info "  -- $(basename "$f") (cleanup) --"
+            fi
+            if [[ "$_TEST_RESULT_PASSED" == false ]]; then
+                print_warning "Cleanup file $(basename "$f") had issues (non-fatal)"
+            fi
+        done
+    fi
+
+    if [[ $_SUITE_FAIL_COUNT -eq 0 ]] && [[ "$has_error" == false ]]; then
+        _SUITE_PASSED=true
+    else
+        _SUITE_PASSED=false
+    fi
+}
+
+# Run a flat test_*.sql file
+invoke_flat_test() {
+    local test_file="$1"
+    if [[ "$TEST_VERBOSE" == true ]]; then
+        echo ""
+        print_info "--- $(basename "$test_file") ---"
+    fi
+    invoke_test_sql_file "$test_file"
+    if [[ "$TEST_VERBOSE" == false ]] && [[ "$_TEST_RESULT_PASSED" == false ]]; then
+        echo ""
+        echo -e "--- $(basename "$test_file") --- ${RED}FAILED${NC}"
+    fi
+}
+
+# Run a folder-based test suite
+invoke_suite_test() {
+    local suite_dir="$1"
+
+    read_test_manifest "$suite_dir"
+
+    local suite_pass_count=0
+    local suite_fail_count=0
+    local suite_passed=true
+    local suite_header_printed=false
+
+    if [[ "$TEST_VERBOSE" == true ]]; then
+        echo ""
+        print_info "=== Suite: $_MANIFEST_NAME ==="
+        if [[ -n "$_MANIFEST_DESCRIPTION" ]]; then
+            print_info "$_MANIFEST_DESCRIPTION"
+        fi
+        suite_header_printed=true
+    fi
+
+    # Discover SQL files matching NNN_*.sql
+    local main_files=()
+    local cleanup_files=()
+
+    for f in "$suite_dir"/*; do
+        [[ ! -f "$f" ]] && continue
+        local fname
+        fname=$(basename "$f")
+
+        if [[ "$fname" =~ ^[0-9]{3}_.*\.sql$ ]]; then
+            local prefix
+            prefix=$((10#${fname:0:3}))
+            if [[ $prefix -ge 900 ]] && [[ $prefix -le 999 ]]; then
+                cleanup_files+=("$f")
+            else
+                main_files+=("$f")
+            fi
+        elif [[ "$fname" != "test.json" ]]; then
+            print_warning "Skipping non-matching file in suite: $fname"
+        fi
+    done
+
+    # Sort arrays
+    IFS=$'\n' main_files=($(sort <<<"${main_files[*]}")); unset IFS
+    IFS=$'\n' cleanup_files=($(sort <<<"${cleanup_files[*]}")); unset IFS
+
+    # Branch on isolation mode
+    if [[ "$_MANIFEST_ISOLATION" == "transaction" ]]; then
+        _TXN_MAIN_FILES=("${main_files[@]}")
+        _TXN_CLEANUP_FILES=("${cleanup_files[@]}")
+        invoke_suite_transaction "$suite_dir"
+        suite_passed=$_SUITE_PASSED
+        suite_pass_count=$_SUITE_PASS_COUNT
+        suite_fail_count=$_SUITE_FAIL_COUNT
+    elif [[ "$_MANIFEST_ISOLATION" == "database" ]]; then
+        # Recreate + restore database before suite
+        print_info "  [database isolation] Recreating database..."
+        recreate_database
+        if [[ -n "$DBBACKUPFILE" ]]; then
+            print_info "  [database isolation] Restoring database..."
+            restore_database
+        fi
+        set_current_database "$DBDESTDB"
+
+        # Run shared setup files individually
+        local tests_dir="tests"
+        for setup_path in "${_MANIFEST_SETUP[@]}"; do
+            local resolved="$tests_dir/$setup_path"
+            if [[ -f "$resolved" ]]; then
+                if [[ "$TEST_VERBOSE" == true ]]; then
+                    echo ""
+                    print_info "  -- $setup_path (shared setup) --"
+                fi
+                invoke_test_sql_file "$resolved"
+            else
+                print_warning "Shared setup file not found: $setup_path"
+            fi
+        done
+
+        # Run main files individually
+        local main_failed=false
+        for f in "${main_files[@]}"; do
+            [[ -z "$f" ]] && continue
+            if [[ "$TEST_VERBOSE" == true ]]; then
+                echo ""
+                print_info "  -- $(basename "$f") --"
+            fi
+            invoke_test_sql_file "$f"
+            suite_pass_count=$((suite_pass_count + _TEST_RESULT_PASS_COUNT))
+            suite_fail_count=$((suite_fail_count + _TEST_RESULT_FAIL_COUNT))
+            if [[ "$_TEST_RESULT_PASSED" == false ]]; then
+                if [[ "$suite_header_printed" == false ]]; then
+                    echo ""
+                    print_info "=== Suite: $_MANIFEST_NAME ==="
+                    suite_header_printed=true
+                fi
+                if [[ "$TEST_VERBOSE" == false ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") --"
+                fi
+                main_failed=true
+                break
+            fi
+        done
+
+        if [[ ${#cleanup_files[@]} -gt 0 ]] && { [[ "$_MANIFEST_ALWAYS_CLEANUP" == true ]] || [[ "$main_failed" == false ]]; }; then
+            for f in "${cleanup_files[@]}"; do
+                [[ -z "$f" ]] && continue
+                if [[ "$TEST_VERBOSE" == true ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") (cleanup) --"
+                fi
+                invoke_test_sql_file "$f"
+                if [[ "$_TEST_RESULT_PASSED" == false ]] && [[ "$TEST_VERBOSE" == false ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") (cleanup) --"
+                fi
+                if [[ "$_TEST_RESULT_PASSED" == false ]]; then
+                    print_warning "Cleanup file $(basename "$f") had issues (non-fatal)"
+                fi
+            done
+        fi
+
+        if [[ "$main_failed" == false ]] && [[ $suite_fail_count -eq 0 ]]; then
+            suite_passed=true
+        else
+            suite_passed=false
+        fi
+    else
+        # "none" — current behavior with shared setup
+        local tests_dir="tests"
+        for setup_path in "${_MANIFEST_SETUP[@]}"; do
+            local resolved="$tests_dir/$setup_path"
+            if [[ -f "$resolved" ]]; then
+                if [[ "$TEST_VERBOSE" == true ]]; then
+                    echo ""
+                    print_info "  -- $setup_path (shared setup) --"
+                fi
+                invoke_test_sql_file "$resolved"
+            else
+                print_warning "Shared setup file not found: $setup_path"
+            fi
+        done
+
+        # Run main phase (stop on first failure)
+        local main_failed=false
+        for f in "${main_files[@]}"; do
+            [[ -z "$f" ]] && continue
+            if [[ "$TEST_VERBOSE" == true ]]; then
+                echo ""
+                print_info "  -- $(basename "$f") --"
+            fi
+            invoke_test_sql_file "$f"
+            suite_pass_count=$((suite_pass_count + _TEST_RESULT_PASS_COUNT))
+            suite_fail_count=$((suite_fail_count + _TEST_RESULT_FAIL_COUNT))
+
+            if [[ "$_TEST_RESULT_PASSED" == false ]]; then
+                if [[ "$suite_header_printed" == false ]]; then
+                    echo ""
+                    print_info "=== Suite: $_MANIFEST_NAME ==="
+                    suite_header_printed=true
+                fi
+                if [[ "$TEST_VERBOSE" == false ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") --"
+                fi
+                main_failed=true
+                break
+            fi
+        done
+
+        # Run cleanup phase
+        if [[ ${#cleanup_files[@]} -gt 0 ]] && { [[ "$_MANIFEST_ALWAYS_CLEANUP" == true ]] || [[ "$main_failed" == false ]]; }; then
+            for f in "${cleanup_files[@]}"; do
+                [[ -z "$f" ]] && continue
+                if [[ "$TEST_VERBOSE" == true ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") (cleanup) --"
+                fi
+                invoke_test_sql_file "$f"
+                if [[ "$_TEST_RESULT_PASSED" == false ]] && [[ "$TEST_VERBOSE" == false ]]; then
+                    echo ""
+                    print_info "  -- $(basename "$f") (cleanup) --"
+                fi
+                if [[ "$_TEST_RESULT_PASSED" == false ]]; then
+                    print_warning "Cleanup file $(basename "$f") had issues (non-fatal)"
+                fi
+            done
+        fi
+
+        if [[ "$main_failed" == false ]] && [[ $suite_fail_count -eq 0 ]]; then
+            suite_passed=true
+        else
+            suite_passed=false
+        fi
+    fi
+
+    if [[ "$suite_passed" == true ]]; then
+        if [[ "$TEST_VERBOSE" == true ]]; then
+            echo ""
+            print_success "Suite $_MANIFEST_NAME: PASSED"
+        fi
+    else
+        if [[ "$suite_header_printed" == false ]]; then
+            echo ""
+            print_info "=== Suite: $_MANIFEST_NAME ==="
+        fi
+        echo ""
+        print_error "Suite $_MANIFEST_NAME: FAILED"
+    fi
+
+    # Set globals for caller
+    _SUITE_PASSED=$suite_passed
+    _SUITE_PASS_COUNT=$suite_pass_count
+    _SUITE_FAIL_COUNT=$suite_fail_count
+}
+
+# Run tests
+run_tests() {
+    local filter="$1"
+    local tests_dir="tests"
+
+    if [[ ! -d "$tests_dir" ]]; then
+        print_warning "Tests directory not found: $tests_dir"
+        return 1
+    fi
+
+    set_current_database "$DBDESTDB"
+
+    # Discover test items: flat test_*.sql files + test_*/ directories
+    local item_types=()
+    local item_paths=()
+
+    for entry in "$tests_dir"/test_*; do
+        [[ ! -e "$entry" ]] && continue
+        local name
+        name=$(basename "$entry")
+
+        if [[ -d "$entry" ]]; then
+            # Apply filter
+            if [[ "$filter" != "all" ]] && [[ "$name" != *"$filter"* ]]; then
+                continue
+            fi
+            item_types+=("suite")
+            item_paths+=("$entry")
+        elif [[ -f "$entry" ]] && [[ "$name" == *.sql ]]; then
+            # Apply filter
+            if [[ "$filter" != "all" ]] && [[ "$name" != *"$filter"* ]]; then
+                continue
+            fi
+            item_types+=("file")
+            item_paths+=("$entry")
+        fi
+    done
+
+    # Apply global ordering from tests/tests.json
+    local tests_json="$tests_dir/tests.json"
+    if [[ -f "$tests_json" ]]; then
+        local order_data
+        if order_data=$(python3 -c "
+import json, sys
+with open('$tests_json') as f:
+    d = json.load(f)
+for name in d.get('order', []):
+    print(name)
+" 2>/dev/null); then
+            if [[ -n "$order_data" ]]; then
+                local ordered_types=()
+                local ordered_paths=()
+                local used=()
+
+                # Initialize used array
+                for i in "${!item_types[@]}"; do
+                    used+=("false")
+                done
+
+                while IFS= read -r order_name; do
+                    for i in "${!item_paths[@]}"; do
+                        local iname
+                        iname=$(basename "${item_paths[$i]}")
+                        if [[ "$iname" == "$order_name" ]] && [[ "${used[$i]}" == "false" ]]; then
+                            ordered_types+=("${item_types[$i]}")
+                            ordered_paths+=("${item_paths[$i]}")
+                            used[$i]="true"
+                            break
+                        fi
+                    done
+                done <<< "$order_data"
+
+                # Add remaining items
+                for i in "${!item_types[@]}"; do
+                    if [[ "${used[$i]}" == "false" ]]; then
+                        ordered_types+=("${item_types[$i]}")
+                        ordered_paths+=("${item_paths[$i]}")
+                    fi
+                done
+
+                item_types=("${ordered_types[@]}")
+                item_paths=("${ordered_paths[@]}")
+            fi
+        else
+            print_warning "Failed to read $tests_json"
+        fi
+    fi
+
+    if [[ ${#item_types[@]} -eq 0 ]]; then
+        print_warning "No test items found matching filter: $filter"
+        return 1
+    fi
+
+    local file_count=0
+    local suite_count=0
+    for t in "${item_types[@]}"; do
+        [[ "$t" == "file" ]] && file_count=$((file_count + 1))
+        [[ "$t" == "suite" ]] && suite_count=$((suite_count + 1))
+    done
+
+    if [[ "$TEST_VERBOSE" == true ]]; then
+        print_info "Running ${#item_types[@]} test item(s) ($file_count file(s), $suite_count suite(s))..."
+    fi
+
+    # Collect results
+    local all_pass_counts=()
+    local all_fail_counts=()
+    local all_passed=()
+    local all_is_suite=()
+    local all_errors=()
+
+    for i in "${!item_types[@]}"; do
+        if [[ "${item_types[$i]}" == "file" ]]; then
+            invoke_flat_test "${item_paths[$i]}"
+            all_pass_counts+=("$_TEST_RESULT_PASS_COUNT")
+            all_fail_counts+=("$_TEST_RESULT_FAIL_COUNT")
+            all_passed+=("$_TEST_RESULT_PASSED")
+            all_is_suite+=(false)
+            all_errors+=("$_TEST_RESULT_ERROR")
+        else
+            invoke_suite_test "${item_paths[$i]}"
+            all_pass_counts+=("$_SUITE_PASS_COUNT")
+            all_fail_counts+=("$_SUITE_FAIL_COUNT")
+            all_passed+=("$_SUITE_PASSED")
+            all_is_suite+=(true)
+            all_errors+=(false)
+        fi
+    done
+
+    # Summary
+    local total_pass=0 total_fail=0 error_only=0
+    local suite_passed_count=0 suite_failed_count=0
+    local file_passed_count=0 file_failed_count=0
+
+    for i in "${!all_passed[@]}"; do
+        total_pass=$((total_pass + all_pass_counts[$i]))
+        total_fail=$((total_fail + all_fail_counts[$i]))
+
+        if [[ "${all_errors[$i]}" == true ]] && [[ ${all_fail_counts[$i]} -eq 0 ]]; then
+            error_only=$((error_only + 1))
+        fi
+
+        if [[ "${all_is_suite[$i]}" == true ]]; then
+            if [[ "${all_passed[$i]}" == true ]]; then
+                suite_passed_count=$((suite_passed_count + 1))
+            else
+                suite_failed_count=$((suite_failed_count + 1))
+            fi
+        else
+            if [[ "${all_passed[$i]}" == true ]]; then
+                file_passed_count=$((file_passed_count + 1))
+            else
+                file_failed_count=$((file_failed_count + 1))
+            fi
+        fi
+    done
+
+    echo ""
+    print_info "=== Test Summary ==="
+    print_success "PASSED: $total_pass"
+    if [[ $total_fail -gt 0 ]] || [[ $error_only -gt 0 ]]; then
+        local fail_msg="FAILED: $total_fail"
+        if [[ $error_only -gt 0 ]]; then
+            fail_msg="$fail_msg (+$error_only error(s))"
+        fi
+        print_error "$fail_msg"
+    else
+        print_info "FAILED: $total_fail"
+    fi
+    print_info "Total:  $((total_pass + total_fail))"
+    if [[ $suite_count -gt 0 ]]; then
+        print_info "Suites: $suite_passed_count passed, $suite_failed_count failed"
+    fi
+    if [[ $file_count -gt 0 ]]; then
+        print_info "Files:  $file_passed_count passed, $file_failed_count failed"
+    fi
+
+    # Return failure if any test failed
+    for p in "${all_passed[@]}"; do
+        if [[ "$p" == false ]]; then
+            return 1
+        fi
+    done
+    return 0
+}
+
 # Show usage
 show_usage() {
     cat << EOF
@@ -439,16 +1140,25 @@ Options:
     -e, --environment ENV       Environment name for configuration
     -o, --operations OPS        Comma-separated operations to perform
                                (recreateDatabase, restoreDatabase, updateDatabase,
-                                preUpdateScripts, postUpdateScripts, prepareVersionTable, fullService)
+                                preUpdateScripts, postUpdateScripts, prepareVersionTable,
+                                execSql, runTests, fullService)
                                Default: fullService
     -s, --start-number NUM     Starting migration file number (default: -1 for all)
     -n, --end-number NUM       Ending migration file number (default: -1 for all)
+    --sql-file FILE            SQL file to execute (for execSql operation)
+    --sql "QUERY"              SQL command to execute inline (for execSql operation)
+    --test-filter PATTERN      Filter test files by pattern (for runTests operation, default: all)
+    --test-verbose             Show all test output including PASS lines (default: silent, only failures shown)
     -h, --help                 Show this help message
 
 Examples:
     $0 -e prod -o fullService
     $0 -e dev -o restoreDatabase,updateDatabase
     $0 -o updateDatabase -s 10 -n 20
+    $0 -o execSql --sql "SELECT 1;"
+    $0 -o execSql --sql-file script.sql
+    $0 -o runTests
+    $0 -o runTests --test-filter connection
 
 Environment files:
     debee.ENV.env              Environment-specific configuration
@@ -477,6 +1187,22 @@ while [[ $# -gt 0 ]]; do
         -n|--end-number)
             UPDATE_END_NUMBER="$2"
             shift 2
+            ;;
+        --sql-file)
+            SQL_FILE="$2"
+            shift 2
+            ;;
+        --sql)
+            SQL_COMMAND="$2"
+            shift 2
+            ;;
+        --test-filter)
+            TEST_FILTER="$2"
+            shift 2
+            ;;
+        --test-verbose)
+            TEST_VERBOSE=true
+            shift
             ;;
         -h|--help)
             show_usage
@@ -548,6 +1274,14 @@ for operation in "${OPERATIONS[@]}"; do
             print_info "Performing prepare version table operation..."
             prepare_version_table
             ;;
+        "execSql")
+            print_info "Performing exec SQL operation..."
+            exec_sql "$SQL_FILE" "$SQL_COMMAND"
+            ;;
+        "runTests")
+            print_info "Performing run tests operation..."
+            run_tests "$TEST_FILTER"
+            ;;
         "fullService")
             print_info "Performing full service operation..."
             recreate_database
@@ -558,7 +1292,7 @@ for operation in "${OPERATIONS[@]}"; do
             ;;
         *)
             print_error "Invalid operation specified: $operation"
-            print_info "Valid operations: recreateDatabase, restoreDatabase, updateDatabase, preUpdateScripts, postUpdateScripts, prepareVersionTable, fullService"
+            print_info "Valid operations: recreateDatabase, restoreDatabase, updateDatabase, preUpdateScripts, postUpdateScripts, prepareVersionTable, execSql, runTests, fullService"
             exit 1
             ;;
     esac

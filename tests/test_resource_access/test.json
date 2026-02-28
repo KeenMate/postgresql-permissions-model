@@ -1,0 +1,6 @@
+{
+  "name": "Resource Access (ACL) Test Suite",
+  "description": "Tests for resource-based authorization: grant/deny/revoke, has_resource_access, deny-overrides, bulk filter, tenant isolation, cascade deletes",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

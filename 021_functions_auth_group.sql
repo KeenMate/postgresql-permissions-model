@@ -394,6 +394,8 @@ begin
 
 	end if;
 
+	perform auth.validate_provider_allows_group_mapping(_provider_code);
+
 	perform
 		auth.has_permission(_user_id, _correlation_id, 'groups.create_mapping', _tenant_id);
 
@@ -693,7 +695,9 @@ begin
 					 ugm.mapped_object_name
 		from auth.user_group ug
 					 inner join auth.user_group_mapping ugm on ug.user_group_id = ugm.user_group_id
+					 inner join auth.provider p on p.code = ugm.provider_code
 		where ug.is_synced
+		  and p.allows_group_sync
 		order by provider_code, code;
 end;
 $$;
@@ -717,6 +721,8 @@ begin
 				 inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
 	where ugm.user_group_mapping_id = _user_group_mapping_id
 	into __user_group_id, __create_missing_users_on_sync, __provider_code;
+
+	perform auth.validate_provider_allows_group_sync(__provider_code);
 
 	create temporary table __temp_current_members as
 	select ui.user_id, ui.username as upn

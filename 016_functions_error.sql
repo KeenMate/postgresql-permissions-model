@@ -10,6 +10,7 @@
  * - 32001-32999: Permission errors
  * - 33001-33999: User/group errors
  * - 34001-34999: Tenant errors
+ * - 35001-35999: Resource access errors
  * - 36001-36999: Token config errors
  *
  * This file is part of the PostgreSQL Permissions Model v2
@@ -451,6 +452,28 @@ begin
 end;
 $$;
 
+-- 33016: Provider does not allow group mapping
+create or replace function error.raise_33016(_provider_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Provider (code: %) does not allow group mapping', _provider_code
+        using errcode = '33016';
+end;
+$$;
+
+-- 33017: Provider does not allow group sync
+create or replace function error.raise_33017(_provider_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Provider (code: %) does not allow group sync', _provider_code
+        using errcode = '33017';
+end;
+$$;
+
 /*
  * Tenant Errors (34001-34999)
  */
@@ -463,6 +486,54 @@ $$
 begin
     raise exception 'User (username: %) has no access to tenant (id: %)', _username, _tenant_id
         using errcode = '34001';
+end;
+$$;
+
+/*
+ * Resource Access Errors (35001-35999)
+ */
+
+-- 35001: No access to resource
+create or replace function error.raise_35001(_user_id bigint, _resource_type text, _resource_id bigint, _tenant_id integer default 1) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User (uid: %) has no access to resource (type: %, id: %) in tenant (id: %)', _user_id, _resource_type, _resource_id, _tenant_id
+        using errcode = '35001';
+end;
+$$;
+
+-- 35002: Either user_id or user_group_id required
+create or replace function error.raise_35002() returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Either target user_id or user_group_id must be provided'
+        using errcode = '35002';
+end;
+$$;
+
+-- 35003: Resource type not found or inactive
+create or replace function error.raise_35003(_resource_type text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Resource type (code: %) does not exist or is not active', _resource_type
+        using errcode = '35003';
+end;
+$$;
+
+-- 35004: Access flag not found
+create or replace function error.raise_35004(_access_flag text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Access flag (code: %) does not exist', _access_flag
+        using errcode = '35004';
 end;
 $$;
 
@@ -545,6 +616,10 @@ create or replace function error.raise_52283(_perm_set_code text) returns void l
 
 -- API key errors
 create or replace function error.raise_52301(_api_key text) returns void language sql as $$ select error.raise_30001(_api_key); $$;
+
+-- Provider capability errors
+create or replace function error.raise_52113(_provider_code text) returns void language sql as $$ select error.raise_33016(_provider_code); $$;
+create or replace function error.raise_52114(_provider_code text) returns void language sql as $$ select error.raise_33017(_provider_code); $$;
 
 -- Owner errors
 create or replace function error.raise_52401(_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void language sql as $$ select error.raise_33015(_user_id, _user_group_id, _tenant_id); $$;

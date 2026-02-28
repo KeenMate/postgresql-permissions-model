@@ -87,6 +87,7 @@ INSERT INTO const.event_category (category_code, title, range_start, range_end, 
     ('token_event',      'Token Events',      15001, 15999, false, 'core'),
     ('provider_event',   'Provider Events',   16001, 16999, false, 'core'),
     ('maintenance_event','Maintenance Events', 17001, 17999, false, 'core'),
+    ('resource_event',    'Resource Access Events', 18001, 18999, false, 'core'),
     ('token_config_event','Token Config Events',19001, 19999, false, 'core'),
     -- Errors (30xxx)
     ('security_error',   'Security Errors',   30001, 30999, true, 'core'),
@@ -94,6 +95,7 @@ INSERT INTO const.event_category (category_code, title, range_start, range_end, 
     ('permission_error', 'Permission Errors', 32001, 32999, true, 'core'),
     ('user_error',       'User/Group Errors', 33001, 33999, true, 'core'),
     ('tenant_error',     'Tenant Errors',     34001, 34999, true, 'core'),
+    ('resource_error',    'Resource Access Errors', 35001, 35999, true, 'core'),
     ('token_config_error','Token Config Errors',36001, 36999, true, 'core')
 ON CONFLICT DO NOTHING;
 
@@ -182,6 +184,13 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     -- Maintenance events (17001-17999)
     (17001, 'audit_data_purged',      'maintenance_event', 'Audit Data Purged',  'Old audit data was purged', true, 'core'),
 
+    -- Resource access events (18001-18999)
+    (18001, 'resource_type_created',       'resource_event', 'Resource Type Created',       'New resource type was registered', true, 'core'),
+    (18010, 'resource_access_granted',     'resource_event', 'Resource Access Granted',     'Access was granted to a resource', true, 'core'),
+    (18011, 'resource_access_revoked',     'resource_event', 'Resource Access Revoked',     'Access was revoked from a resource', true, 'core'),
+    (18012, 'resource_access_denied',      'resource_event', 'Resource Access Denied',      'Deny rule was set on a resource', true, 'core'),
+    (18013, 'resource_access_bulk_revoked','resource_event', 'Resource Access Bulk Revoked','All access was revoked from a resource', true, 'core'),
+
     -- Token config events (19001-19999)
     (19001, 'token_type_created',     'token_config_event', 'Token Type Created', 'New token type was created', true, 'core'),
     (19002, 'token_type_updated',     'token_config_event', 'Token Type Updated', 'Token type was updated', true, 'core'),
@@ -239,6 +248,12 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
 
     -- Tenant errors (34001-34999)
     (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true, 'core'),
+
+    -- Resource access errors (35001-35999)
+    (35001, 'err_no_resource_access',             'resource_error', 'No Resource Access',             'User has no access to this resource', true, 'core'),
+    (35002, 'err_resource_grant_no_target',       'resource_error', 'No Grant Target',                'Either target user or group must be specified', true, 'core'),
+    (35003, 'err_resource_type_not_found',        'resource_error', 'Resource Type Not Found',        'Resource type does not exist or is inactive', true, 'core'),
+    (35004, 'err_resource_access_flag_not_found', 'resource_error', 'Access Flag Not Found',          'Access flag does not exist', true, 'core'),
 
     -- Token config errors (36001-36999)
     (36001, 'err_token_type_not_found',      'token_config_error', 'Token Type Not Found', 'Token type does not exist', true, 'core'),
@@ -345,6 +360,19 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (19002, 'en', 'Token type "{token_type_code}" was updated by {actor}'),
     (19003, 'en', 'Token type "{token_type_code}" was deleted by {actor}'),
 
+    -- Resource access events (18xxx)
+    (18001, 'en', 'Resource type "{resource_type}" was created by {actor}'),
+    (18010, 'en', 'Access to {resource_type} "{resource_id}" was granted to {target_type} "{target_name}" by {actor}'),
+    (18011, 'en', 'Access to {resource_type} "{resource_id}" was revoked from {target_type} "{target_name}" by {actor}'),
+    (18012, 'en', 'Deny rule on {resource_type} "{resource_id}" was set for user "{target_name}" by {actor}'),
+    (18013, 'en', 'All access to {resource_type} "{resource_id}" was revoked by {actor}'),
+
+    -- Resource access error messages (35xxx)
+    (35001, 'en', 'User (uid: {user_id}) has no access to resource (type: {resource_type}, id: {resource_id})'),
+    (35002, 'en', 'Either target user_id or user_group_id must be provided'),
+    (35003, 'en', 'Resource type "{resource_type}" does not exist or is not active'),
+    (35004, 'en', 'Access flag "{access_flag}" does not exist'),
+
     -- Token config error messages (36xxx)
     (36001, 'en', 'Token type "{token_type_code}" does not exist'),
     (36002, 'en', 'Token type "{token_type_code}" is a system token type and cannot be modified or deleted'),
@@ -385,6 +413,10 @@ SELECT * FROM unsecure.assign_permission_as_system(null::integer, 4, 'svc_token_
 SELECT * FROM unsecure.assign_permission_as_system(null::integer, 5, 'svc_api_gateway_permissions');
 SELECT * FROM unsecure.assign_permission_as_system(null::integer, 6, 'svc_group_syncer_permissions');
 SELECT * FROM unsecure.assign_permission_as_system(null::integer, 800, 'svc_data_processor_permissions');
+
+-- Reset sequences to 1000 to reserve space for system tenants and groups
+ALTER SEQUENCE auth.tenant_tenant_id_seq RESTART WITH 1000;
+ALTER SEQUENCE auth.user_group_user_group_id_seq RESTART WITH 1000;
 
 -- Backfill short_code for all permissions (in case any were created without it)
 UPDATE auth.permission SET short_code = unsecure.compute_short_code(permission_id)

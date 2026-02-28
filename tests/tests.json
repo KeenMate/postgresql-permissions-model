@@ -12,6 +12,7 @@
     "test_language_translation",
     "test_group_members_and_delete_tenant",
     "test_auth_group_member_tenant",
-    "test_search_functions"
+    "test_search_functions",
+    "test_resource_access"
   ]
 }

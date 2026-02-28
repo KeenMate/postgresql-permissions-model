@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-02-28
+
+### Added
+
+#### Resource Access (ACL) System
+
+Resource-level authorization layered on top of RBAC. While RBAC controls what actions a user can perform globally, the ACL system controls which specific resources they can act on.
+
+**Tables** (`034_tables_resource_access.sql`):
+- `const.resource_type` — registry of valid resource types (e.g. `folder`, `document`)
+- `const.resource_access_flag` — registry of access flags (`read`, `write`, `delete`, `share`); extensible with custom flags
+- `auth.resource_access` — core ACL table, list-partitioned by `resource_type`. One row = one flag for one user/group on one resource. Supports both grants (`is_deny=false`) and explicit denies (`is_deny=true`)
+
+**Functions** (`035_functions_resource_access.sql`):
+
+| Function | Purpose |
+|----------|---------|
+| `auth.has_resource_access()` | Check if user has a flag on a resource (deny-overrides algorithm) |
+| `auth.filter_accessible_resources()` | Bulk filter — returns subset of resource IDs user can access |
+| `auth.get_resource_access_flags()` | Returns all effective flags + source (direct/group name) |
+| `auth.grant_resource_access()` | Grant flags to user or group (idempotent upsert) |
+| `auth.deny_resource_access()` | Explicit deny on user (overrides all group grants) |
+| `auth.revoke_resource_access()` | Revoke specific flags or all flags |
+| `auth.revoke_all_resource_access()` | Remove all ACL rows for a resource (cleanup on delete) |
+| `auth.get_resource_grants()` | List all grants/denies on a resource |
+| `auth.get_user_accessible_resources()` | List resources a user can access |
+| `auth.create_resource_type()` | Register new resource type + auto-create partition |
+| `unsecure.validate_resource_type()` | Validate resource type exists and is active |
+| `unsecure.validate_access_flags()` | Validate all flags in array exist |
+| `unsecure.ensure_resource_access_partition()` | Create partition for resource type if missing |
+
+**Access check algorithm** (priority order):
+1. System user (id=1) — always allowed
+2. Tenant owner — always allowed
+3. User-level deny — blocked, overrides everything
+4. User-level grant — allowed
+5. Group-level grant (via active group membership) — allowed
+6. No matching row — denied
+
+**Deny model**: User-level only. Cannot deny groups. Per-flag granularity. Explicit denies override all group grants for that user.
+
+**RBAC permissions** (`022_functions_auth_permission.sql`):
+- New parent: `Resources` (not assignable)
+- Children: `resources.create_resource_type`, `resources.grant_access`, `resources.deny_access`, `resources.revoke_access`, `resources.update_access`, `resources.get_grants`
+- New perm set: "Resource manager" (resources + journal read)
+- Updated perm sets: "System admin" and "Full admin" now include `resources`
+
+**Error codes** (`016_functions_error.sql`):
+- `35001` — User has no access to resource
+- `35002` — Neither user_id nor user_group_id provided
+- `35003` — Resource type not found or inactive
+- `35004` — Access flag not found
+
+**Event codes** (`029_seed_data.sql`):
+- `18001` resource_type_created, `18010` resource_access_granted, `18011` resource_access_revoked, `18012` resource_access_denied, `18013` resource_access_bulk_revoked
+
+**Test suite** (`tests/test_resource_access/`):
+- 8 test files covering grant/revoke, has_resource_access, deny-overrides, bulk filter, effective flags/grants, tenant isolation, cascade deletes
+- Transaction isolation mode
+
+#### Provider Capability Flags
+
+New columns on `auth.provider` to control group mapping and sync behavior per provider (`013_tables_auth.sql`, `024_functions_auth_provider.sql`):
+
+- `allows_group_mapping` (boolean, default false) — whether provider supports group mapping
+- `allows_group_sync` (boolean, default false) — whether provider supports group sync
+- Constraint: `allows_group_sync` requires `allows_group_mapping`
+- New validation functions: `auth.validate_provider_allows_group_mapping()`, `auth.validate_provider_allows_group_sync()`
+- `auth.create_provider()`, `auth.update_provider()`, `auth.ensure_provider()` updated with new parameters
+- `auth.create_user_group_mapping()` now validates provider allows group mapping
+- `auth.sync_user_group_members()` now validates provider allows group sync
+- `unsecure.resolve_user_groups_from_provider()` skips mapping resolution when provider doesn't allow it
+- New error codes: `33016` (provider does not allow group mapping), `33017` (provider does not allow group sync)
+
+### Changed
+
+- Reset `auth.tenant` and `auth.user_group` identity sequences to start at 1000 (IDs 1-999 reserved for system use) (`029_seed_data.sql`)
+
 ## [2.13.0] - 2026-02-28
 
 ### Changed

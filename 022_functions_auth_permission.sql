@@ -524,12 +524,22 @@ begin
 	perform unsecure.create_permission_as_system('Read translations', 'translations', _source := 'core');
 	perform unsecure.create_permission_as_system('Copy translations', 'translations', _source := 'core');
 
+	-- Permissions: Resources
+	perform unsecure.create_permission_as_system('Resources', null, false, _source := 'core');
+	perform unsecure.create_permission_as_system('Create resource type', 'resources', _source := 'core');
+	perform unsecure.create_permission_as_system('Grant access', 'resources', _source := 'core');
+	perform unsecure.create_permission_as_system('Deny access', 'resources', _source := 'core');
+	perform unsecure.create_permission_as_system('Revoke access', 'resources', _source := 'core');
+	perform unsecure.create_permission_as_system('Update access', 'resources', _source := 'core');
+	perform unsecure.create_permission_as_system('Get grants', 'resources', _source := 'core');
+
 	-- Permission sets
 	perform unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
 		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'journal.purge_journal', 'api_keys', 'languages', 'translations', 'token_configuration',
 			'tokens.create_token', 'tokens.validate_token', 'tokens.set_as_used',
 			'authentication.get_data', 'authentication.create_auth_event', 'authentication.read_user_events',
-			'authentication.ensure_permissions', 'authentication.get_users_groups_and_permissions'],
+			'authentication.ensure_permissions', 'authentication.get_users_groups_and_permissions',
+			'resources'],
 		_source := 'core');
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload'],
@@ -573,9 +583,12 @@ begin
 		_permissions := array ['journal', 'authentication.read_user_events',
 			'users.read_users', 'groups.get_group', 'groups.get_groups', 'tenants.read_tenants'],
 		_source := 'core');
+	perform unsecure.create_perm_set_as_system('Resource manager', true, _is_assignable := true,
+		_permissions := array ['resources', 'journal.read_journal', 'journal.get_payload'],
+		_source := 'core');
 	perform unsecure.create_perm_set_as_system('Full admin', true, _is_assignable := true,
 		_permissions := array ['tenants', 'providers', 'users', 'groups', 'journal', 'journal.purge_journal',
-			'api_keys', 'languages', 'translations', 'token_configuration',
+			'api_keys', 'languages', 'translations', 'token_configuration', 'resources',
 			'permissions.create_permission', 'permissions.update_permission', 'permissions.delete_permission',
 			'permissions.create_permission_set', 'permissions.update_permission_set', 'permissions.delete_permission_set',
 			'permissions.assign_permission', 'permissions.unassign_permission',

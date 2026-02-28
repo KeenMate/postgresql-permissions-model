@@ -184,6 +184,7 @@ def process_files() -> Dict[str, Dict[str, Any]]:
                     'all_updates': [],
                     'last_update_file': '',
                     'last_update_line': 0,
+                    'last_update_operation': '',
                     'last_update_source': ''
                 }
 
@@ -198,6 +199,7 @@ def process_files() -> Dict[str, Dict[str, Any]]:
             # Update latest reference
             all_objects[key]['last_update_file'] = obj['file']
             all_objects[key]['last_update_line'] = obj['line']
+            all_objects[key]['last_update_operation'] = obj['operation']
             all_objects[key]['last_update_source'] = source_type
 
     return all_objects
@@ -355,9 +357,172 @@ def output_markdown(objects: Dict[str, Dict[str, Any]], output_file: str = None)
     else:
         print(output)
 
+def output_html(objects: Dict[str, Dict[str, Any]], output_file: str = None, use_template: bool = True):
+    """Output objects as HTML table using template if available."""
+
+    # Check if template exists and use_template is True
+    template_path = Path('debee/version_table_template.html')
+
+    if use_template and template_path.exists():
+        # Use template-based approach
+        print("Using HTML template from debee/version_table_template.html")
+
+        # Check if we have any ad-hoc updates
+        has_adhoc_updates = False
+        for obj in objects.values():
+            for update in obj['all_updates']:
+                if update.get('source') == 'ad-hoc':
+                    has_adhoc_updates = True
+                    break
+            if has_adhoc_updates:
+                break
+
+        # Prepare data for JavaScript
+        js_data = []
+        for key in sorted(objects.keys()):
+            obj = objects[key]
+
+            # Separate migration and ad-hoc updates
+            migration_updates = []
+            adhoc_updates = []
+
+            for u in obj['all_updates']:
+                update_str = f"{u['file']}:{u['line']}:{u['operation']}"
+                source = u.get('source', 'migration')
+                if source == 'ad-hoc':
+                    adhoc_updates.append(update_str)
+                else:
+                    migration_updates.append(update_str)
+
+            # Reverse order so latest updates appear at the bottom
+            migration_updates.reverse()
+            adhoc_updates.reverse()
+
+            js_data.append({
+                'schema': obj['schema'],
+                'object_name': obj['object_name'],
+                'object_type': obj['object_type'],
+                'last_file': obj['last_update_file'],
+                'last_line': obj['last_update_line'],
+                'last_operation': obj.get('last_update_operation', ''),
+                'update_count': len(obj['all_updates']),
+                'migration_updates': '<br>'.join(migration_updates) if migration_updates else '-',
+                'adhoc_updates': '<br>'.join(adhoc_updates) if adhoc_updates else '-'
+            })
+
+        # Read template
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+
+        # Create JavaScript data injection
+        js_injection = f"""
+        function loadData() {{
+            tableData = {json.dumps(js_data, indent=12)};
+            filteredData = [...tableData];
+            hasAdhocUpdates = {str(has_adhoc_updates).lower()};
+        }}
+        """
+
+        # Replace the loadData function in the template
+        import re
+        pattern = r'function loadData\(\) \{[^}]*// For now, using empty array[^}]*\}'
+        output = re.sub(pattern, js_injection.strip(), template_content)
+
+        # If pattern didn't match, try simpler replacement
+        if '// <!-- DATA_PLACEHOLDER -->' in output:
+            data_line = f"            tableData = {json.dumps(js_data)};"
+            output = output.replace('            // <!-- DATA_PLACEHOLDER -->', data_line)
+
+    else:
+        # Fallback to simple HTML generation
+        if use_template:
+            print("Template not found, using fallback HTML generation")
+
+        html_parts = ['<!DOCTYPE html>', '<html lang="en">', '<head>',
+                     '    <meta charset="UTF-8">',
+                     '    <meta name="viewport" content="width=device-width, initial-scale=1.0">',
+                     '    <title>Database Objects Tracking</title>',
+                     '    <style>',
+                     '        body { font-family: Arial, sans-serif; margin: 20px; }',
+                     '        h1 { color: #333; }',
+                     '        h2 { color: #555; margin-top: 30px; }',
+                     '        table { border-collapse: collapse; width: 100%; margin-top: 20px; }',
+                     '        th { background-color: #4CAF50; color: white; padding: 12px; text-align: left; border: 1px solid #ddd; }',
+                     '        td { padding: 8px; text-align: left; border: 1px solid #ddd; }',
+                     '        tr:nth-child(even) { background-color: #f2f2f2; }',
+                     '        tr:hover { background-color: #e8f4e8; }',
+                     '        .summary { margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-left: 4px solid #4CAF50; }',
+                     '        .summary ul { list-style-type: none; padding-left: 0; }',
+                     '        .summary li { margin: 10px 0; }',
+                     '        .update-list { max-height: 100px; overflow-y: auto; font-size: 0.9em; }',
+                     '        .update-item { margin: 2px 0; }',
+                     '    </style>',
+                     '</head>',
+                     '<body>',
+                     '    <h1>Database Objects Tracking</h1>',
+                     '    <table>',
+                     '        <thead>',
+                     '            <tr>',
+                     '                <th>Schema</th>',
+                     '                <th>Object Name</th>',
+                     '                <th>Type</th>',
+                     '                <th>Last File</th>',
+                     '                <th>Line</th>',
+                     '                <th>Updates</th>',
+                     '                <th>Migration Updates</th>',
+                     '                <th>Ad-hoc Updates</th>',
+                     '            </tr>',
+                     '        </thead>',
+                     '        <tbody>']
+
+        for key in sorted(objects.keys()):
+            obj = objects[key]
+
+            # Separate migration and ad-hoc updates
+            migration_updates = []
+            adhoc_updates = []
+
+            for u in obj['all_updates']:
+                update_str = f"{u['file']}:{u['line']}:{u['operation']}"
+                source = u.get('source', 'migration')
+                if source == 'ad-hoc':
+                    adhoc_updates.append(update_str)
+                else:
+                    migration_updates.append(update_str)
+
+            # Reverse order
+            migration_updates.reverse()
+            adhoc_updates.reverse()
+
+            migration_updates_html = '<br>'.join(migration_updates) if migration_updates else '-'
+            adhoc_updates_html = '<br>'.join(adhoc_updates) if adhoc_updates else '-'
+
+            html_parts.extend([
+                '            <tr>',
+                f'                <td>{obj["schema"]}</td>',
+                f'                <td>{obj["object_name"]}</td>',
+                f'                <td>{obj["object_type"]}</td>',
+                f'                <td>{obj["last_update_file"]}</td>',
+                f'                <td>{obj["last_update_line"]}</td>',
+                f'                <td>{len(obj["all_updates"])}</td>',
+                f'                <td>{migration_updates_html}</td>',
+                f'                <td>{adhoc_updates_html}</td>',
+                '            </tr>'
+            ])
+
+        html_parts.extend(['        </tbody>', '    </table>', '</body>', '</html>'])
+        output = '\n'.join(html_parts)
+
+    if output_file:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(output)
+        print(f"Output saved to: {output_file}")
+    else:
+        print(output)
+
 def main():
     parser = argparse.ArgumentParser(description='Extract database objects from SQL migration files')
-    parser.add_argument('--format', choices=['json', 'csv', 'markdown'], default='json',
+    parser.add_argument('--format', choices=['json', 'csv', 'markdown', 'html'], default='json',
                       help='Output format (default: json)')
     parser.add_argument('--output', help='Output file (default: stdout)')
 
@@ -394,6 +559,8 @@ def main():
         output_csv(objects, args.output)
     elif args.format == 'markdown':
         output_markdown(objects, args.output)
+    elif args.format == 'html':
+        output_html(objects, args.output)
 
 if __name__ == '__main__':
     main()

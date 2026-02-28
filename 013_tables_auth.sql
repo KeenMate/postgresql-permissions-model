@@ -22,10 +22,14 @@ create table auth.provider
         unique,
     name        text                 not null,
     is_active   boolean default true not null,
+    allows_group_mapping boolean default false not null,
+    allows_group_sync    boolean default false not null,
     constraint provider_created_by_check
         check (length(created_by) <= 250),
     constraint provider_updated_by_check
-        check (length(updated_by) <= 250)
+        check (length(updated_by) <= 250),
+    constraint provider_sync_requires_mapping
+        check ((not allows_group_sync) or (allows_group_sync and allows_group_mapping))
 );
 
 create table auth.tenant
