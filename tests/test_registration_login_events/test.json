@@ -1,0 +1,6 @@
+{
+  "name": "Registration & Login Events",
+  "description": "User registration events, login success/failure events, request_context flow, password hash storage, provider authentication",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Search Functions",
+  "description": "All search functions: execution, filtering, pagination, empty results",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

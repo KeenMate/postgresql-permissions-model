@@ -129,24 +129,38 @@ Use the PowerShell script `debee.ps1` for all database operations:
 ```
 
 ### Running SQL Commands
-Use `exec-sql.sh` for quick SQL execution (loads environment from debee.env/.debee.env):
+Use the `execSql` operation built into debee for quick SQL execution:
 
-```bash
-# Run inline SQL
-./exec-sql.sh "SELECT * FROM auth.user_info LIMIT 5;"
-
+```powershell
 # Run SQL file
-./exec-sql.sh -f 999-examples.sql
+./debee.ps1 -Operations execSql -SqlFile 999-examples.sql
+
+# Run inline SQL
+./debee.ps1 -Operations execSql -Sql "SELECT * FROM auth.user_info LIMIT 5;"
 
 # Interactive psql session
-./exec-sql.sh
+./debee.ps1 -Operations execSql
 ```
 
-### Legacy Windows Batch Script
-For simple setup on Windows:
-```batch
-run.bat
+```bash
+# Bash equivalent
+./debee.sh -o execSql --sql-file 999-examples.sql
+./debee.sh -o execSql --sql "SELECT * FROM auth.user_info LIMIT 5;"
+./debee.sh -o execSql
 ```
+
+```bash
+# Python equivalent
+python debee.py -o execSql --sql-file 999-examples.sql
+python debee.py -o execSql --sql "SELECT * FROM auth.user_info LIMIT 5;"
+python debee.py -o execSql
+```
+
+Priority: File > Inline command > Interactive session.
+
+### Legacy Scripts
+- `exec-sql.sh` - Standalone SQL execution (predates debee's `execSql` operation)
+- `run.bat` - Simple Windows batch setup
 
 ### Environment Configuration
 - Primary config: `debee.env`
@@ -313,38 +327,148 @@ Refer to `readme.md:16-124` for complete error code documentation.
 
 ## Testing and Validation
 
-### Automated Tests
-Test files are located in the `tests/` directory and can be run with:
+### Running Tests
+Tests use debee's built-in `runTests` operation:
 
-```bash
+```powershell
 # Run all tests
-./tests/run-tests.sh
+./debee.ps1 -Operations runTests
 
-# Run specific test suite
-./tests/run-tests.sh cache                    # Cache invalidation tests
-./tests/run-tests.sh permission_cache_invalidation  # Same as above
-
-# Run individual test file directly
-./exec-sql.sh -f tests/test_permission_cache_invalidation.sql
+# Run filtered tests (substring match on file/directory name)
+./debee.ps1 -Operations runTests -TestFilter provider
+./debee.ps1 -Operations runTests -TestFilter cache
 ```
 
-**Available Test Suites:**
-| Test File | Description |
-|-----------|-------------|
-| `test_permission_cache_invalidation.sql` | Tests cache invalidation on permission changes, parameter validation, provider validation, and owner functions |
+```bash
+# Bash equivalent
+./debee.sh -o runTests
+./debee.sh -o runTests --test-filter provider
+```
+
+```bash
+# Python equivalent
+python debee.py -o runTests
+python debee.py -o runTests --test-filter provider
+```
+
+Run a single test file directly:
+```bash
+./debee.sh -o execSql --sql-file tests/test_provider_crud/001_create_provider.sql
+```
+
+### Test Organization
+
+Tests support two forms:
+
+**Flat test files** — single SQL files named `test_*.sql`:
+```
+tests/
+├── test_connection.sql
+├── test_provider_crud.sql
+└── test_permission_cache_invalidation.sql
+```
+
+**Suite directories** — directories named `test_*/` with numbered SQL files:
+```
+tests/
+└── test_connectivity/
+    ├── test.json              # Optional manifest
+    ├── 000_setup.sql          # Main phase (000-899)
+    ├── 001_verify_connection.sql
+    └── 999_cleanup.sql        # Cleanup phase (900-999)
+```
+
+Suite file phases:
+- **000–899 (main)** — Setup + execution + verification, runs in order, stops on first error
+- **900–999 (cleanup)** — Always runs if `always_cleanup: true` (default), failures are warnings only
+
+### Suite Manifest (test.json)
+
+Optional file inside a suite directory:
+```json
+{
+  "name": "Connection Test Suite",
+  "description": "Verify database connectivity and basic operations",
+  "always_cleanup": true,
+  "isolation": "none",
+  "setup": ["shared/create_schema.sql"]
+}
+```
+
+- **`always_cleanup`** — Run cleanup files (900-999) even if main phase fails (default: `true`)
+- **`isolation`** — Isolation mode (see below, default: `"none"`)
+- **`setup`** — Shared setup scripts from `tests/` directory, run before the suite's own files
+
+### Isolation Modes
+
+| Mode | Behavior |
+|------|----------|
+| `"none"` (default) | Files run individually against target database, changes persist |
+| `"transaction"` | All setup + main files wrapped in `BEGIN/ROLLBACK`, changes rolled back automatically |
+| `"database"` | Fresh database recreated before suite (calls `recreateDatabase` + `restoreDatabase`) |
+
+### Test Execution Order
+
+Global ordering controlled by `tests/tests.json`:
+```json
+{
+  "order": [
+    "test_connection.sql",
+    "test_connectivity",
+    "test_provider_crud.sql"
+  ]
+}
+```
+
+Items in `"order"` run first in specified order, unlisted items follow alphabetically. Ordering is applied before `--test-filter`.
+
+### Shared Setup Scripts
+
+Reusable SQL scripts in `tests/shared/`, referenced by suite manifests via the `"setup"` field. Paths are relative to `tests/`.
+
+### Pass/Fail Detection
+
+Debee scans test output for `PASS` and `FAIL` strings and checks psql exit codes. Output is colorized (green/red) with a summary at the end.
+
+### Available Tests
+
+All tests are organized as suite directories with `test.json` manifests:
+
+| Suite | Description |
+|-------|-------------|
+| `test_connection/` | Basic database connectivity check |
+| `test_connectivity/` | Connectivity with temp table operations |
+| `test_provider_crud/` | Provider CRUD, journaling, capability flags, group mapping validation |
+| `test_registration_login_events/` | User registration, login events, request_context flow |
+| `test_disabled_locked_users/` | Disabled/locked user blocking, cache clearing, error codes |
+| `test_permission_cache_invalidation/` | Cache invalidation (soft/hard), parameter validation, owner functions |
+| `test_short_code/` | Hierarchical permission short codes, custom short codes |
+| `test_correlation_id/` | Correlation ID flow to journal and user_event, search filtering |
+| `test_event_code_management/` | Event category/code/message CRUD, system protection, cascading deletes |
+| `test_language_translation/` | Language CRUD, translations, copy/overwrite, search, triggers |
+| `test_group_members_and_delete_tenant/` | Group member queries, tenant deletion regression tests |
+| `test_auth_group_member_tenant/` | Auth-layer group member and tenant functions with permission checks |
+| `test_search_functions/` | All search functions: pagination, filtering, empty results |
+
+### Writing New Tests
+
+**Flat test files** should:
+1. Be named `test_*.sql` in the `tests/` directory
+2. Use `DO $$ ... $$` blocks for each test case
+3. Use `RAISE NOTICE` for pass/fail output (text must contain `PASS:` or `FAIL:`)
+4. Use `RAISE EXCEPTION` for hard failures
+5. Clean up test data at the end
+
+**Suite directories** should:
+1. Be named `test_*/` in the `tests/` directory
+2. Use numbered SQL files (`000_setup.sql`, `001_test.sql`, `900_cleanup.sql`)
+3. Optionally include a `test.json` manifest for name, isolation mode, and shared setup
+4. Place cleanup in the 900-999 range so it runs even on failure
 
 ### Manual Testing
 - Use `999-examples.sql` for interactive testing scenarios
 - Always test permission inheritance and tenant isolation
 - Verify audit events are properly logged
-
-### Writing New Tests
-Test files should:
-1. Be named `test_*.sql` in the `tests/` directory
-2. Use `DO $$ ... $$` blocks for each test case
-3. Use `RAISE NOTICE` for pass/fail output
-4. Use `RAISE EXCEPTION` for failures
-5. Clean up test data at the end
 
 ## Important Notes
 - This is a pure PostgreSQL solution - no external dependencies beyond PostgreSQL extensions

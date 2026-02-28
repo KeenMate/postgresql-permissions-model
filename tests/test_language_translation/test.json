@@ -1,0 +1,6 @@
+{
+  "name": "Language & Translation",
+  "description": "Language CRUD, default flag enforcement, translation CRUD, triggers, copy/overwrite, search, error handling",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Correlation ID Support",
+  "description": "Tests for v2.3.0 correlation ID feature: flow to journal/user_event and search filtering",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

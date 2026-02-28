@@ -1,0 +1,6 @@
+{
+  "name": "Provider CRUD",
+  "description": "Provider management functions: create, update, delete, enable, disable, ensure, capability flags, group mapping validation",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

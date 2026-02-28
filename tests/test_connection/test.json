@@ -1,0 +1,6 @@
+{
+  "name": "Database Connection",
+  "description": "Verify basic database connectivity",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

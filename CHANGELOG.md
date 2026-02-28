@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-02-28
+
+### Changed
+
+#### Debee Integration — execSql and runTests
+
+Replaced standalone `exec-sql.sh` and `tests/run-tests.sh` with debee's built-in `execSql` and `runTests` operations. All three debee implementations (PowerShell, Bash, Python) now handle SQL execution and test running natively.
+
+- **`execSql`** — Execute SQL files, inline commands, or open interactive psql sessions directly through debee
+- **`runTests`** — Full test framework with suite directories, `test.json` manifests, isolation modes, shared setup scripts, and `--test-filter` filtering
+
+#### Test Suite Restructure
+
+Converted all 11 flat test files (`test_*.sql`) into suite directories following the debee test framework conventions:
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| `test_connection/` | 1 | Basic database connectivity |
+| `test_connectivity/` | 3 | Connectivity with temp table operations |
+| `test_provider_crud/` | 19 | Provider CRUD, journaling, capability flags |
+| `test_registration_login_events/` | 21 | Registration, login events, request_context |
+| `test_disabled_locked_users/` | 9 | Disabled/locked user blocking, cache clearing |
+| `test_permission_cache_invalidation/` | 12 | Cache invalidation (soft/hard), owner functions |
+| `test_short_code/` | 16 | Hierarchical permission short codes |
+| `test_correlation_id/` | 5 | Correlation ID flow and search filtering |
+| `test_event_code_management/` | 20 | Event category/code/message CRUD, system protection |
+| `test_language_translation/` | 25 | Language CRUD, translations, copy/overwrite |
+| `test_group_members_and_delete_tenant/` | 5 | Group member queries, tenant deletion |
+| `test_auth_group_member_tenant/` | 11 | Auth-layer group/tenant with permission checks |
+| `test_search_functions/` | 14 | All search functions: pagination, filtering |
+
+Each suite directory contains:
+- `test.json` — Manifest with name, description, `isolation: "transaction"`
+- `000_setup.sql` — Search path and test data setup
+- `001_*.sql` – `008_*.sql` — Grouped test files
+- `900_cleanup.sql` — Cleanup (transaction rollback handles data automatically)
+
+Global test ordering controlled by `tests/tests.json`.
+
+### Removed
+
+- `exec-sql.sh` — Replaced by `debee execSql`
+- `tests/run-tests.sh` — Replaced by `debee runTests`
+- All flat `tests/test_*.sql` files — Replaced by suite directories
+
 ## [2.12.0] - 2026-02-26
 
 ### Added

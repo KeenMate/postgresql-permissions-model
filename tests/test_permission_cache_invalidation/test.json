@@ -1,0 +1,6 @@
+{
+  "name": "Permission Cache Invalidation",
+  "description": "Cache invalidation on permission changes, soft/hard invalidation, parameter validation, provider validation, owner functions",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

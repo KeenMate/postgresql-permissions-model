@@ -1,0 +1,6 @@
+{
+  "name": "Permission Short Codes",
+  "description": "Auto-computed hierarchical short codes, custom short codes, views, cache, permissions map, unique constraint",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

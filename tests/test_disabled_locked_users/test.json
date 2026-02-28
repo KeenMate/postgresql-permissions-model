@@ -1,0 +1,6 @@
+{
+  "name": "Disabled and Locked Users",
+  "description": "Verifies that disabled/locked users have cache cleared and are blocked from permission recalculation",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

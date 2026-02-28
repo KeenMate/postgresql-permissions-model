@@ -1,0 +1,6 @@
+{
+  "name": "Connection Test Suite",
+  "description": "Verify database connectivity and basic operations",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

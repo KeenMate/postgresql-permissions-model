@@ -1,0 +1,6 @@
+{
+  "name": "Auth Group Member & Tenant",
+  "description": "Auth-layer group member and tenant functions with permission checks: create/delete member, get members, available tenants, assigned groups",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

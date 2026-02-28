@@ -1,0 +1,17 @@
+{
+  "order": [
+    "test_connection",
+    "test_connectivity",
+    "test_provider_crud",
+    "test_registration_login_events",
+    "test_disabled_locked_users",
+    "test_permission_cache_invalidation",
+    "test_short_code",
+    "test_correlation_id",
+    "test_event_code_management",
+    "test_language_translation",
+    "test_group_members_and_delete_tenant",
+    "test_auth_group_member_tenant",
+    "test_search_functions"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Event Code Management",
+  "description": "Event category/code/message CRUD, range validation, system protection, cascading deletes",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

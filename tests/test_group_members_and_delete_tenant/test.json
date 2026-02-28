@@ -1,0 +1,6 @@
+{
+  "name": "Group Members & Delete Tenant",
+  "description": "Regression tests for get_user_group_members column error and delete_tenant return type mismatch",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}
