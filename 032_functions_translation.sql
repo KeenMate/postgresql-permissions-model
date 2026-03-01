@@ -5,10 +5,10 @@
  * CRUD, copy, and search functions for public.translation
  *
  * Functions:
- * - public.create_translation     - Create a new translation (18001)
- * - public.update_translation     - Update an existing translation (18002)
- * - public.delete_translation     - Delete a translation (18003)
- * - public.copy_translations      - Copy translations between languages (18004)
+ * - public.create_translation     - Create a new translation (21001)
+ * - public.update_translation     - Update an existing translation (21002)
+ * - public.delete_translation     - Delete a translation (21003)
+ * - public.copy_translations      - Copy translations between languages (21004)
  * - public.get_group_translations - Get all translations for a group as jsonb
  * - public.search_translations    - Paginated search with accent-insensitive matching
  *
@@ -40,7 +40,7 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'translations.create_translation', _tenant_id);
 
     if not exists (select 1 from const.language where code = _language_code) then
-        perform error.raise_35001(_language_code);
+        perform error.raise_37001(_language_code);
     end if;
 
     return query
@@ -51,7 +51,7 @@ begin
         returning *;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
-        , 18001  -- translation_created
+        , 21001  -- translation_created
         , null::jsonb  -- keys
         , jsonb_strip_nulls(jsonb_build_object(
             'language_code', _language_code, 'data_group', _data_group,
@@ -80,7 +80,7 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'translations.update_translation', _tenant_id);
 
     if not exists (select 1 from public.translation where translation_id = _translation_id) then
-        perform error.raise_35002(_translation_id);
+        perform error.raise_37002(_translation_id);
     end if;
 
     return query
@@ -92,7 +92,7 @@ begin
         returning *;
 
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
-        , 18002  -- translation_updated
+        , 21002  -- translation_updated
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id, 'value', _value)
         , _tenant_id);
@@ -117,13 +117,13 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'translations.delete_translation', _tenant_id);
 
     if not exists (select 1 from public.translation where translation_id = _translation_id) then
-        perform error.raise_35002(_translation_id);
+        perform error.raise_37002(_translation_id);
     end if;
 
     delete from public.translation where translation_id = _translation_id;
 
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
-        , 18003  -- translation_deleted
+        , 21003  -- translation_deleted
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id)
         , _tenant_id);
@@ -156,10 +156,10 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'translations.copy_translations', _tenant_id);
 
     if not exists (select 1 from const.language where code = _from_language_code) then
-        perform error.raise_35001(_from_language_code);
+        perform error.raise_37001(_from_language_code);
     end if;
     if not exists (select 1 from const.language where code = _to_language_code) then
-        perform error.raise_35001(_to_language_code);
+        perform error.raise_37001(_to_language_code);
     end if;
 
     -- Phase 1: Update existing translations if overwrite is enabled
@@ -210,7 +210,7 @@ begin
     get diagnostics __inserted_count = row_count;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
-        , 18004  -- translations_copied
+        , 21004  -- translations_copied
         , null::jsonb  -- keys
         , jsonb_build_object(
             'from_language', _from_language_code, 'to_language', _to_language_code,
@@ -305,7 +305,7 @@ begin
                 and (_data_object_code is null or t.data_object_code = _data_object_code)
                 and (_data_object_id is null or t.data_object_id = _data_object_id)
                 and (helpers.is_empty_string(__search_text)
-                    or t.ua_search_data like '%' || __search_text || '%')
+                    or t.nrm_search_data like '%' || __search_text || '%')
             order by t.data_group, t.data_object_code, t.language_code
             offset ((_page - 1) * _page_size) limit _page_size
         )

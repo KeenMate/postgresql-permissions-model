@@ -60,8 +60,8 @@ BEGIN
 
     SELECT count(*) INTO __event_count
     FROM const.event_code
-    WHERE event_id BETWEEN 17001 AND 18999
-       OR event_id BETWEEN 35001 AND 35999;
+    WHERE event_id BETWEEN 20001 AND 21999
+       OR event_id BETWEEN 37001 AND 37999;
 
     IF __category_count = 3 AND __event_count = 9 THEN
         RAISE NOTICE '  PASS: 3 categories and 9 event codes exist';
@@ -83,7 +83,7 @@ BEGIN
     FROM pg_proc p
     JOIN pg_namespace n ON p.pronamespace = n.oid
     WHERE n.nspname = 'error'
-      AND p.proname IN ('raise_35001', 'raise_35002');
+      AND p.proname IN ('raise_37001', 'raise_37002');
 
     IF __func_count = 2 THEN
         RAISE NOTICE '  PASS: Both error functions exist';

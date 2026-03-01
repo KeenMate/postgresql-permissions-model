@@ -39,6 +39,7 @@ as
 $$
 begin
     perform unsecure.clear_permission_cache('trigger', OLD.user_id, null);
+    perform unsecure.invalidate_user_group_id_cache(OLD.user_id, null);
     return OLD;
 end;
 $$;
@@ -53,6 +54,8 @@ begin
     if OLD.is_active is distinct from NEW.is_active then
         perform unsecure.invalidate_group_members_permission_cache(
             'trigger', NEW.user_group_id, NEW.tenant_id);
+        perform unsecure.invalidate_group_members_group_id_cache(
+            NEW.user_group_id, NEW.tenant_id);
     end if;
     return NEW;
 end;
@@ -74,6 +77,9 @@ begin
 
     if _affected_user_ids is not null then
         perform unsecure.invalidate_users_permission_cache('trigger', _affected_user_ids, OLD.tenant_id);
+        -- Hard-clear group ID cache for all affected members
+        perform unsecure.invalidate_user_group_id_cache(uid, OLD.tenant_id)
+        from unnest(_affected_user_ids) as uid;
     end if;
 
     return OLD;
@@ -126,6 +132,41 @@ begin
 end;
 $$;
 
+
+-- Cache invalidation on user_group_member INSERT
+-- Covers: unsecure.create_user_group_member(), auth.create_user_group_member()
+create or replace function triggers.cache_user_group_member_insert() returns trigger
+    language plpgsql
+as
+$$
+begin
+    perform unsecure.invalidate_user_group_id_cache(NEW.user_id, null);
+    return NEW;
+end;
+$$;
+
+-- Cache invalidation on user_info status changes (disable/lock) and delete
+-- Hard-clears group ID cache so stale group memberships don't persist
+create or replace function triggers.cache_user_group_id_on_user_change() returns trigger
+    language plpgsql
+as
+$$
+begin
+    if TG_OP = 'DELETE' then
+        -- CASCADE on user_group_id_cache handles this, but be explicit
+        perform unsecure.clear_user_group_id_cache(OLD.user_id, null);
+        return OLD;
+    end if;
+
+    -- UPDATE: hard-clear on disable or lock
+    if (OLD.is_active is distinct from NEW.is_active and NEW.is_active = false)
+       or (OLD.is_locked is distinct from NEW.is_locked and NEW.is_locked = true) then
+        perform unsecure.clear_user_group_id_cache(NEW.user_id, null);
+    end if;
+
+    return NEW;
+end;
+$$;
 
 -- =============================================================================
 -- PART 2: NOTIFICATION TRIGGER FUNCTIONS
@@ -528,3 +569,19 @@ create trigger trg_notify_api_key
     on auth.api_key
     for each row
 execute function triggers.notify_api_key();
+
+-- ---- user_group_member (group ID cache) ----
+-- Invalidate group ID cache when a member is added
+create trigger trg_cache_user_group_member_insert
+    after insert
+    on auth.user_group_member
+    for each row
+execute function triggers.cache_user_group_member_insert();
+
+-- ---- user_info (group ID cache) ----
+-- Hard-clear group ID cache on user disable/lock/delete
+create trigger trg_cache_user_group_id_on_user_change
+    after update or delete
+    on auth.user_info
+    for each row
+execute function triggers.cache_user_group_id_on_user_change();

@@ -139,8 +139,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
 
     -- Make user_1 a tenant owner
-    INSERT INTO auth.owner (created_by, updated_by, tenant_id, user_id)
-    VALUES ('test', 'test', 1, __user_id_1);
+    INSERT INTO auth.owner (created_by, tenant_id, user_id)
+    VALUES ('test', 1, __user_id_1);
 
     -- No direct grants exist for this resource, but owner should pass
     SELECT auth.has_resource_access(__user_id_1, 'test-corr-hra-6', 'document', 888, 'delete', 1, false)

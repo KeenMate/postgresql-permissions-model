@@ -24,16 +24,16 @@ BEGIN
     RAISE NOTICE 'SETUP: Creating test users, groups, tenants, and resource types...';
 
     -- Create test users (system user_id=1 already exists)
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Test User 1', 'ra_test_user_1', 'ra_test_user_1@test.com', 'ra_test_user_1@test.com', true, 1)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Test User 1', 'ra_test_user_1', 'ra_test_user_1@test.com', 'ra_test_user_1@test.com', 'ra_test_user_1@test.com', true)
     RETURNING user_id INTO __user_id_1;
 
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Test User 2', 'ra_test_user_2', 'ra_test_user_2@test.com', 'ra_test_user_2@test.com', true, 1)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Test User 2', 'ra_test_user_2', 'ra_test_user_2@test.com', 'ra_test_user_2@test.com', 'ra_test_user_2@test.com', true)
     RETURNING user_id INTO __user_id_2;
 
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Test User 3', 'ra_test_user_3', 'ra_test_user_3@test.com', 'ra_test_user_3@test.com', true, 1)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Test User 3', 'ra_test_user_3', 'ra_test_user_3@test.com', 'ra_test_user_3@test.com', 'ra_test_user_3@test.com', true)
     RETURNING user_id INTO __user_id_3;
 
     -- Create test groups
@@ -58,16 +58,16 @@ BEGIN
     RETURNING tenant_id INTO __tenant_id_2;
 
     -- Add user 1 to tenant 2
-    INSERT INTO auth.tenant_user (created_by, updated_by, tenant_id, user_id)
-    VALUES ('test', 'test', __tenant_id_2, __user_id_1);
+    INSERT INTO auth.tenant_user (created_by, tenant_id, user_id)
+    VALUES ('test', __tenant_id_2, __user_id_1);
 
-    -- Create resource types
-    INSERT INTO const.resource_type (code, title, description, source)
-    VALUES ('document', 'Document', 'Test document resource type', 'test')
+    -- Create resource types (with ltree path for hierarchy support)
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
+    VALUES ('document', 'Document', 'Test document resource type', 'test', null, 'document'::ext.ltree)
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, title, description, source)
-    VALUES ('folder', 'Folder', 'Test folder resource type', 'test')
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
+    VALUES ('folder', 'Folder', 'Test folder resource type', 'test', null, 'folder'::ext.ltree)
     ON CONFLICT DO NOTHING;
 
     -- Create partitions for test resource types

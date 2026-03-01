@@ -36,7 +36,7 @@ BEGIN
     SELECT count(*) INTO __journal_count
     FROM journal
     WHERE correlation_id LIKE 'test-corr-%'
-      AND event_id BETWEEN 17001 AND 18999;
+      AND event_id BETWEEN 20001 AND 21999;
 
     IF __journal_count >= 5 THEN
         RAISE NOTICE '  PASS: % journal entries found', __journal_count;
@@ -50,14 +50,14 @@ END $$;
 -- ============================================================================
 DO $$
 BEGIN
-    RAISE NOTICE 'TEST 22: Error 35001 - language not found on update';
+    RAISE NOTICE 'TEST 22: Error 37001 - language not found on update';
 
     BEGIN
         PERFORM public.update_language('test', 1, 'test-corr-err1', 'xx_nonexistent');
         RAISE EXCEPTION '  FAIL: Should have raised exception for nonexistent language';
     EXCEPTION
-        WHEN SQLSTATE '35001' THEN
-            RAISE NOTICE '  PASS: Correctly raised error 35001';
+        WHEN SQLSTATE '37001' THEN
+            RAISE NOTICE '  PASS: Correctly raised error 37001';
     END;
 END $$;
 
@@ -66,13 +66,13 @@ END $$;
 -- ============================================================================
 DO $$
 BEGIN
-    RAISE NOTICE 'TEST 23: Error 35002 - translation not found on update';
+    RAISE NOTICE 'TEST 23: Error 37002 - translation not found on update';
 
     BEGIN
         PERFORM public.update_translation('test', 1, 'test-corr-err2', 999999, 'nonexistent');
         RAISE EXCEPTION '  FAIL: Should have raised exception for nonexistent translation';
     EXCEPTION
-        WHEN SQLSTATE '35002' THEN
-            RAISE NOTICE '  PASS: Correctly raised error 35002';
+        WHEN SQLSTATE '37002' THEN
+            RAISE NOTICE '  PASS: Correctly raised error 37002';
     END;
 END $$;

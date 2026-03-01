@@ -13,6 +13,8 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **Flexible group types**: Internal, External (mapped to identity providers), and Hybrid
 - **Identity provider integration**: Works with any provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
 - **Permission sets** for role-based access control
+- **Resource-level ACL** for per-resource access control (grants, denies, group inheritance)
+- **Language & translation** with full-text and accent-insensitive search
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
 - **Permission caching** for performance with automatic invalidation
@@ -42,11 +44,19 @@ DBDESTDB=your_database_name
 ```
 
 ### Running SQL
-Use `exec-sql.sh` for quick SQL execution:
-```bash
-./exec-sql.sh "SELECT * FROM auth.user_info;"   # Inline SQL
-./exec-sql.sh -f script.sql                      # Run file
-./exec-sql.sh                                    # Interactive psql
+Use debee's `execSql` operation:
+```powershell
+./debee.ps1 -Operations execSql -Sql "SELECT * FROM auth.user_info;"   # Inline SQL
+./debee.ps1 -Operations execSql -SqlFile script.sql                    # Run file
+./debee.ps1 -Operations execSql                                        # Interactive psql
+```
+
+### Running Tests
+```powershell
+make test                      # Run all tests
+make test FILTER=resource      # Run filtered subset
+./debee.ps1 -Operations runTests                          # Direct debee call
+./debee.ps1 -Operations runTests -TestFilter provider     # Filtered
 ```
 
 ### Basic Usage
@@ -92,7 +102,9 @@ select * from auth.search_permissions(1, null, _parent_code := 'users');
 - **`auth.user_group`** - Three group types (internal/external/hybrid)
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
+- **`auth.resource_access`** - Resource-level ACL (list-partitioned by resource_type)
 - **`auth.api_key`** - Service authentication with technical users
+- **`const.language`** / **`public.translation`** - Language registry and translation storage with full-text search
 - **`public.journal`** - Audit logging with multi-key support, request context tracking (range-partitioned by month)
 - **`auth.user_event`** - Security event audit trail with request context tracking (range-partitioned by month)
 
@@ -224,6 +236,9 @@ SELECT * FROM search_journal(
 | `token_event` | Token lifecycle |
 | `provider_event` | Provider lifecycle |
 | `maintenance_event` | System maintenance operations |
+| `resource_event` | Resource access (ACL) operations |
+| `language_event` | Language CRUD |
+| `translation_event` | Translation CRUD and copy operations |
 
 ### Audit Summary Queries
 
@@ -442,6 +457,8 @@ select * from auth.disable_provider('admin', 1, null, 'google');
 ## Documentation
 
 - **[CLAUDE.md](./CLAUDE.md)** - Developer guide for Claude Code
+- **[resource-access.md](./resource-access.md)** - Resource-level ACL system documentation
+- **[CHANGELOG.md](./CHANGELOG.md)** - Version history
 - **Complete Documentation** - [postgresql-permissions-model-docs](../postgresql-permissions-model-docs) (comprehensive documentation project)
 - **[functions.md](./functions.md)** - Function reference
 - **[features.md](./features.md)** - Feature list
@@ -494,15 +511,23 @@ The system uses structured event/error codes organized by category. Codes are st
 | 13001-13999 | Group Events | Group membership and mappings |
 | 14001-14999 | API Key Events | API key lifecycle and validation |
 | 15001-15999 | Token Events | Token lifecycle |
+| 16001-16999 | Provider Events | Provider lifecycle |
 | 17001-17999 | Maintenance Events | System maintenance operations |
+| 18001-18999 | Resource Access Events | Resource type and ACL operations |
+| 19001-19999 | Token Config Events | Token configuration changes |
+| 20001-20999 | Language Events | Language CRUD |
+| 21001-21999 | Translation Events | Translation CRUD and copy operations |
 | 30001-30999 | Security Errors | Authentication and token errors |
 | 31001-31999 | Validation Errors | Missing required parameters |
 | 32001-32999 | Permission Errors | Permission not found, not assignable |
 | 33001-33999 | User/Group Errors | Entity not found, not active, system entity |
 | 34001-34999 | Tenant Errors | Tenant access errors |
+| 35001-35999 | Resource Access Errors | Resource ACL errors |
+| 36001-36999 | Token Config Errors | Token configuration errors |
+| 37001-37999 | Language/Translation Errors | Language and translation errors |
 | 50000+ | Reserved | Application-specific events and errors |
 
-### Informational Events (10xxx-15xxx)
+### Informational Events (10xxx-21xxx)
 
 #### User Events (10001-10999)
 
@@ -608,7 +633,34 @@ The system uses structured event/error codes organized by category. Codes are st
 |------|-------|-------------|
 | 17001 | audit_data_purged | Old audit data was purged |
 
-### Error Codes (30xxx-34xxx)
+#### Resource Access Events (18001-18999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 18001 | resource_type_created | New resource type was registered |
+| 18010 | resource_access_granted | Resource access was granted |
+| 18011 | resource_access_revoked | Resource access was revoked |
+| 18012 | resource_access_denied | Resource access was denied |
+| 18013 | resource_access_bulk_revoked | All resource access was revoked for a resource |
+
+#### Language Events (20001-20999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 20001 | language_created | New language was created |
+| 20002 | language_updated | Language was updated |
+| 20003 | language_deleted | Language was deleted |
+
+#### Translation Events (21001-21999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 21001 | translation_created | New translation was created |
+| 21002 | translation_updated | Translation was updated |
+| 21003 | translation_deleted | Translation was deleted |
+| 21004 | translations_copied | Translations were copied between languages |
+
+### Error Codes (30xxx-37xxx)
 
 #### Security Errors (30001-30999)
 
@@ -667,6 +719,22 @@ The system uses structured event/error codes organized by category. Codes are st
 | Code | Function | Description |
 |------|----------|-------------|
 | 34001 | error.raise_34001 | User has no access to this tenant |
+
+#### Resource Access Errors (35001-35999)
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 35001 | error.raise_35001 | User has no access to resource |
+| 35002 | error.raise_35002 | Neither user_id nor user_group_id provided |
+| 35003 | error.raise_35003 | Resource type not found or inactive |
+| 35004 | error.raise_35004 | Access flag not found |
+
+#### Language/Translation Errors (37001-37999)
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 37001 | error.raise_37001 | Language does not exist |
+| 37002 | error.raise_37002 | Translation does not exist |
 
 ### Legacy Code Mapping (v1 Compatibility)
 

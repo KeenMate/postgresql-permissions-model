@@ -2,10 +2,10 @@
 
 # Show available targets
 help:
-	@echo "Usage: make [target]"
+	@echo "Usage: make [target] [FILTER=name]"
 	@echo ""
 	@echo "Tests:"
-	@echo "  test              Run all tests"
+	@echo "  test              Run all tests (or FILTER=name for subset)"
 	@echo "  test-cache        Run cache invalidation tests"
 	@echo "  test-disabled     Run disabled user tests"
 	@echo "  test-correlation  Run correlation tests"
@@ -16,30 +16,34 @@ help:
 	@echo "  update            Run database migrations"
 	@echo "  sql               Open interactive psql session"
 
-# Run all tests
+# Run all tests (use FILTER= for subset, e.g. make test FILTER=resource)
 test:
-	./tests/run-tests.sh
+ifdef FILTER
+	powershell.exe -File ./debee.ps1 -Operations runTests -TestFilter $(FILTER)
+else
+	powershell.exe -File ./debee.ps1 -Operations runTests
+endif
 
 # Run specific test suites
 test-cache:
-	./tests/run-tests.sh cache
+	powershell.exe -File ./debee.ps1 -Operations runTests -TestFilter cache
 
 test-disabled:
-	./tests/run-tests.sh disabled
+	powershell.exe -File ./debee.ps1 -Operations runTests -TestFilter disabled
 
 test-correlation:
-	./tests/run-tests.sh correlation
+	powershell.exe -File ./debee.ps1 -Operations runTests -TestFilter correlation
 
 test-search:
-	./tests/run-tests.sh search_functions
+	powershell.exe -File ./debee.ps1 -Operations runTests -TestFilter search_functions
 
-# Database operations (via debee.ps1)
+# Database operations
 setup:
 	powershell.exe -File ./debee.ps1 -Operations fullService
 
 update:
 	powershell.exe -File ./debee.ps1 -Operations updateDatabase
 
-# Run arbitrary SQL
+# Interactive psql session
 sql:
-	./exec-sql.sh
+	powershell.exe -File ./debee.ps1 -Operations execSql

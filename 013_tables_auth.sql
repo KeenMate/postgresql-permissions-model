@@ -95,7 +95,7 @@ create table auth.user_info
     is_locked               boolean default false                             not null,
     original_username       text                                              not null,
     user_preferences        jsonb   default '{}'::jsonb                       not null,
-    ua_username             text generated always as (lower(username)) stored not null,
+    nrm_username            text generated always as (lower(username)) stored not null,
     nrm_search_data         text,
     constraint user_info_created_by_check
         check (length(created_by) <= 250),

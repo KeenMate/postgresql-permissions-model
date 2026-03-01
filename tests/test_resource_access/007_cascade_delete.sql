@@ -15,8 +15,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
 
     -- Create a temporary user
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Temp Delete User', 'ra_temp_delete', 'ra_temp_delete@test.com', 'ra_temp_delete@test.com', true, 1)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Temp Delete User', 'ra_temp_delete', 'ra_temp_delete@test.com', 'ra_temp_delete@test.com', 'ra_temp_delete@test.com', true)
     RETURNING user_id INTO __temp_user_id;
 
     -- Grant access
@@ -95,12 +95,14 @@ BEGIN
     RETURNING tenant_id INTO __temp_tenant_id;
 
     -- Create a user in that tenant
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Temp Tenant User', 'ra_temp_tenant_user', 'ra_temp_tenant_user@test.com', 'ra_temp_tenant_user@test.com', true, __temp_tenant_id)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Temp Tenant User', 'ra_temp_tenant_user', 'ra_temp_tenant_user@test.com', 'ra_temp_tenant_user@test.com', 'ra_temp_tenant_user@test.com', true)
     RETURNING user_id INTO __temp_user_id;
 
-    -- Need permissions in the temp tenant
-    PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', __temp_tenant_id);
+    -- Create system_admin perm set in temp tenant (only exists in tenant 1 by default)
+    PERFORM unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
+        _permissions := array['resources'], _tenant_id := __temp_tenant_id);
+    PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', _tenant_id := __temp_tenant_id);
 
     -- Grant access in temp tenant
     PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-cascade-3a', 'document', 4003,
@@ -108,6 +110,16 @@ BEGIN
 
     SELECT count(*) FROM auth.resource_access WHERE tenant_id = __temp_tenant_id INTO __count_before;
 
+    -- Clear dependent tables before deleting tenant (not all FKs cascade)
+    DELETE FROM auth.user_permission_cache WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM auth.user_group_id_cache WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM auth.permission_assignment WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM auth.perm_set_perm WHERE perm_set_id IN (SELECT perm_set_id FROM auth.perm_set WHERE tenant_id = __temp_tenant_id);
+    DELETE FROM auth.perm_set WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM auth.user_group_member WHERE user_group_id IN (SELECT user_group_id FROM auth.user_group WHERE tenant_id = __temp_tenant_id);
+    DELETE FROM auth.user_group WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM auth.tenant_user WHERE tenant_id = __temp_tenant_id;
+    DELETE FROM public.journal WHERE tenant_id = __temp_tenant_id;
     -- Delete the tenant (should cascade to resource_access)
     DELETE FROM auth.tenant WHERE tenant_id = __temp_tenant_id;
 
@@ -137,8 +149,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Create a temporary granter
-    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, normalized_email, can_login, tenant_id)
-    VALUES ('test', 'test', 'RA Temp Granter', 'ra_temp_granter', 'ra_temp_granter@test.com', 'ra_temp_granter@test.com', true, 1)
+    INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
+    VALUES ('test', 'test', 'RA Temp Granter', 'ra_temp_granter', 'ra_temp_granter@test.com', 'ra_temp_granter@test.com', 'ra_temp_granter@test.com', true)
     RETURNING user_id INTO __temp_granter_id;
 
     -- Give granter permissions
@@ -151,6 +163,11 @@ BEGIN
     SELECT granted_by FROM auth.resource_access
     WHERE resource_type = 'document' AND resource_id = 4004 AND user_id = __user_id_2
     INTO __granted_by_before;
+
+    -- Clear dependent data before deleting the granter
+    DELETE FROM auth.permission_assignment WHERE user_id = __temp_granter_id;
+    DELETE FROM auth.user_permission_cache WHERE user_id = __temp_granter_id;
+    DELETE FROM auth.user_group_id_cache WHERE user_id = __temp_granter_id;
 
     -- Delete the granter
     DELETE FROM auth.user_info WHERE user_id = __temp_granter_id;

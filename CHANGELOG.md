@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.0] - 2026-03-01
+
+### Changed
+
+#### Event ID reassignment — resolve collisions between modules
+
+Language/translation events collided with maintenance and resource access events (both used ranges 17001-17999, 18001-18999, 35001-35999). Since `029_seed_data.sql` runs before `030_tables_language.sql`, the `ON CONFLICT DO NOTHING` silently skipped language/translation event inserts.
+
+Reassigned to free ranges:
+
+| Module | Old Range | New Range |
+|--------|-----------|-----------|
+| Language Events | 17001-17999 | 20001-20999 |
+| Translation Events | 18001-18999 | 21001-21999 |
+| Language/Translation Errors | 35001-35999 | 37001-37999 |
+
+Error functions renamed: `error.raise_35001` → `error.raise_37001`, `error.raise_35002` → `error.raise_37002`.
+
+Files updated: `030_tables_language.sql`, `031_functions_language.sql`, `032_functions_translation.sql`, `tests/test_language_translation/001_tables_and_seed_data.sql`, `tests/test_language_translation/006_constraints_journal_errors.sql`.
+
+#### Column rename — `ua_*` → `nrm_*`
+
+Renamed all `ua_` prefixed columns to `nrm_` (normalized) for consistency:
+- `auth.user_info.ua_username` → `nrm_username`
+- `public.translation.ua_search_data` → `nrm_search_data`
+- Index `ix_translation_ua_search` → `ix_translation_nrm_search`
+
+#### `unsecure.create_perm_set_as_system` — bypass `is_assignable` check
+
+Converted from a thin SQL wrapper (that delegated to `unsecure.create_perm_set`) to a standalone plpgsql function that inserts directly, bypassing the `is_assignable` check on permissions. This allows system perm sets like `system_admin` to include non-assignable permissions (e.g., `resources`) without making them permanently assignable.
+
+#### Makefile — all targets now use debee
+
+Replaced `./tests/run-tests.sh` and `./exec-sql.sh` references with `debee.ps1` calls. Added `FILTER=` support to `make test`.
+
+### Fixed
+
+- `unsecure.recalculate_user_permissions` — added `drop table if exists` before creating temp table `__temp_users_groups_permissions` to prevent failure when called twice in the same transaction
+- Resource access test suite — fixed column names, type mismatches, missing FK cleanup, and missing perm set creation for non-default tenants
+
 ## [2.14.0] - 2026-02-28
 
 ### Added

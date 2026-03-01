@@ -13,9 +13,9 @@ BEGIN
     FROM public.create_translation('test', 1, 'test-corr-4', 'en', 'ui_labels', 'Hello World',
         _data_object_code := 'greeting');
 
-    IF __trans.ua_search_data IS NOT NULL AND __trans.ts_search_data IS NOT NULL THEN
-        RAISE NOTICE '  PASS: Translation created, ua_search_data="%", ts_search_data set',
-            __trans.ua_search_data;
+    IF __trans.nrm_search_data IS NOT NULL AND __trans.ts_search_data IS NOT NULL THEN
+        RAISE NOTICE '  PASS: Translation created, nrm_search_data="%", ts_search_data set',
+            __trans.nrm_search_data;
     ELSE
         RAISE EXCEPTION '  FAIL: Trigger did not populate search fields';
     END IF;
@@ -34,10 +34,10 @@ BEGIN
     FROM public.create_translation('test', 1, 'test-corr-5', 'fr', 'ui_labels', 'Héllo Wörld',
         _data_object_code := 'greeting');
 
-    IF __trans.ua_search_data = 'hello world' THEN
-        RAISE NOTICE '  PASS: Accents removed in ua_search_data="%"', __trans.ua_search_data;
+    IF __trans.nrm_search_data = 'hello world' THEN
+        RAISE NOTICE '  PASS: Accents removed in nrm_search_data="%"', __trans.nrm_search_data;
     ELSE
-        RAISE EXCEPTION '  FAIL: Expected "hello world", got "%"', __trans.ua_search_data;
+        RAISE EXCEPTION '  FAIL: Expected "hello world", got "%"', __trans.nrm_search_data;
     END IF;
 END $$;
 

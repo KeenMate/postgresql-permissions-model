@@ -7,7 +7,7 @@ DO $$
 DECLARE
     __user_id_1 bigint;
     __user_id_2 bigint;
-    __tenant_id_2 bigint;
+    __tenant_id_2 integer;
     __result boolean;
 BEGIN
     RAISE NOTICE 'TEST 1: Cross-tenant access is prevented';
@@ -46,7 +46,7 @@ DO $$
 DECLARE
     __user_id_1 bigint;
     __user_id_2 bigint;
-    __tenant_id_2 bigint;
+    __tenant_id_2 integer;
     __result_t1 bigint[];
     __result_t2 bigint[];
 BEGIN
@@ -60,8 +60,12 @@ BEGIN
     PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2a', 'document', 3010,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := 1);
 
+    -- Create system_admin perm set in tenant 2 (only exists in tenant 1 by default)
+    PERFORM unsecure.create_perm_set_as_system('System admin', true, _is_assignable := true,
+        _permissions := array['resources'], _tenant_id := __tenant_id_2);
+
     -- Give user_id_1 the system admin perms in tenant 2
-    PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', __tenant_id_2::integer);
+    PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', _tenant_id := __tenant_id_2);
 
     PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2b', 'document', 3011,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := __tenant_id_2::integer);
@@ -92,7 +96,7 @@ DO $$
 DECLARE
     __user_id_1 bigint;
     __user_id_2 bigint;
-    __tenant_id_2 bigint;
+    __tenant_id_2 integer;
     __count_t1 integer;
     __count_t2 integer;
 BEGIN

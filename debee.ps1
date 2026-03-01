@@ -526,7 +526,7 @@ function Invoke-TestSqlFile {
 	param (
 		[Parameter(Mandatory)]
 		[string]$FilePath,
-		[switch]$Verbose
+		[switch]$ShowDetail
 	)
 
 	$result = @{
@@ -556,7 +556,7 @@ function Invoke-TestSqlFile {
 
 	# Colorize and print output
 	$lines = $output -split "`n"
-	if ($Verbose) {
+	if ($ShowDetail) {
 		foreach ($line in $lines) {
 			if ($line -match "PASS") {
 				Write-Host "  $line" -ForegroundColor Green
@@ -593,7 +593,7 @@ function Invoke-SuiteTransaction {
 		[Parameter(Mandatory)]
 		[array]$MainFiles,
 		[array]$CleanupFiles = @(),
-		[switch]$Verbose
+		[switch]$ShowDetail
 	)
 
 	$suiteResult = @{
@@ -675,7 +675,7 @@ function Invoke-SuiteTransaction {
 
 			$sectionHasFailures = $sectionFailCount -gt 0
 
-			if ($Verbose) {
+			if ($ShowDetail) {
 				if ($sectionName -ne "(preamble)") {
 					Write-Host "`n  -- $sectionName --"
 				}
@@ -715,11 +715,11 @@ function Invoke-SuiteTransaction {
 	# Run cleanup files individually after rollback
 	if ($CleanupFiles.Count -gt 0 -and ($Manifest.AlwaysCleanup -or -not $suiteResult.Error)) {
 		foreach ($f in $CleanupFiles) {
-			if ($Verbose) {
+			if ($ShowDetail) {
 				Write-Host "`n  -- $($f.Name) (cleanup) --"
 			}
-			$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
-			if (-not $cleanupResult.Passed -and -not $Verbose) {
+			$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -ShowDetail:$ShowDetail
+			if (-not $cleanupResult.Passed -and -not $ShowDetail) {
 				Write-Host "`n  -- $($f.Name) (cleanup) --"
 			}
 			if (-not $cleanupResult.Passed) {
@@ -736,14 +736,14 @@ function Invoke-FlatTest {
 	param (
 		[Parameter(Mandatory)]
 		[System.IO.FileInfo]$TestFile,
-		[switch]$Verbose
+		[switch]$ShowDetail
 	)
 
-	if ($Verbose) {
+	if ($ShowDetail) {
 		Write-Host "`n--- $($TestFile.Name) ---"
 	}
-	$result = Invoke-TestSqlFile -FilePath $TestFile.FullName -Verbose:$Verbose
-	if (-not $Verbose -and -not $result.Passed) {
+	$result = Invoke-TestSqlFile -FilePath $TestFile.FullName -ShowDetail:$ShowDetail
+	if (-not $ShowDetail -and -not $result.Passed) {
 		Write-Host "`n--- $($TestFile.Name) --- " -NoNewline
 		Write-Host "FAILED" -ForegroundColor Red
 	}
@@ -755,7 +755,7 @@ function Invoke-SuiteTest {
 	param (
 		[Parameter(Mandatory)]
 		[string]$SuiteDir,
-		[switch]$Verbose
+		[switch]$ShowDetail
 	)
 
 	$manifest = Read-TestManifest -SuiteDir $SuiteDir
@@ -770,7 +770,7 @@ function Invoke-SuiteTest {
 	}
 
 	$suiteHeaderPrinted = $false
-	if ($Verbose) {
+	if ($ShowDetail) {
 		Write-Host "`n=== Suite: $($manifest.Name) ==="
 		if ($manifest.Description) {
 			Write-Host $manifest.Description
@@ -800,7 +800,7 @@ function Invoke-SuiteTest {
 
 	# Branch on isolation mode
 	if ($manifest.Isolation -eq "transaction") {
-		$suiteResult = Invoke-SuiteTransaction -SuiteDir $SuiteDir -Manifest $manifest -MainFiles $mainFiles -CleanupFiles $cleanupFiles -Verbose:$Verbose
+		$suiteResult = Invoke-SuiteTransaction -SuiteDir $SuiteDir -Manifest $manifest -MainFiles $mainFiles -CleanupFiles $cleanupFiles -ShowDetail:$ShowDetail
 	}
 	elseif ($manifest.Isolation -eq "database") {
 		# Recreate + restore database before suite
@@ -817,8 +817,8 @@ function Invoke-SuiteTest {
 		foreach ($setupPath in $manifest.Setup) {
 			$resolved = Join-Path $testsDir $setupPath
 			if (Test-Path $resolved) {
-				if ($Verbose) { Write-Host "`n  -- $setupPath (shared setup) --" }
-				Invoke-TestSqlFile -FilePath $resolved -Verbose:$Verbose | Out-Null
+				if ($ShowDetail) { Write-Host "`n  -- $setupPath (shared setup) --" }
+				Invoke-TestSqlFile -FilePath $resolved -ShowDetail:$ShowDetail | Out-Null
 			}
 			else {
 				Write-Warning "Shared setup file not found: $setupPath"
@@ -828,8 +828,8 @@ function Invoke-SuiteTest {
 		# Run main files individually
 		$mainFailed = $false
 		foreach ($f in $mainFiles) {
-			if ($Verbose) { Write-Host "`n  -- $($f.Name) --" }
-			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+			if ($ShowDetail) { Write-Host "`n  -- $($f.Name) --" }
+			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -ShowDetail:$ShowDetail
 			$suiteResult.PassCount += $fileResult.PassCount
 			$suiteResult.FailCount += $fileResult.FailCount
 			if (-not $fileResult.Passed) {
@@ -837,7 +837,7 @@ function Invoke-SuiteTest {
 					Write-Host "`n=== Suite: $($manifest.Name) ==="
 					$suiteHeaderPrinted = $true
 				}
-				if (-not $Verbose) { Write-Host "`n  -- $($f.Name) --" }
+				if (-not $ShowDetail) { Write-Host "`n  -- $($f.Name) --" }
 				$mainFailed = $true
 				break
 			}
@@ -845,9 +845,9 @@ function Invoke-SuiteTest {
 
 		if ($cleanupFiles.Count -gt 0 -and ($manifest.AlwaysCleanup -or -not $mainFailed)) {
 			foreach ($f in $cleanupFiles) {
-				if ($Verbose) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
-				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
-				if (-not $cleanupResult.Passed -and -not $Verbose) {
+				if ($ShowDetail) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
+				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -ShowDetail:$ShowDetail
+				if (-not $cleanupResult.Passed -and -not $ShowDetail) {
 					Write-Host "`n  -- $($f.Name) (cleanup) --"
 				}
 				if (-not $cleanupResult.Passed) {
@@ -864,8 +864,8 @@ function Invoke-SuiteTest {
 		foreach ($setupPath in $manifest.Setup) {
 			$resolved = Join-Path $testsDir $setupPath
 			if (Test-Path $resolved) {
-				if ($Verbose) { Write-Host "`n  -- $setupPath (shared setup) --" }
-				Invoke-TestSqlFile -FilePath $resolved -Verbose:$Verbose | Out-Null
+				if ($ShowDetail) { Write-Host "`n  -- $setupPath (shared setup) --" }
+				Invoke-TestSqlFile -FilePath $resolved -ShowDetail:$ShowDetail | Out-Null
 			}
 			else {
 				Write-Warning "Shared setup file not found: $setupPath"
@@ -875,8 +875,8 @@ function Invoke-SuiteTest {
 		# Run main phase (stop on first failure)
 		$mainFailed = $false
 		foreach ($f in $mainFiles) {
-			if ($Verbose) { Write-Host "`n  -- $($f.Name) --" }
-			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
+			if ($ShowDetail) { Write-Host "`n  -- $($f.Name) --" }
+			$fileResult = Invoke-TestSqlFile -FilePath $f.FullName -ShowDetail:$ShowDetail
 			$suiteResult.PassCount += $fileResult.PassCount
 			$suiteResult.FailCount += $fileResult.FailCount
 
@@ -885,7 +885,7 @@ function Invoke-SuiteTest {
 					Write-Host "`n=== Suite: $($manifest.Name) ==="
 					$suiteHeaderPrinted = $true
 				}
-				if (-not $Verbose) { Write-Host "`n  -- $($f.Name) --" }
+				if (-not $ShowDetail) { Write-Host "`n  -- $($f.Name) --" }
 				$mainFailed = $true
 				break
 			}
@@ -894,9 +894,9 @@ function Invoke-SuiteTest {
 		# Run cleanup phase
 		if ($cleanupFiles.Count -gt 0 -and ($manifest.AlwaysCleanup -or -not $mainFailed)) {
 			foreach ($f in $cleanupFiles) {
-				if ($Verbose) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
-				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -Verbose:$Verbose
-				if (-not $cleanupResult.Passed -and -not $Verbose) {
+				if ($ShowDetail) { Write-Host "`n  -- $($f.Name) (cleanup) --" }
+				$cleanupResult = Invoke-TestSqlFile -FilePath $f.FullName -ShowDetail:$ShowDetail
+				if (-not $cleanupResult.Passed -and -not $ShowDetail) {
 					Write-Host "`n  -- $($f.Name) (cleanup) --"
 				}
 				if (-not $cleanupResult.Passed) {
@@ -910,7 +910,7 @@ function Invoke-SuiteTest {
 
 	$status = if ($suiteResult.Passed) { "PASSED" } else { "FAILED" }
 	if ($suiteResult.Passed) {
-		if ($Verbose) {
+		if ($ShowDetail) {
 			Write-Host "`nSuite $($manifest.Name): $status" -ForegroundColor Green
 		}
 	}
@@ -927,7 +927,7 @@ function Invoke-SuiteTest {
 function Run-Tests {
 	param (
 		[string]$Filter = "all",
-		[switch]$Verbose
+		[switch]$ShowDetail
 	)
 
 	$testsDir = "tests"
@@ -989,7 +989,7 @@ function Run-Tests {
 
 	$fileCount = ($testItems | Where-Object { $_.Type -eq "file" }).Count
 	$suiteCount = ($testItems | Where-Object { $_.Type -eq "suite" }).Count
-	if ($Verbose) {
+	if ($ShowDetail) {
 		Write-Host "Running $($testItems.Count) test item(s) ($fileCount file(s), $suiteCount suite(s))..."
 	}
 
@@ -997,10 +997,10 @@ function Run-Tests {
 
 	foreach ($item in $testItems) {
 		if ($item.Type -eq "file") {
-			$results += Invoke-FlatTest -TestFile $item.Path -Verbose:$Verbose
+			$results += Invoke-FlatTest -TestFile $item.Path -ShowDetail:$ShowDetail
 		}
 		else {
-			$results += Invoke-SuiteTest -SuiteDir $item.Path -Verbose:$Verbose
+			$results += Invoke-SuiteTest -SuiteDir $item.Path -ShowDetail:$ShowDetail
 		}
 	}
 
@@ -1091,7 +1091,7 @@ foreach ($o in $Operations) {
   }
   "runTests" {
 			Write-Host "Performing run tests operation..."
-			Run-Tests -Filter $TestFilter -Verbose:$TestVerbose
+			Run-Tests -Filter $TestFilter -ShowDetail:$TestVerbose
   }
   "fullService" {
 			Write-Host "Performing full service operation for us, lazy boys..."

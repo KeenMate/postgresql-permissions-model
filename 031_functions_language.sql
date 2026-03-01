@@ -5,9 +5,9 @@
  * CRUD and query functions for const.language
  *
  * Functions:
- * - public.create_language       - Create a new language (17001)
- * - public.update_language       - Update an existing language (17002)
- * - public.delete_language       - Delete a language (17003)
+ * - public.create_language       - Create a new language (20001)
+ * - public.update_language       - Update an existing language (20002)
+ * - public.delete_language       - Delete a language (20003)
  * - public.get_language          - Get single language by code
  * - public.get_languages         - Get all languages with optional filters
  * - public.get_frontend_languages       - Get frontend languages ordered
@@ -75,7 +75,7 @@ begin
         returning *;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
-        , 17001  -- language_created
+        , 20001  -- language_created
         , null::jsonb  -- keys
         , jsonb_strip_nulls(jsonb_build_object(
             'language_code', _code, 'language_value', _value,
@@ -116,7 +116,7 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'languages.update_language', _tenant_id);
 
     if not exists (select 1 from const.language where code = _code) then
-        perform error.raise_35001(_code);
+        perform error.raise_37001(_code);
     end if;
 
     -- Unset other defaults when setting this as default
@@ -152,7 +152,7 @@ begin
         returning *;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
-        , 17002  -- language_updated
+        , 20002  -- language_updated
         , null::jsonb  -- keys
         , jsonb_strip_nulls(jsonb_build_object('language_code', _code, 'language_value', _value))
         , _tenant_id);
@@ -177,14 +177,14 @@ begin
     perform auth.has_permission(_user_id, _correlation_id, 'languages.delete_language', _tenant_id);
 
     if not exists (select 1 from const.language where code = _code) then
-        perform error.raise_35001(_code);
+        perform error.raise_37001(_code);
     end if;
 
     -- CASCADE on translation FK handles cleanup
     delete from const.language where code = _code;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
-        , 17003  -- language_deleted
+        , 20003  -- language_deleted
         , null::jsonb  -- keys
         , jsonb_build_object('language_code', _code)
         , _tenant_id);

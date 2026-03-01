@@ -10,14 +10,20 @@ BEGIN
 
     -- Resource access rows are cleaned up by transaction rollback (isolation: transaction)
     -- but clean up explicitly for safety
-    DELETE FROM auth.resource_access WHERE resource_type IN ('document', 'folder');
+    DELETE FROM auth.resource_access WHERE root_type IN ('document', 'folder', 'project');
+    DELETE FROM auth.user_group_id_cache WHERE created_by IN ('cache', 'test');
     DELETE FROM auth.owner WHERE created_by = 'test';
     DELETE FROM auth.permission_assignment WHERE created_by = 'test';
+    -- Also clean up system-created assignments for test users
+    DELETE FROM auth.permission_assignment
+    WHERE user_id IN (SELECT user_id FROM auth.user_info WHERE code LIKE 'ra_test_%' OR code LIKE 'ra_temp_%');
     DELETE FROM auth.user_group_member WHERE created_by = 'test';
     DELETE FROM auth.user_group WHERE code LIKE 'ra_test_%';
     DELETE FROM auth.tenant_user WHERE created_by = 'test';
     DELETE FROM auth.user_info WHERE code LIKE 'ra_test_%' OR code LIKE 'ra_temp_%';
     DELETE FROM auth.tenant WHERE code = 'ra_test_tenant_2';
+    -- Delete child types before parent types (FK constraint)
+    DELETE FROM const.resource_type WHERE parent_code IS NOT NULL AND source = 'test';
     DELETE FROM const.resource_type WHERE source = 'test';
 
     -- Drop temp table
@@ -78,5 +84,21 @@ BEGIN
     RAISE NOTICE '    2. Group delete cascades';
     RAISE NOTICE '    3. Tenant delete cascades';
     RAISE NOTICE '    4. Granter delete sets null';
+    RAISE NOTICE '  008 Hierarchical Types (dot-delimited codes):';
+    RAISE NOTICE '    1. Register parent + child types';
+    RAISE NOTICE '    2. Grant on parent, child inherits read';
+    RAISE NOTICE '    3. Direct child grant works independently';
+    RAISE NOTICE '    4. Deny on child overrides parent grant';
+    RAISE NOTICE '    5. Group grant on parent cascades to child';
+    RAISE NOTICE '  009 Matrix Query:';
+    RAISE NOTICE '    1. Matrix returns all sub-types with flags';
+    RAISE NOTICE '    2. Denied flags excluded from matrix';
+    RAISE NOTICE '    3. System user gets full matrix';
+    RAISE NOTICE '    4. Inherited + direct flags combined';
+    RAISE NOTICE '  010 Group Cache:';
+    RAISE NOTICE '    1. Cache populated on first access';
+    RAISE NOTICE '    2. Cache hit on second access';
+    RAISE NOTICE '    3. Soft invalidation on group member change';
+    RAISE NOTICE '    4. Hard invalidation on user disable';
     RAISE NOTICE '';
 END $$;

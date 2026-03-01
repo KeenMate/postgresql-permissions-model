@@ -7,9 +7,9 @@
  * error functions, event codes, and permission seeding.
  *
  * Language/Translation Event Ranges:
- * - 17001-17999: Language events (informational)
- * - 18001-18999: Translation events (informational)
- * - 35001-35999: Language/Translation errors
+ * - 20001-20999: Language events (informational)
+ * - 21001-21999: Translation events (informational)
+ * - 37001-37999: Language/Translation errors
  *
  * This file is part of the PostgreSQL Permissions Model v2
  */
@@ -61,7 +61,7 @@ create table public.translation
     data_object_code text,
     data_object_id   bigint,
     value            text                                             not null,
-    ua_search_data   text,
+    nrm_search_data   text,
     ts_search_data   tsvector,
     constraint translation_created_by_check check (length(created_by) <= 250),
     constraint translation_updated_by_check check (length(updated_by) <= 250)
@@ -78,8 +78,8 @@ create unique index uq_translation_id
 create index ix_translation_ts_search
     on public.translation using gin (ts_search_data);
 
-create index ix_translation_ua_search
-    on public.translation using gin (ua_search_data gin_trgm_ops);
+create index ix_translation_nrm_search
+    on public.translation using gin (nrm_search_data gin_trgm_ops);
 
 create index ix_translation_group
     on public.translation (data_group, language_code);
@@ -121,7 +121,7 @@ as
 $$
 begin
     if tg_op = 'INSERT' or tg_op = 'UPDATE' then
-        new.ua_search_data = helpers.normalize_text(new.value);
+        new.nrm_search_data = helpers.normalize_text(new.value);
         new.ts_search_data = to_tsvector(helpers.calculate_ts_regconfig(new.language_code), new.value);
         return new;
     end if;
@@ -151,28 +151,28 @@ ALTER TABLE const.event_message
     FOREIGN KEY (language_code) REFERENCES const.language(code);
 
 -- ============================================================================
--- Error Functions (35001-35999)
+-- Error Functions (37001-37999)
 -- ============================================================================
 
--- 35001: Language not found
-create or replace function error.raise_35001(_language_code text) returns void
+-- 37001: Language not found
+create or replace function error.raise_37001(_language_code text) returns void
     language plpgsql
 as
 $$
 begin
     raise exception 'Language (code: %) does not exist', _language_code
-        using errcode = '35001';
+        using errcode = '37001';
 end;
 $$;
 
--- 35002: Translation not found
-create or replace function error.raise_35002(_translation_id integer) returns void
+-- 37002: Translation not found
+create or replace function error.raise_37002(_translation_id integer) returns void
     language plpgsql
 as
 $$
 begin
     raise exception 'Translation (id: %) does not exist', _translation_id
-        using errcode = '35002';
+        using errcode = '37002';
 end;
 $$;
 
@@ -181,35 +181,35 @@ $$;
 -- ============================================================================
 
 INSERT INTO const.event_category (category_code, title, range_start, range_end, is_error) VALUES
-    ('language_event',    'Language Events',    17001, 17999, false),
-    ('translation_event', 'Translation Events', 18001, 18999, false),
-    ('language_error',    'Language/Translation Errors', 35001, 35999, true)
+    ('language_event',    'Language Events',    20001, 20999, false),
+    ('translation_event', 'Translation Events', 21001, 21999, false),
+    ('language_error',    'Language/Translation Errors', 37001, 37999, true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO const.event_code (event_id, code, category_code, title, description, is_system) VALUES
-    -- Language events (17001-17999)
-    (17001, 'language_created',      'language_event',    'Language Created',      'New language was created', true),
-    (17002, 'language_updated',      'language_event',    'Language Updated',      'Language was updated', true),
-    (17003, 'language_deleted',      'language_event',    'Language Deleted',      'Language was deleted', true),
+    -- Language events (20001-20999)
+    (20001, 'language_created',      'language_event',    'Language Created',      'New language was created', true),
+    (20002, 'language_updated',      'language_event',    'Language Updated',      'Language was updated', true),
+    (20003, 'language_deleted',      'language_event',    'Language Deleted',      'Language was deleted', true),
 
-    -- Translation events (18001-18999)
-    (18001, 'translation_created',   'translation_event', 'Translation Created',   'New translation was created', true),
-    (18002, 'translation_updated',   'translation_event', 'Translation Updated',   'Translation was updated', true),
-    (18003, 'translation_deleted',   'translation_event', 'Translation Deleted',   'Translation was deleted', true),
-    (18004, 'translations_copied',   'translation_event', 'Translations Copied',   'Translations were copied between languages', true),
+    -- Translation events (21001-21999)
+    (21001, 'translation_created',   'translation_event', 'Translation Created',   'New translation was created', true),
+    (21002, 'translation_updated',   'translation_event', 'Translation Updated',   'Translation was updated', true),
+    (21003, 'translation_deleted',   'translation_event', 'Translation Deleted',   'Translation was deleted', true),
+    (21004, 'translations_copied',   'translation_event', 'Translations Copied',   'Translations were copied between languages', true),
 
-    -- Language/Translation errors (35001-35999)
-    (35001, 'err_language_not_found',    'language_error', 'Language Not Found',    'Language does not exist', true),
-    (35002, 'err_translation_not_found', 'language_error', 'Translation Not Found', 'Translation does not exist', true)
+    -- Language/Translation errors (37001-37999)
+    (37001, 'err_language_not_found',    'language_error', 'Language Not Found',    'Language does not exist', true),
+    (37002, 'err_translation_not_found', 'language_error', 'Translation Not Found', 'Translation does not exist', true)
 ON CONFLICT DO NOTHING;
 
 -- Event message templates
 INSERT INTO const.event_message (event_id, language_code, message_template) VALUES
-    (17001, 'en', 'Language "{language_code}" ({language_value}) was created by {actor}'),
-    (17002, 'en', 'Language "{language_code}" was updated by {actor}'),
-    (17003, 'en', 'Language "{language_code}" was deleted by {actor}'),
-    (18001, 'en', 'Translation for "{data_group}.{data_object_code}" in language "{language_code}" was created by {actor}'),
-    (18002, 'en', 'Translation (id: {translation_id}) was updated by {actor}'),
-    (18003, 'en', 'Translation (id: {translation_id}) was deleted by {actor}'),
-    (18004, 'en', 'Translations were copied from "{from_language}" to "{to_language}" by {actor}')
+    (20001, 'en', 'Language "{language_code}" ({language_value}) was created by {actor}'),
+    (20002, 'en', 'Language "{language_code}" was updated by {actor}'),
+    (20003, 'en', 'Language "{language_code}" was deleted by {actor}'),
+    (21001, 'en', 'Translation for "{data_group}.{data_object_code}" in language "{language_code}" was created by {actor}'),
+    (21002, 'en', 'Translation (id: {translation_id}) was updated by {actor}'),
+    (21003, 'en', 'Translation (id: {translation_id}) was deleted by {actor}'),
+    (21004, 'en', 'Translations were copied from "{from_language}" to "{to_language}" by {actor}')
 ON CONFLICT DO NOTHING;

@@ -1063,13 +1063,40 @@ $$;
 
 create or replace function unsecure.create_perm_set_as_system(_title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1, _source text DEFAULT NULL::text) returns SETOF auth.perm_set
     rows 1
-    language sql
+    language plpgsql
 as
 $$
+declare
+	__last_id int;
+begin
+	-- System-level perm set creation bypasses is_assignable check on permissions.
+	-- This allows system perm sets (e.g., system_admin) to include non-assignable
+	-- permissions like 'resources' that should not be assignable via normal UI/API.
 
-select *
-from unsecure.create_perm_set('system', 1, null, _title, _is_system, _is_assignable, _permissions, _tenant_id, _source);
+	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system, is_assignable, source)
+	values ('system', 'system', _tenant_id, _title, _is_system, _is_assignable, _source)
+	returning perm_set_id
+		into __last_id;
 
+	insert into auth.perm_set_perm(created_by, perm_set_id, permission_id)
+	select 'system', __last_id, p.permission_id
+	from unnest(_permissions) as perm_code
+				 inner join auth.permission p
+										on p.full_code = perm_code::ext.ltree;
+
+	perform create_journal_message_for_entity('system', 1, null
+			, 12020  -- perm_set_created
+			, 'perm_set', __last_id
+			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
+				, 'is_system', _is_system, 'is_assignable', _is_assignable
+				, 'permissions', array_to_string(_permissions, ', '))
+			, _tenant_id);
+
+	return query
+		select *
+		from auth.perm_set
+		where perm_set_id = __last_id;
+end;
 $$;
 
 create or replace function unsecure.update_perm_set(_updated_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
@@ -1788,6 +1815,7 @@ begin
             __perm_cache_timeout_in_s := 300;
         end if;
 
+        drop table if exists __temp_users_groups_permissions;
         create temporary table __temp_users_groups_permissions
         (
             tenant_id                integer,
@@ -2244,6 +2272,147 @@ begin
     perform unsecure.ensure_audit_partitions();
 
     return query select __count;
+end;
+$$;
+
+-- =============================================================================
+-- Group ID Cache Helpers
+-- =============================================================================
+-- Mirrors the permission cache pattern: populate on demand, soft/hard invalidation.
+
+/*
+ * unsecure.get_cached_group_ids — Returns cached active group IDs for a user in a tenant.
+ *
+ * On cache miss or expiry: resolves from user_group_member + user_group, upserts cache, returns.
+ * Uses the same TTL sys_param as the permission cache (default 300s).
+ */
+create or replace function unsecure.get_cached_group_ids(
+    _user_id   bigint,
+    _tenant_id integer
+) returns integer[]
+    language plpgsql
+as
+$$
+declare
+    __group_ids               integer[];
+    __perm_cache_timeout_in_s bigint;
+    __expiration_date         timestamptz;
+begin
+    -- Check for non-expired cache entry
+    select group_ids
+    from auth.user_group_id_cache
+    where user_id = _user_id
+      and tenant_id = _tenant_id
+      and expiration_date > now()
+    into __group_ids;
+
+    if found then
+        return __group_ids;
+    end if;
+
+    -- Cache miss or expired — resolve from source tables
+    select coalesce(array_agg(ug.user_group_id), '{}')
+    from auth.user_group_member ugm
+    inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
+        and ug.is_active = true
+        and ug.tenant_id = _tenant_id
+    where ugm.user_id = _user_id
+    into __group_ids;
+
+    -- Read TTL from sys_param (same as permission cache)
+    select number_value
+    from const.sys_param sp
+    where sp.group_code = 'auth'
+      and sp.code = 'perm_cache_timeout_in_s'
+    into __perm_cache_timeout_in_s;
+
+    if __perm_cache_timeout_in_s is null then
+        __perm_cache_timeout_in_s := 300;
+    end if;
+
+    __expiration_date := now() + interval '1 second' * __perm_cache_timeout_in_s;
+
+    -- Upsert cache entry
+    insert into auth.user_group_id_cache (
+        created_by, updated_by, user_id, tenant_id, group_ids, expiration_date
+    ) values (
+        'cache', 'cache', _user_id, _tenant_id, __group_ids, __expiration_date
+    )
+    on conflict (user_id, tenant_id) do update
+    set group_ids = excluded.group_ids,
+        expiration_date = excluded.expiration_date,
+        updated_by = 'cache',
+        updated_at = now();
+
+    return __group_ids;
+end;
+$$;
+
+/*
+ * unsecure.invalidate_user_group_id_cache — Soft invalidation (set expiration to now)
+ *
+ * If _tenant_id is NULL, invalidates all tenants for the user.
+ */
+create or replace function unsecure.invalidate_user_group_id_cache(
+    _user_id   bigint,
+    _tenant_id integer default null
+) returns void
+    language plpgsql
+as
+$$
+begin
+    update auth.user_group_id_cache
+    set expiration_date = now(),
+        updated_by = 'invalidate',
+        updated_at = now()
+    where user_id = _user_id
+      and (_tenant_id is null or tenant_id = _tenant_id);
+end;
+$$;
+
+/*
+ * unsecure.clear_user_group_id_cache — Hard invalidation (delete rows)
+ *
+ * If _tenant_id is NULL, clears all tenants for the user.
+ */
+create or replace function unsecure.clear_user_group_id_cache(
+    _user_id   bigint,
+    _tenant_id integer default null
+) returns void
+    language plpgsql
+as
+$$
+begin
+    delete from auth.user_group_id_cache
+    where user_id = _user_id
+      and (_tenant_id is null or tenant_id = _tenant_id);
+end;
+$$;
+
+/*
+ * unsecure.invalidate_group_members_group_id_cache — Soft invalidate group ID cache
+ * for all members of a specific group.
+ *
+ * Used when a group's is_active status changes.
+ */
+create or replace function unsecure.invalidate_group_members_group_id_cache(
+    _user_group_id integer,
+    _tenant_id     integer
+) returns void
+    language plpgsql
+as
+$$
+begin
+    update auth.user_group_id_cache
+    set expiration_date = now(),
+        updated_by = 'invalidate',
+        updated_at = now()
+    where tenant_id = _tenant_id
+      and user_id in (
+          select user_id
+          from auth.user_group_member
+          where user_group_id = _user_group_id
+      );
 end;
 $$;
 
