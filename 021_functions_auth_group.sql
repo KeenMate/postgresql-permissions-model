@@ -11,25 +11,15 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 create or replace function auth.is_group_member(_user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
-    immutable
     language plpgsql
 as
 $$
 begin
-	if exists(select
-						from auth.user_group_members
-						where user_id = _user_id
-							and tenant_id = _tenant_id
-							and user_group_id = _user_group_id) then
-		return true;
-	end if;
-
-	return false;
+	return _user_group_id = any(unsecure.get_cached_group_ids(_user_id, _tenant_id));
 end;
 $$;
 
 create or replace function auth.can_manage_user_group(_user_id bigint, _correlation_id text, _user_group_id integer, _permission text, _tenant_id integer DEFAULT 1) returns boolean
-    immutable
     language plpgsql
 as
 $$
@@ -38,12 +28,12 @@ declare
 	__has_owner                 bool;
 	__is_member                 bool;
 begin
-	select ug.can_members_manage_others, ugm.member_id is not null
+	select ug.can_members_manage_others
 	from auth.user_group ug
-				 left join auth.user_group_member ugm on ug.user_group_id = ugm.user_group_id
-		and ugm.user_id = _user_id
 	where ug.user_group_id = _user_group_id
-	into __can_members_manage_others, __is_member;
+	into __can_members_manage_others;
+
+	__is_member := _user_group_id = any(unsecure.get_cached_group_ids(_user_id, _tenant_id));
 
 	if not (__can_members_manage_others and __is_member) then
 		__has_owner := auth.has_owner(_user_group_id, _tenant_id);
