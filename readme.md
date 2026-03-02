@@ -17,6 +17,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **Language & translation** with full-text and accent-insensitive search
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
+- **App bootstrapping** with idempotent ensure functions and optional `_is_final_state` declarative sync
 - **Permission caching** for performance with automatic invalidation
 - **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
 - **Built-in search/paging** for users, groups, tenants, permissions, and permission sets
@@ -91,6 +92,49 @@ select * from auth.search_user_groups(1, 'admin', _is_active := true);
 -- Search permissions by parent
 select * from auth.search_permissions(1, null, _parent_code := 'users');
 ```
+
+### App Bootstrapping (Ensure Functions)
+
+Idempotent bulk-create functions for application startup. Call them every boot — they create what's missing, skip what exists, and optionally remove what's no longer defined.
+
+```sql
+-- Define permissions (safe to call every startup)
+select * from auth.ensure_permissions('app', 1, null, '[
+    {"title": "Documents", "is_assignable": false},
+    {"title": "Read documents", "parent_code": "documents"},
+    {"title": "Write documents", "parent_code": "documents"}
+]', 'my_app');
+
+-- Define permission sets with their permissions
+select * from auth.ensure_perm_sets('app', 1, null, '[
+    {"title": "Document Viewer", "permissions": ["documents.read_documents"]},
+    {"title": "Document Editor", "permissions": ["documents.read_documents", "documents.write_documents"]}
+]', 'my_app');
+
+-- Define groups
+select * from auth.ensure_user_groups('app', 1, null, '[
+    {"title": "Document Editors"},
+    {"title": "Document Viewers", "is_external": true}
+]', 1, 'my_app');
+
+-- Define group mappings (by title or ID)
+select * from auth.ensure_user_group_mappings('app', 1, null, '[
+    {"user_group_title": "Document Viewers", "provider_code": "azure_ad",
+     "mapped_object_id": "aad-group-guid", "mapped_object_name": "Corp Viewers"}
+]');
+```
+
+**Final state sync** — pass `_is_final_state := true` to make the input the complete definition. Items with the same `_source` not in the input are removed:
+
+```sql
+-- Remove "Write documents" on next deploy — just omit it
+select * from auth.ensure_permissions('app', 1, null, '[
+    {"title": "Documents", "is_assignable": false},
+    {"title": "Read documents", "parent_code": "documents"}
+]', 'my_app', _is_final_state := true);
+```
+
+The `_source` parameter scopes deletions — each module manages only its own items without affecting others.
 
 ## Architecture
 

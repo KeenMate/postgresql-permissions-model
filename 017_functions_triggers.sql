@@ -93,6 +93,7 @@ $$
 begin
 	return concat_ws(' ', helpers.normalize_text(_user_group.title)
 		, helpers.normalize_text(_user_group.code)
+		, helpers.normalize_text(_user_group.source)
 		);
 end;
 $$;

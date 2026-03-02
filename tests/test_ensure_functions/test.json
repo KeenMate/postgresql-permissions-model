@@ -1,0 +1,6 @@
+{
+  "name": "Ensure Functions",
+  "description": "Tests for auth.ensure_permissions, auth.ensure_perm_sets, auth.ensure_user_groups, and auth.ensure_user_group_mappings bulk idempotent creation functions, including _is_final_state sync behavior",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

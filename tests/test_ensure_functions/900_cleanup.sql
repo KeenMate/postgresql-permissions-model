@@ -1,0 +1,70 @@
+set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
+
+DO $$
+BEGIN
+    RAISE NOTICE 'CLEANUP: Transaction rollback handles all test data cleanup';
+END $$;
+
+DO $$
+BEGIN
+    RAISE NOTICE '';
+    RAISE NOTICE '=================================================================';
+    RAISE NOTICE 'Ensure Functions - COMPLETED SUCCESSFULLY';
+    RAISE NOTICE '=================================================================';
+    RAISE NOTICE '';
+    RAISE NOTICE 'All 45 tests passed:';
+    RAISE NOTICE '  ensure_permissions:';
+    RAISE NOTICE '    1. Create hierarchy (root + children)';
+    RAISE NOTICE '    2. Idempotent (no duplicates on re-call)';
+    RAISE NOTICE '    3. Mix of existing and new';
+    RAISE NOTICE '    4. Custom short_code and per-item source';
+    RAISE NOTICE '    5. Deep hierarchy (grandchild)';
+    RAISE NOTICE '    6. is_assignable=false respected';
+    RAISE NOTICE '    7. Function-level source as fallback';
+    RAISE NOTICE '    8. Returns all requested (existing + new)';
+    RAISE NOTICE '  ensure_perm_sets:';
+    RAISE NOTICE '    9. Create new perm set with permissions';
+    RAISE NOTICE '    10. Idempotent (no duplicates)';
+    RAISE NOTICE '    11. Existing set gets new permissions added';
+    RAISE NOTICE '    12. Multiple perm sets in one call';
+    RAISE NOTICE '    13. is_assignable and custom source';
+    RAISE NOTICE '    14. Perm set with no permissions';
+    RAISE NOTICE '  ensure_user_groups:';
+    RAISE NOTICE '    15. Create new groups';
+    RAISE NOTICE '    16. Idempotent (no duplicates)';
+    RAISE NOTICE '    17. Groups with various flags';
+    RAISE NOTICE '    18. Mix of existing and new';
+    RAISE NOTICE '    19. is_system always false';
+    RAISE NOTICE '    20. Returns all requested (existing + new)';
+    RAISE NOTICE '  ensure_user_group_mappings:';
+    RAISE NOTICE '    21. Create using user_group_id';
+    RAISE NOTICE '    22. Create using user_group_title';
+    RAISE NOTICE '    23. Idempotent (no duplicates)';
+    RAISE NOTICE '    24. Multiple mappings (mix id + title)';
+    RAISE NOTICE '    25. Invalid title raises error';
+    RAISE NOTICE '    26. Ordered by mapping_id';
+    RAISE NOTICE '  ensure_permissions final_state:';
+    RAISE NOTICE '    27. Null source raises error';
+    RAISE NOTICE '    28. Default does NOT remove';
+    RAISE NOTICE '    29. Removes unlisted same-source';
+    RAISE NOTICE '    30. Does NOT remove different source';
+    RAISE NOTICE '    31. Cleans up references before deleting';
+    RAISE NOTICE '  ensure_perm_sets final_state:';
+    RAISE NOTICE '    32. Null source raises error';
+    RAISE NOTICE '    33. Default does NOT remove sets';
+    RAISE NOTICE '    34. Removes unlisted same-source sets';
+    RAISE NOTICE '    35. Does NOT remove different source';
+    RAISE NOTICE '    36. Syncs permissions within set';
+    RAISE NOTICE '  ensure_user_groups final_state:';
+    RAISE NOTICE '    37. Null source raises error';
+    RAISE NOTICE '    38. Default does NOT remove groups';
+    RAISE NOTICE '    39. Removes unlisted same-source groups';
+    RAISE NOTICE '    40. Does NOT remove different source';
+    RAISE NOTICE '    41. Cleans up references before deleting';
+    RAISE NOTICE '  ensure_user_group_mappings final_state:';
+    RAISE NOTICE '    42. Default does NOT remove mappings';
+    RAISE NOTICE '    43. Removes unlisted same-group mappings';
+    RAISE NOTICE '    44. Scoped by (group, provider)';
+    RAISE NOTICE '    45. Role-based mappings';
+    RAISE NOTICE '';
+END $$;

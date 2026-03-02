@@ -14,6 +14,9 @@
  * - auth.get_resource_grants          — list all grants/denies for a resource
  * - auth.get_user_accessible_resources — list resources a user can access
  * - auth.create_resource_type         — register a new resource type (with hierarchy)
+ * - auth.update_resource_type         — update resource type title/description/active/source
+ * - auth.ensure_resource_types        — bulk-ensure resource types from JSONB array
+ * - auth.get_resource_types           — list registered resource types
  *
  * v2: Hierarchical resource types, root-type partitioning, group ID cache.
  *
@@ -1013,6 +1016,37 @@ end;
 $$;
 
 -- ============================================================================
+-- unsecure.update_resource_type_full_title
+-- ============================================================================
+-- Updates full_title for the given resource type and all its descendants.
+-- Pattern matches unsecure.update_permission_full_title.
+--
+-- full_title = ancestor titles joined by ' > ', e.g.:
+--   'project'            → 'Project'
+--   'project.documents'  → 'Project > Project Documents'
+--
+create or replace function unsecure.update_resource_type_full_title(_path ext.ltree)
+returns void
+    language sql
+as
+$$
+update const.resource_type rt
+set full_title = (
+    select array_to_string(
+        array(
+            select a.title
+            from const.resource_type a
+            where a.path @> s.path
+            order by a.path
+        ),
+        ' > ')
+    from const.resource_type s
+    where s.code = rt.code
+)
+where rt.path <@ _path;
+$$;
+
+-- ============================================================================
 -- Resource type management: auth.create_resource_type
 -- ============================================================================
 --
@@ -1059,7 +1093,7 @@ begin
     -- Path = text2ltree(code). The code itself encodes the hierarchy.
     _path := text2ltree(_code);
 
-    -- Insert resource type
+    -- Insert resource type (trigger updates full_title automatically)
     insert into const.resource_type (code, title, description, source, parent_code, path)
     values (_code, _title, _description, _source, _parent_code, _path)
     on conflict do nothing;
@@ -1080,3 +1114,226 @@ begin
         , _tenant_id);
 end;
 $$;
+
+-- ============================================================================
+-- auth.update_resource_type
+-- ============================================================================
+-- Update an existing resource type's title, description, is_active, or source.
+-- Code and parent_code are immutable (they define the hierarchy).
+-- Trigger automatically recalculates full_title when title changes.
+--
+create or replace function auth.update_resource_type(
+    _updated_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _code           text,
+    _title          text    default null,
+    _description    text    default null,
+    _is_active      boolean default null,
+    _source         text    default null,
+    _tenant_id      integer default 1
+) returns setof const.resource_type
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    -- Permission check (reuses create permission — admin-level operation)
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    -- Validate resource type exists
+    if not exists (select 1 from const.resource_type where code = _code) then
+        perform error.raise_35003(_code);
+    end if;
+
+    -- Update only non-null parameters
+    update const.resource_type
+    set title       = coalesce(_title, title),
+        description = coalesce(_description, description),
+        is_active   = coalesce(_is_active, is_active),
+        source      = coalesce(_source, source)
+    where code = _code;
+
+    -- Return updated row
+    return query
+        select * from const.resource_type rt where rt.code = _code;
+
+    -- Journal
+    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+        , 18002  -- resource_type_updated
+        , 'resource_type', 0
+        , jsonb_build_object('resource_type', _code, 'title', _title,
+            'is_active', _is_active)
+        , _tenant_id);
+end;
+$$;
+
+-- ============================================================================
+-- auth.ensure_resource_types
+-- ============================================================================
+-- Bulk-ensure resource types from a JSONB array.
+--
+-- Accepts an array of objects, each with:
+--   code        (required) — resource type code, dots encode hierarchy
+--   title       (required) — display title
+--   parent_code (optional) — parent resource type code
+--   description (optional) — description
+--   source      (optional) — overrides the _source parameter per item
+--
+-- Items are automatically sorted by hierarchy depth (parents first),
+-- so callers don't need to worry about ordering.
+--
+-- Example:
+--   select * from auth.ensure_resource_types('app', 1, 'setup', '[
+--       {"code": "project",           "title": "Project"},
+--       {"code": "project.documents", "title": "Project Documents", "parent_code": "project"},
+--       {"code": "project.invoices",  "title": "Project Invoices",  "parent_code": "project"}
+--   ]'::jsonb, _source := 'my_app');
+--
+create or replace function auth.ensure_resource_types(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _resource_types jsonb,
+    _source         text    default null,
+    _tenant_id      integer default 1
+) returns setof const.resource_type
+    language plpgsql
+as
+$$
+declare
+    _item        jsonb;
+    _code        text;
+    _title       text;
+    _parent_code text;
+    _description text;
+    _item_source text;
+    _path        ext.ltree;
+begin
+    -- Permission check (once for the batch)
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    -- Process items sorted by hierarchy depth (parents before children)
+    for _item in
+        select value
+        from jsonb_array_elements(_resource_types)
+        order by nlevel(text2ltree(value->>'code'))
+    loop
+        _code        := _item->>'code';
+        _title       := _item->>'title';
+        _parent_code := _item->>'parent_code';
+        _description := _item->>'description';
+        _item_source := coalesce(_item->>'source', _source);
+        _path        := text2ltree(_code);
+
+        -- Skip if already exists
+        if exists (select 1 from const.resource_type where code = _code) then
+            continue;
+        end if;
+
+        -- Validate parent exists if specified
+        if _parent_code is not null then
+            if not exists (
+                select 1 from const.resource_type
+                where code = _parent_code and is_active = true
+            ) then
+                perform error.raise_35003(_parent_code);
+            end if;
+        end if;
+
+        -- Insert (trigger updates full_title automatically)
+        insert into const.resource_type (code, title, description, source, parent_code, path)
+        values (_code, _title, _description, _item_source, _parent_code, _path)
+        on conflict do nothing;
+
+        -- Auto-create partition (only root types get a new partition)
+        perform unsecure.ensure_resource_access_partition(_code);
+
+        -- Journal
+        perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+            , 18001  -- resource_type_created
+            , 'resource_type', 0
+            , jsonb_build_object('resource_type', _code, 'title', _title,
+                'parent_code', _parent_code)
+            , _tenant_id);
+    end loop;
+
+    -- Return all processed resource types
+    return query
+        select rt.*
+        from const.resource_type rt
+        where rt.code in (select value->>'code' from jsonb_array_elements(_resource_types))
+        order by rt.path;
+end;
+$$;
+
+-- ============================================================================
+-- auth.get_resource_types
+-- ============================================================================
+-- Lists registered resource types. No RBAC check — resource types are
+-- public metadata (like access flags).
+--
+-- Optional filters:
+--   _source      — filter by source (e.g. 'projects_app')
+--   _parent_code — filter by parent (e.g. 'project' returns only children)
+--   _active_only — if true (default), only active types are returned
+--
+create or replace function auth.get_resource_types(
+    _source      text    default null,
+    _parent_code text    default null,
+    _active_only boolean default true
+) returns table(
+    __code        text,
+    __title       text,
+    __full_title  text,
+    __description text,
+    __is_active   boolean,
+    __source      text,
+    __parent_code text,
+    __path        ext.ltree
+)
+    stable
+    language plpgsql
+as
+$$
+begin
+    return query
+    select rt.code, rt.title, rt.full_title, rt.description, rt.is_active, rt.source,
+           rt.parent_code, rt.path
+    from const.resource_type rt
+    where (_active_only = false or rt.is_active = true)
+      and (_source is null or rt.source = _source)
+      and (_parent_code is null or rt.parent_code = _parent_code)
+    order by rt.path;
+end;
+$$;
+
+-- ============================================================================
+-- Trigger: const.resource_type → full_title
+-- ============================================================================
+-- Recalculate full_title on insert or when title/parent_code changes.
+-- pg_trigger_depth() guard prevents recursion since the called function
+-- updates full_title on the same table.
+--
+-- Placed here (not in 033_triggers) because it depends on both:
+--   const.resource_type (034) and unsecure.update_resource_type_full_title (035)
+--
+create or replace function triggers.update_resource_type_full_title() returns trigger
+    language plpgsql
+as
+$$
+begin
+    if pg_trigger_depth() > 1 then
+        return new;
+    end if;
+
+    perform unsecure.update_resource_type_full_title(new.path);
+    return new;
+end;
+$$;
+
+create trigger trg_resource_type_full_title
+    after insert or update of title, parent_code, full_title
+    on const.resource_type
+    for each row
+execute function triggers.update_resource_type_full_title();

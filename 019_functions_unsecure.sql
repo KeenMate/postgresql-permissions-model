@@ -410,7 +410,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_system boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
+create or replace function unsecure.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_system boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1, _source text DEFAULT NULL)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -421,9 +421,9 @@ declare
 begin
 
 	insert into auth.user_group ( created_by, updated_by, tenant_id, title, is_default, is_system, is_assignable
-															, is_active, is_external)
+															, is_active, is_external, source)
 	values ( _created_by, _created_by, _tenant_id, _title, _is_default, _is_system, _is_assignable, _is_active
-				 , _is_external)
+				 , _is_external, _source)
 	returning user_group_id
 		into __last_id;
 

@@ -55,7 +55,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _is_external boolean DEFAULT false, _is_default boolean DEFAULT false, _tenant_id integer DEFAULT 1, _source text DEFAULT NULL)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -70,7 +70,7 @@ begin
 		select *
 		from unsecure.create_user_group(_created_by, _user_id, _correlation_id, _title
 			, _is_assignable, _is_active, _is_external, false,
-																		_is_default, _tenant_id);
+																		_is_default, _tenant_id, _source);
 end ;
 $$;
 
@@ -1010,4 +1010,265 @@ begin
                  left join member_counts mc on ug.user_group_id = mc.user_group_id;
 end;
 $$;
+
+
+-- region ensure_user_groups
+
+create or replace function auth.ensure_user_groups(
+    _created_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _user_groups     jsonb,
+    _tenant_id       integer default 1,
+    _source          text    default null,
+    _is_final_state  boolean default false
+) returns setof auth.user_group
+    language plpgsql
+as
+$$
+declare
+    _item            jsonb;
+    _title           text;
+    _is_assignable   boolean;
+    _is_active       boolean;
+    _is_external     boolean;
+    _is_default      boolean;
+    _code            text;
+    _input_codes     text[] := '{}';
+    _group_to_delete record;
+begin
+    -- Single permission check for the batch
+    perform auth.has_permission(_user_id, _correlation_id, 'groups.create_group', _tenant_id);
+
+    if _is_final_state then
+        perform auth.has_permission(_user_id, _correlation_id, 'groups.delete_group', _tenant_id);
+
+        if _source is null then
+            raise exception '_source is required when _is_final_state is true';
+        end if;
+    end if;
+
+    for _item in
+        select value
+        from jsonb_array_elements(_user_groups)
+    loop
+        _title         := _item ->> 'title';
+        _is_assignable := coalesce((_item ->> 'is_assignable')::boolean, true);
+        _is_active     := coalesce((_item ->> 'is_active')::boolean, true);
+        _is_external   := coalesce((_item ->> 'is_external')::boolean, false);
+        _is_default    := coalesce((_item ->> 'is_default')::boolean, false);
+        _code          := helpers.get_code(_title, '_');
+
+        _input_codes := array_append(_input_codes, _code);
+
+        -- Skip if already exists for this tenant
+        if exists (select 1 from auth.user_group where code = _code and tenant_id = _tenant_id) then
+            continue;
+        end if;
+
+        -- Delegate to unsecure.create_user_group (is_system always false)
+        perform unsecure.create_user_group(
+            _created_by, _user_id, _correlation_id,
+            _title, _is_assignable, _is_active, _is_external,
+            false, _is_default, _tenant_id, _source
+        );
+    end loop;
+
+    -- Final state: remove groups with same source+tenant that are not in the input set
+    if _is_final_state then
+        for _group_to_delete in
+            select ug.user_group_id, ug.code
+            from auth.user_group ug
+            where ug.source = _source
+              and ug.tenant_id = _tenant_id
+              and ug.is_system = false
+              and ug.code != all (_input_codes)
+        loop
+            -- Clean up user_group_mapping references
+            delete from auth.user_group_mapping
+            where user_group_id = _group_to_delete.user_group_id;
+
+            -- Clean up permission_assignment references
+            delete from auth.permission_assignment
+            where user_group_id = _group_to_delete.user_group_id;
+
+            -- Delete the group (trg_cache_user_group_before_delete handles cache invalidation)
+            -- Cascades to user_group_member and owner
+            delete from auth.user_group
+            where user_group_id = _group_to_delete.user_group_id;
+
+            -- Journal the removal
+            perform create_journal_message_for_entity(
+                _created_by, _user_id, _correlation_id,
+                13003,  -- group_deleted
+                'group', _group_to_delete.user_group_id,
+                jsonb_build_object('group_code', _group_to_delete.code,
+                    'reason', 'final_state_sync', 'source', _source),
+                _tenant_id
+            );
+        end loop;
+    end if;
+
+    -- Return all processed groups (existing + newly created)
+    return query
+        select ug.*
+        from auth.user_group ug
+        where ug.tenant_id = _tenant_id
+          and ug.code in (
+            select helpers.get_code(item ->> 'title', '_')
+            from jsonb_array_elements(_user_groups) as item
+        )
+        order by ug.title;
+end;
+$$;
+
+-- endregion
+
+
+-- region ensure_user_group_mappings
+
+create or replace function auth.ensure_user_group_mappings(
+    _created_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _mappings        jsonb,
+    _tenant_id       integer default 1,
+    _is_final_state  boolean default false
+) returns setof auth.user_group_mapping
+    language plpgsql
+as
+$$
+declare
+    _item               jsonb;
+    _user_group_id      integer;
+    _user_group_title   text;
+    _provider_code      text;
+    _mapped_object_id   text;
+    _mapped_object_name text;
+    _mapped_role        text;
+    _mapping_ids        integer[] := '{}';
+    _result_id          integer;
+    _input_combos       jsonb[]   := '{}';
+    _combo              jsonb;
+    _del_mapping        record;
+    _affected_user_ids  bigint[];
+begin
+    -- Single permission check for the batch
+    perform auth.has_permission(_user_id, _correlation_id, 'groups.create_mapping', _tenant_id);
+
+    if _is_final_state then
+        perform auth.has_permission(_user_id, _correlation_id, 'groups.delete_mapping', _tenant_id);
+    end if;
+
+    for _item in
+        select value
+        from jsonb_array_elements(_mappings)
+    loop
+        _user_group_id      := (_item ->> 'user_group_id')::integer;
+        _user_group_title   := _item ->> 'user_group_title';
+        _provider_code      := _item ->> 'provider_code';
+        _mapped_object_id   := _item ->> 'mapped_object_id';
+        _mapped_object_name := _item ->> 'mapped_object_name';
+        _mapped_role        := _item ->> 'mapped_role';
+
+        -- Resolve user_group_title to user_group_id if needed
+        if _user_group_id is null and _user_group_title is not null then
+            select ug.user_group_id
+            from auth.user_group ug
+            where ug.code = helpers.get_code(_user_group_title, '_')
+              and ug.tenant_id = _tenant_id
+            into _user_group_id;
+
+            if _user_group_id is null then
+                perform error.raise_52171(0);
+            end if;
+        end if;
+
+        -- Track input (group, provider) combos and their specific mappings for final state
+        if _is_final_state then
+            _input_combos := array_append(_input_combos,
+                jsonb_build_object(
+                    'group_id', _user_group_id,
+                    'provider_code', _provider_code,
+                    'mapped_object_id', coalesce(lower(_mapped_object_id), ''),
+                    'mapped_role', coalesce(lower(_mapped_role), '')
+                )
+            );
+        end if;
+
+        -- Delegate to existing ensure function (handles existence check + creation)
+        select m.__user_group_mapping_id
+        from auth.ensure_user_group_mapping(
+            _created_by, _user_id, _correlation_id,
+            _user_group_id, _provider_code,
+            _mapped_object_id, _mapped_object_name, _mapped_role,
+            _tenant_id
+        ) m
+        into _result_id;
+
+        _mapping_ids := array_append(_mapping_ids, _result_id);
+    end loop;
+
+    -- Final state: for each unique (group, provider) pair in input, remove mappings not in the input
+    if _is_final_state then
+        -- Get distinct (group_id, provider_code) pairs from input
+        for _combo in
+            select distinct jsonb_build_object('group_id', c ->> 'group_id', 'provider_code', c ->> 'provider_code')
+            from unnest(_input_combos) as c
+        loop
+            for _del_mapping in
+                select ugm.user_group_mapping_id, ugm.user_group_id,
+                       ugm.mapped_object_id, ugm.mapped_role, ugm.provider_code
+                from auth.user_group_mapping ugm
+                where ugm.user_group_id = (_combo ->> 'group_id')::integer
+                  and ugm.provider_code = _combo ->> 'provider_code'
+                  and ugm.user_group_mapping_id != all (_mapping_ids)
+            loop
+                -- Collect affected user_ids for cache invalidation
+                select array_agg(distinct ugm.user_id)
+                from auth.user_group_member ugm
+                where ugm.user_group_id = _del_mapping.user_group_id
+                into _affected_user_ids;
+
+                -- Delete the mapping
+                delete from auth.user_group_mapping
+                where user_group_mapping_id = _del_mapping.user_group_mapping_id;
+
+                -- Invalidate permission cache for affected users
+                if _affected_user_ids is not null and array_length(_affected_user_ids, 1) > 0 then
+                    update auth.user_permission_cache
+                    set expiration_date = now(),
+                        updated_by = _created_by,
+                        updated_at = now()
+                    where tenant_id = _tenant_id
+                      and user_id = any (_affected_user_ids);
+                end if;
+
+                -- Journal the removal
+                perform create_journal_message_for_entity(
+                    _created_by, _user_id, _correlation_id,
+                    13021,  -- group_mapping_deleted
+                    'user_group_mapping', _del_mapping.user_group_mapping_id,
+                    jsonb_build_object(
+                        'user_group_id', _del_mapping.user_group_id,
+                        'provider_code', _del_mapping.provider_code,
+                        'mapped_object_id', _del_mapping.mapped_object_id,
+                        'mapped_role', _del_mapping.mapped_role,
+                        'reason', 'final_state_sync'),
+                    _tenant_id
+                );
+            end loop;
+        end loop;
+    end if;
+
+    -- Return all processed mappings
+    return query
+        select ugm.*
+        from auth.user_group_mapping ugm
+        where ugm.user_group_mapping_id = any (_mapping_ids)
+        order by ugm.user_group_mapping_id;
+end;
+$$;
+
+-- endregion
 

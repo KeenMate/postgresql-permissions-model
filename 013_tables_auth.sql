@@ -284,6 +284,7 @@ create table auth.user_group
     is_synced                    boolean default false not null,
     create_missing_users_on_sync boolean default false not null,
     nrm_search_data              text,
+    source                       text default null,
     constraint user_group_created_by_check
         check (length(created_by) <= 250),
     constraint user_group_updated_by_check

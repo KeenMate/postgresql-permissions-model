@@ -27,6 +27,7 @@ create table const.resource_type
 (
     code        text    not null primary key,
     title       text    not null,
+    full_title  text,
     description text,
     is_active   boolean not null default true,
     source      text    default null,

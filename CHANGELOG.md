@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.0] - 2026-03-02
+
+### Added
+
+#### Bulk Ensure Functions for App Bootstrapping
+
+Four new `auth.ensure_*` functions for idempotent bulk creation of permissions, permission sets, user groups, and group mappings. Designed for application startup — call them every time the app boots and they create only what's missing, skip what already exists, and optionally remove what's no longer defined.
+
+| Function | Description |
+|----------|-------------|
+| `auth.ensure_permissions(_created_by, _user_id, _correlation_id, _permissions jsonb, _source, _is_final_state)` | Create/sync hierarchical permissions from JSONB array. Processes parents before children. |
+| `auth.ensure_perm_sets(_created_by, _user_id, _correlation_id, _perm_sets jsonb, _source, _tenant_id, _is_final_state)` | Create/sync permission sets with their permissions. Adds missing permissions to existing sets. |
+| `auth.ensure_user_groups(_created_by, _user_id, _correlation_id, _user_groups jsonb, _tenant_id, _source, _is_final_state)` | Create/sync user groups. Always sets `is_system=false`. |
+| `auth.ensure_user_group_mappings(_created_by, _user_id, _correlation_id, _mappings jsonb, _tenant_id, _is_final_state)` | Create/sync group mappings. Supports both `user_group_id` and `user_group_title` for group resolution. |
+
+All functions return the full set of processed entities (existing + newly created), not just the new ones.
+
+**Example — app bootstrap:**
+```sql
+-- Define permissions (idempotent — safe to call every startup)
+select * from auth.ensure_permissions('app', 1, null, '[
+    {"title": "Documents", "is_assignable": false},
+    {"title": "Read documents", "parent_code": "documents"},
+    {"title": "Write documents", "parent_code": "documents"}
+]', 'my_app');
+
+-- Define permission sets
+select * from auth.ensure_perm_sets('app', 1, null, '[
+    {"title": "Document Viewer", "permissions": ["documents.read_documents"]},
+    {"title": "Document Editor", "permissions": ["documents.read_documents", "documents.write_documents"]}
+]', 'my_app');
+
+-- Define groups
+select * from auth.ensure_user_groups('app', 1, null, '[
+    {"title": "Document Editors"},
+    {"title": "Document Viewers", "is_external": true}
+]', 1, 'my_app');
+```
+
+**Files:** `022_functions_auth_permission.sql`, `021_functions_auth_group.sql`
+
+**Tests:** `tests/test_ensure_functions/` — 26 tests covering creation, idempotency, hierarchy, flags, mixed existing+new, return sets, error handling.
+
+#### `_is_final_state` — Declarative State Sync for Ensure Functions
+
+New `_is_final_state boolean default false` parameter on all 4 ensure functions. When `true`, the input represents the **complete desired state** — items not in the input are removed (scoped by `_source` to prevent cross-module interference).
+
+**Scoping rules:**
+- `_source` is **required** when `_is_final_state = true` (raises exception if null)
+- Only items matching the same `_source` (+ `_tenant_id` where applicable) are candidates for removal
+- Items with a different source or null source are never touched
+- For `ensure_user_group_mappings`: scoped by `(user_group_id, provider_code)` pairs in the input — no `_source` needed
+
+**What each function removes when `_is_final_state = true`:**
+
+| Function | Removes |
+|----------|---------|
+| `ensure_permissions` | Permissions with same source not in input. Deepest-first (children before parents). Cleans up `perm_set_perm` and `permission_assignment` rows. Updates `has_children` flags. |
+| `ensure_perm_sets` | **Within each set:** removes permissions not in that set's `permissions[]` array. **Whole sets:** removes perm sets with same source+tenant not in input. Cleans up `permission_assignment` rows, invalidates affected users' permission cache. |
+| `ensure_user_groups` | Non-system groups with same source+tenant not in input. Cleans up `user_group_mapping` and `permission_assignment` rows. `trg_cache_user_group_before_delete` trigger handles cache invalidation. |
+| `ensure_user_group_mappings` | For each `(group, provider)` combo in input, removes mappings not in the input set. Invalidates affected users' permission cache. |
+
+**Example — remove "Write documents" permission on next deploy:**
+```sql
+-- Only list what should exist — "Write documents" will be removed
+select * from auth.ensure_permissions('app', 1, null, '[
+    {"title": "Documents", "is_assignable": false},
+    {"title": "Read documents", "parent_code": "documents"}
+]', 'my_app', _is_final_state := true);
+```
+
+All removals are journaled (events `12003` permission_deleted, `12022` perm_set_deleted, `13003` group_deleted, `13021` group_mapping_deleted).
+
+**Additional permission checks:** `permissions.delete_permission` (ensure_permissions), `permissions.delete_permission_set` (ensure_perm_sets), `groups.delete_group` (ensure_user_groups), `groups.delete_mapping` (ensure_user_group_mappings).
+
+**Tests:** 19 additional tests (27–45) covering null source error, default-no-remove, same-source removal, different-source safety, reference cleanup, within-set permission sync, (group,provider) scoping, role-based mappings.
+
+#### `source` Column on `auth.user_group`
+
+New `source text default null` column on `auth.user_group` table, matching the existing pattern on `auth.permission` and `auth.perm_set`. Used as the deletion boundary for `_is_final_state` scoping.
+
+- `013_tables_auth.sql` — column added after `nrm_search_data`
+- `017_functions_triggers.sql` — `source` included in search value calculation
+- `019_functions_unsecure.sql` — `_source` parameter added to `unsecure.create_user_group`
+- `021_functions_auth_group.sql` — `_source` parameter added to `auth.create_user_group`
+
 ## [2.15.0] - 2026-03-01
 
 ### Changed
@@ -1477,6 +1563,14 @@ See git history for v1.x changes.
 
 | Version | Date | Description |
 |---------|------|-------------|
+| 2.16.0 | 2026-03-02 | Bulk ensure functions for app bootstrapping, `_is_final_state` declarative sync, `source` column on user_group |
+| 2.15.0 | 2026-03-01 | Event ID collision fix, column renames, Makefile debee migration |
+| 2.14.0 | 2026-02-28 | Resource access (ACL) system, provider capability flags |
+| 2.13.0 | 2026-02-28 | User group caching, hierarchical resource access |
+| 2.12.0 | 2026-02-26 | Search function fixes, group member tenant functions |
+| 2.11.0 | 2026-02-26 | Event code management, audit partitioning, storage modes |
+| 2.10.0 | 2026-02-23 | Request context tracking, user events for registration/login |
+| 2.9.0 | 2026-02-22 | User event system, registration/login bug fixes |
 | 2.8.0 | 2026-02-21 | Audit infrastructure, composable admin permission sets, ensure_provider, bug fixes |
 | 2.7.0 | 2026-02-21 | Dedicated service accounts with least-privilege permissions, missing permission seed fixes |
 | 2.6.0 | 2026-02-20 | Real-time LISTEN/NOTIFY notifications, cache invalidation gap fixes |

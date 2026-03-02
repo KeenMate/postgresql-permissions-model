@@ -186,6 +186,7 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
 
     -- Resource access events (18001-18999)
     (18001, 'resource_type_created',       'resource_event', 'Resource Type Created',       'New resource type was registered', true, 'core'),
+    (18002, 'resource_type_updated',       'resource_event', 'Resource Type Updated',       'Resource type was updated', true, 'core'),
     (18010, 'resource_access_granted',     'resource_event', 'Resource Access Granted',     'Access was granted to a resource', true, 'core'),
     (18011, 'resource_access_revoked',     'resource_event', 'Resource Access Revoked',     'Access was revoked from a resource', true, 'core'),
     (18012, 'resource_access_denied',      'resource_event', 'Resource Access Denied',      'Deny rule was set on a resource', true, 'core'),
@@ -362,6 +363,7 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
 
     -- Resource access events (18xxx)
     (18001, 'en', 'Resource type "{resource_type}" was created by {actor}'),
+    (18002, 'en', 'Resource type "{resource_type}" was updated by {actor}'),
     (18010, 'en', 'Access to {resource_type} "{resource_id}" was granted to {target_type} "{target_name}" by {actor}'),
     (18011, 'en', 'Access to {resource_type} "{resource_id}" was revoked from {target_type} "{target_name}" by {actor}'),
     (18012, 'en', 'Deny rule on {resource_type} "{resource_id}" was set for user "{target_name}" by {actor}'),
