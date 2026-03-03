@@ -18,6 +18,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
 - **App bootstrapping** with idempotent ensure functions and optional `_is_final_state` declarative sync
+- **User blacklist** for blocking re-creation of deleted/banned users (username + provider identity)
 - **Permission caching** for performance with automatic invalidation
 - **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
 - **Built-in search/paging** for users, groups, tenants, permissions, and permission sets
@@ -147,6 +148,7 @@ The `_source` parameter scopes deletions — each module manages only its own it
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
 - **`auth.resource_access`** - Resource-level ACL (list-partitioned by resource_type)
+- **`auth.user_blacklist`** - Blacklist for deleted/banned user identities
 - **`auth.api_key`** - Service authentication with technical users
 - **`const.language`** / **`public.translation`** - Language registry and translation storage with full-text search
 - **`public.journal`** - Audit logging with multi-key support, request context tracking (range-partitioned by month)
@@ -603,6 +605,9 @@ The system uses structured event/error codes organized by category. Codes are st
 | 10061 | invitation_accepted | User invitation was accepted |
 | 10062 | invitation_rejected | User invitation was rejected |
 | 10070 | external_data_updated | User data was updated from external source |
+| 10080 | user_blacklisted | User was added to blacklist |
+| 10081 | user_unblacklisted | User was removed from blacklist |
+| 10082 | user_creation_blocked | User creation was blocked by blacklist |
 
 #### Tenant Events (11001-11999)
 
@@ -757,6 +762,8 @@ The system uses structured event/error codes organized by category. Codes are st
 | 33013 | error.raise_33013 | User group is not assignable or is external |
 | 33014 | error.raise_33014 | User group is a system group |
 | 33015 | error.raise_33015 | User is not tenant or group owner |
+| 33018 | error.raise_33018 | User is blacklisted and cannot be created |
+| 33019 | error.raise_33019 | User identity is blacklisted and cannot be created |
 
 #### Tenant Errors (34001-34999)
 

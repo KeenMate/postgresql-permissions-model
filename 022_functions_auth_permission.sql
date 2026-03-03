@@ -462,6 +462,8 @@ begin
 	perform unsecure.create_permission_as_system('Get users groups and permissions', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Create user tenant preferences', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Update user tenant preferences', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Manage blacklist', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Search blacklist', 'users', _source := 'core');
 
 	-- Permissions: Tenants
 	perform unsecure.create_permission_as_system('Tenants', _source := 'core');

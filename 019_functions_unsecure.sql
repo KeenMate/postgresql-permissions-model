@@ -316,17 +316,25 @@ returning *;
 
 $$;
 
-create or replace function unsecure.delete_user_by_id(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function unsecure.delete_user_by_id(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _blacklist boolean default false)
     returns TABLE(__user_id bigint, __username text)
-    language sql
+    language plpgsql
 as
 $$
+begin
+    -- blacklist all identities before deletion (while FK data still exists)
+    if _blacklist then
+        perform unsecure.blacklist_user_identities(
+            _deleted_by, _user_id, _correlation_id,
+            _target_user_id, 'user_deleted'
+        );
+    end if;
 
-delete
-from auth.user_info
-where user_id = _target_user_id
-returning user_id, username;
-
+    return query
+        delete from auth.user_info
+        where user_id = _target_user_id
+        returning user_id, username;
+end;
 $$;
 
 create or replace function unsecure.create_user_event(_created_by text, _user_id bigint, _correlation_id text, _event_type_code text, _target_user_id bigint, _request_context jsonb DEFAULT NULL::jsonb, _event_data jsonb DEFAULT NULL::jsonb, _target_user_oid text DEFAULT NULL::text, _target_username text DEFAULT NULL::text)
@@ -1254,6 +1262,11 @@ begin
 	__normalized_username := lower(trim(_username));
 	__normalized_email := lower(trim(_email));
 
+	-- check blacklist before creating user
+	if unsecure.check_user_blacklist(_username := __normalized_username) then
+		perform error.raise_33018(__normalized_username);
+	end if;
+
 	select user_id
 	from auth.user_info
 	where username = __normalized_username
@@ -1295,6 +1308,11 @@ declare
 begin
 	__normalized_username := lower(trim(_username));
 	__normalized_email := lower(trim(_email));
+
+	-- check blacklist before creating service user
+	if unsecure.check_user_blacklist(_username := __normalized_username) then
+		perform error.raise_33018(__normalized_username);
+	end if;
 
 	__last_service_user_id := _custom_service_user_id;
 
@@ -1583,6 +1601,15 @@ begin
 	from auth.user_info
 	where user_id = _target_user_id
 	into __user_info;
+
+	-- defense-in-depth: check blacklist by provider identity
+	if unsecure.check_user_blacklist(
+		_provider_code := _provider_code,
+		_provider_uid := _provider_uid,
+		_provider_oid := _provider_oid
+	) then
+		perform error.raise_33019(_provider_code, coalesce(_provider_uid, _provider_oid));
+	end if;
 
 	return query insert into auth.user_identity (created_by, updated_by, user_id, provider_code, uid, provider_oid,
 																							 user_data, password_hash, password_salt, is_active)
@@ -2413,6 +2440,113 @@ begin
           from auth.user_group_member
           where user_group_id = _user_group_id
       );
+end;
+$$;
+
+create or replace function unsecure.check_user_blacklist(
+    _username text default null,
+    _provider_code text default null,
+    _provider_uid text default null,
+    _provider_oid text default null
+) returns boolean
+    stable
+    language plpgsql
+as
+$$
+begin
+    return exists (
+        select 1
+        from auth.user_blacklist bl
+        where (_username is not null and bl.username = lower(trim(_username)))
+           or (_provider_code is not null and _provider_uid is not null
+               and bl.provider_code = _provider_code and bl.provider_uid = _provider_uid)
+           or (_provider_oid is not null and bl.provider_oid = _provider_oid)
+    );
+end;
+$$;
+
+create or replace function unsecure.blacklist_user(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _username text default null,
+    _provider_code text default null,
+    _provider_uid text default null,
+    _provider_oid text default null,
+    _original_user_id bigint default null,
+    _reason text default 'manual'
+) returns table(__blacklist_id bigint)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __last_id bigint;
+begin
+    insert into auth.user_blacklist (created_by, username, provider_code, provider_uid, provider_oid,
+                                     original_user_id, reason)
+    values (_created_by, lower(trim(_username)), _provider_code, _provider_uid, _provider_oid,
+            _original_user_id, _reason)
+    returning blacklist_id into __last_id;
+
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+        , 10080  -- user_blacklisted
+        , 'user', coalesce(_original_user_id, 0)
+        , jsonb_build_object('username', _username, 'provider_code', _provider_code,
+                             'provider_uid', _provider_uid, 'provider_oid', _provider_oid,
+                             'reason', _reason)
+        , 1);
+
+    return query select __last_id;
+end;
+$$;
+
+create or replace function unsecure.blacklist_user_identities(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _target_user_id bigint,
+    _reason text default 'user_deleted'
+) returns void
+    language plpgsql
+as
+$$
+declare
+    __user_info auth.user_info;
+    __identity record;
+begin
+    -- get user info before deletion
+    select * from auth.user_info where user_id = _target_user_id into __user_info;
+
+    if __user_info.user_id is null then
+        return;
+    end if;
+
+    -- blacklist the username
+    if __user_info.username is not null then
+        perform unsecure.blacklist_user(
+            _created_by, _user_id, _correlation_id,
+            _username := __user_info.username,
+            _original_user_id := _target_user_id,
+            _reason := _reason
+        );
+    end if;
+
+    -- blacklist each provider identity
+    for __identity in
+        select provider_code, uid, provider_oid
+        from auth.user_identity
+        where user_id = _target_user_id
+    loop
+        perform unsecure.blacklist_user(
+            _created_by, _user_id, _correlation_id,
+            _provider_code := __identity.provider_code,
+            _provider_uid := __identity.uid,
+            _provider_oid := __identity.provider_oid,
+            _original_user_id := _target_user_id,
+            _reason := _reason
+        );
+    end loop;
 end;
 $$;
 

@@ -14,6 +14,7 @@
     "test_auth_group_member_tenant",
     "test_search_functions",
     "test_resource_access",
-    "test_ensure_functions"
+    "test_ensure_functions",
+    "test_user_blacklist"
   ]
 }

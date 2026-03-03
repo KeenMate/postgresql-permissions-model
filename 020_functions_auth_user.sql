@@ -607,46 +607,40 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_user_info(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__user_info_id integer)
+create or replace function auth.delete_user_info(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer default 1, _blacklist boolean default false)
+    returns table(__user_id bigint, __username text)
     rows 1
     language plpgsql
 as
 $$
 declare
-	__is_system bool;
+    __is_system bool;
 begin
+    perform
+        auth.has_permission(_user_id, _correlation_id, 'users.delete_user_info', _tenant_id);
 
-	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.delete_user_info', _tenant_id);
+    select is_system
+    from auth.user_info ui
+    where ui.user_id = _target_user_id
+    into __is_system;
 
-	select is_system, tenant_id
-	from auth.user_group ug
-	where ug.user_group_id = _user_group_id
-	into __is_system;
+    if __is_system is null then
+        perform error.raise_33001(_target_user_id);
+    end if;
 
-	if
-		__is_system is null then
-		perform error.raise_52171(_user_group_id);
-	end if;
+    if __is_system then
+        perform error.raise_33002(_target_user_id);
+    end if;
 
-	if
-		__is_system then
-		perform error.raise_52271(_user_group_id);
-	end if;
+    return query
+        select *
+        from unsecure.delete_user_by_id(_deleted_by, _user_id, _correlation_id, _target_user_id, _blacklist);
 
-	return query
-		delete
-			from auth.user_group
-				where tenant_id = _tenant_id
-					and user_group_id = _user_group_id
-				returning user_group_id;
-
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
-			, 13003  -- group_deleted
-			, 'group', _user_group_id
-			, jsonb_build_object('group_title', _user_group_id::text)
-			, _tenant_id);
+    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+        , 10003  -- user_deleted
+        , 'user', _target_user_id
+        , jsonb_build_object('user_id', _target_user_id::text, 'blacklisted', _blacklist::text)
+        , _tenant_id);
 end;
 $$;
 
@@ -682,6 +676,15 @@ begin
 
 	if
 		__target_user_id is null then
+		-- check blacklist by provider identity (primary check for OAuth users)
+		if unsecure.check_user_blacklist(
+			_provider_code := _provider_code,
+			_provider_uid := _provider_uid,
+			_provider_oid := _provider_oid
+		) then
+			perform error.raise_33019(_provider_code, coalesce(_provider_uid, _provider_oid));
+		end if;
+
 		-- create user because it does not exists
 		select user_id
 		from unsecure.create_user_info(_created_by, _user_id, _correlation_id, lower(_username), lower(_email), _display_name,
@@ -895,6 +898,162 @@ begin
              , fu.total_items
         from filtered_users fu
                  inner join auth.user_info ui on fu.user_id = ui.user_id;
+end;
+$$;
+
+create or replace function auth.is_blacklisted(
+    _username text default null,
+    _provider_code text default null,
+    _provider_uid text default null,
+    _provider_oid text default null
+) returns boolean
+    stable
+    language sql
+as
+$$
+    select unsecure.check_user_blacklist(_username, _provider_code, _provider_uid, _provider_oid);
+$$;
+
+create or replace function auth.add_to_blacklist(
+    _created_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _username text default null,
+    _provider_code text default null,
+    _provider_uid text default null,
+    _provider_oid text default null,
+    _reason text default 'manual',
+    _notes text default null,
+    _tenant_id integer default 1
+) returns table(__blacklist_id bigint)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __last_id bigint;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'users.manage_blacklist', _tenant_id);
+
+    insert into auth.user_blacklist (created_by, username, provider_code, provider_uid, provider_oid,
+                                     reason, notes)
+    values (_created_by, lower(trim(_username)), _provider_code, _provider_uid, _provider_oid,
+            _reason, _notes)
+    returning blacklist_id into __last_id;
+
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+        , 10080  -- user_blacklisted
+        , 'user', 0
+        , jsonb_build_object('username', _username, 'provider_code', _provider_code,
+                             'provider_uid', _provider_uid, 'provider_oid', _provider_oid,
+                             'reason', _reason, 'notes', _notes)
+        , _tenant_id);
+
+    return query select __last_id;
+end;
+$$;
+
+create or replace function auth.remove_from_blacklist(
+    _deleted_by text,
+    _user_id bigint,
+    _correlation_id text,
+    _blacklist_id bigint,
+    _tenant_id integer default 1
+) returns table(__removed_blacklist_id bigint, __username text, __provider_code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __item auth.user_blacklist;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'users.manage_blacklist', _tenant_id);
+
+    delete from auth.user_blacklist
+    where blacklist_id = _blacklist_id
+    returning * into __item;
+
+    if __item.blacklist_id is null then
+        raise exception 'Blacklist entry (id: %) does not exist', _blacklist_id
+            using errcode = '33018';
+    end if;
+
+    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+        , 10081  -- user_unblacklisted
+        , 'user', coalesce(__item.original_user_id, 0)
+        , jsonb_build_object('username', __item.username, 'provider_code', __item.provider_code,
+                             'provider_uid', __item.provider_uid, 'provider_oid', __item.provider_oid,
+                             'blacklist_id', _blacklist_id)
+        , _tenant_id);
+
+    return query
+        select __item.blacklist_id, __item.username, __item.provider_code;
+end;
+$$;
+
+create or replace function auth.search_blacklist(
+    _user_id bigint,
+    _correlation_id text,
+    _search_text text default null,
+    _reason text default null,
+    _page integer default 1,
+    _page_size integer default 30,
+    _tenant_id integer default 1
+) returns table(
+    __blacklist_id bigint,
+    __username text,
+    __provider_code text,
+    __provider_uid text,
+    __provider_oid text,
+    __original_user_id bigint,
+    __reason text,
+    __notes text,
+    __created_at timestamptz,
+    __created_by text,
+    __total_items bigint
+)
+    stable
+    rows 100
+    language plpgsql
+as
+$$
+declare
+    __search_text text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'users.search_blacklist', _tenant_id);
+
+    __search_text := lower(trim(_search_text));
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 30), 100);
+
+    return query
+        with filtered as (
+            select bl.blacklist_id
+                 , count(*) over () as total_items
+            from auth.user_blacklist bl
+            where (_reason is null or bl.reason = _reason)
+              and (__search_text is null or __search_text = ''
+                   or bl.username like '%' || __search_text || '%'
+                   or bl.provider_uid like '%' || __search_text || '%'
+                   or bl.provider_oid like '%' || __search_text || '%'
+                   or lower(bl.notes) like '%' || __search_text || '%')
+            order by bl.created_at desc
+            offset ((_page - 1) * _page_size) limit _page_size
+        )
+        select bl.blacklist_id
+             , bl.username
+             , bl.provider_code
+             , bl.provider_uid
+             , bl.provider_oid
+             , bl.original_user_id
+             , bl.reason
+             , bl.notes
+             , bl.created_at
+             , bl.created_by
+             , f.total_items
+        from filtered f
+                 inner join auth.user_blacklist bl on f.blacklist_id = bl.blacklist_id;
 end;
 $$;
 

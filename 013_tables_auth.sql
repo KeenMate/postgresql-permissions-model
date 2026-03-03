@@ -500,6 +500,23 @@ create table auth.user_tenant_preference
         check (length(updated_by) <= 250)
 );
 
+create table auth.user_blacklist
+(
+    created_at        timestamptz default now() not null,
+    created_by        text default 'unknown'::text not null
+        constraint user_blacklist_created_by_check check (length(created_by) <= 250),
+    blacklist_id      bigint generated always as identity primary key,
+    username          text,
+    provider_code     text references auth.provider (code) on update cascade on delete cascade,
+    provider_uid      text,
+    provider_oid      text,
+    original_user_id  bigint,
+    reason            text,
+    notes             text,
+    constraint user_blacklist_has_identity
+        check (username is not null or provider_uid is not null or provider_oid is not null)
+);
+
 create unique index uq_auth_user_info
     on auth.user_info (username);
 
@@ -553,6 +570,15 @@ create index ix_user_event_target_user
 
 create index ix_user_event_request_context
     on auth.user_event using gin (request_context) where request_context is not null;
+
+create index ix_blacklist_username
+    on auth.user_blacklist (username) where username is not null;
+
+create index ix_blacklist_provider_uid
+    on auth.user_blacklist (provider_code, provider_uid) where provider_code is not null and provider_uid is not null;
+
+create index ix_blacklist_provider_oid
+    on auth.user_blacklist (provider_oid) where provider_oid is not null;
 
 -- Default partition (safety net for unexpected created_at values)
 create table auth.user_event_default partition of auth.user_event default;

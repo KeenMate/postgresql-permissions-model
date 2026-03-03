@@ -1,0 +1,6 @@
+{
+  "name": "User Blacklist",
+  "description": "User blacklist: manual blacklisting, blocking user creation, auto-blacklist on delete, unblacklist, search, edge cases",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.17.0] - 2026-03-02
+
+### Added
+
+#### User Blacklist for Deleted Users
+
+New `auth.user_blacklist` table and supporting functions to prevent re-creation of deleted or banned users. Blocks re-registration by username (email/direct) and re-authentication by provider identity (OAuth/SAML). Supports both automatic blacklisting on deletion and manual blacklisting by admins.
+
+**New table:** `auth.user_blacklist` — stores blacklisted usernames, provider UIDs/OIDs, original user_id for audit trail, reason, and admin notes. Constraint ensures at least one identifier (username, provider_uid, or provider_oid) is present.
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `unsecure.check_user_blacklist(_username, _provider_code, _provider_uid, _provider_oid)` | unsecure | Core check — returns true if any identifier matches a blacklist entry |
+| `unsecure.blacklist_user(...)` | unsecure | Inserts a single blacklist entry with journal event 10080 |
+| `unsecure.blacklist_user_identities(_target_user_id, _reason)` | unsecure | Bulk: reads user_info + all user_identity rows, blacklists each. Must be called before deletion. |
+| `auth.add_to_blacklist(...)` | auth | Permission-checked (`users.manage_blacklist`). Manual blacklisting with reason and notes. |
+| `auth.remove_from_blacklist(_blacklist_id)` | auth | Permission-checked (`users.manage_blacklist`). Deletes entry, journals event 10081. |
+| `auth.search_blacklist(_search_text, _reason, _page, _page_size)` | auth | Permission-checked (`users.search_blacklist`). Paginated search across username, provider_uid, provider_oid, notes. |
+| `auth.is_blacklisted(...)` | auth | Public wrapper around `unsecure.check_user_blacklist`. No permission check (used in creation paths). |
+
+**New permissions:** `users.manage_blacklist`, `users.search_blacklist`
+
+**New event codes:** 10080 (user_blacklisted), 10081 (user_unblacklisted), 10082 (user_creation_blocked)
+
+**New error codes:** 33018 (err_user_blacklisted), 33019 (err_identity_blacklisted). Legacy aliases: `error.raise_52115` → 33018, `error.raise_52116` → 33019.
+
+**Blacklist checks added to existing functions:**
+
+| Function | Check | Blocks |
+|----------|-------|--------|
+| `unsecure.create_user_info()` | Username blacklist | Email/direct registration |
+| `unsecure.create_service_user_info()` | Username blacklist | Service user creation |
+| `unsecure.create_user_identity()` | Provider uid/oid blacklist | Defense-in-depth for any identity creation path |
+| `auth.ensure_user_from_provider()` | Provider uid/oid blacklist (before user creation) | OAuth/SAML re-authentication |
+
+**Auto-blacklist on delete:** `unsecure.delete_user_by_id()` gains `_blacklist boolean default false` parameter. When true, calls `blacklist_user_identities()` before the DELETE (while FK data still exists). Function converted from `language sql` to `language plpgsql` to support this.
+
+**Tests:** `tests/test_user_blacklist/` — 21 tests covering manual blacklisting, creation blocking (username + provider identity), auto-blacklist on delete, unblacklist + re-creation, search/pagination, edge cases (duplicates, service users, case-insensitive matching, default no-blacklist on delete).
+
+**Files:** `013_tables_auth.sql`, `016_functions_error.sql`, `019_functions_unsecure.sql`, `020_functions_auth_user.sql`, `022_functions_auth_permission.sql`, `029_seed_data.sql`
+
+### Fixed
+
+#### `auth.delete_user_info()` — was deleting user groups instead of users
+
+The function body was a copy-paste from `auth.delete_user_group` — it referenced `auth.user_group`, `_user_group_id`, and journaled event 13003 (group_deleted). Fixed to correctly reference `auth.user_info`, `_target_user_id`, use proper error checks (33001 user not found, 33002 user is system), call `unsecure.delete_user_by_id()`, and journal event 10003 (user_deleted). Also added `_blacklist boolean default false` parameter for the new blacklist feature.
+
 ## [2.16.0] - 2026-03-02
 
 ### Added

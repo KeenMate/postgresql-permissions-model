@@ -131,6 +131,9 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     (10061, 'invitation_accepted',    'user_event', 'Invitation Accepted',    'User invitation was accepted', true, 'core'),
     (10062, 'invitation_rejected',    'user_event', 'Invitation Rejected',    'User invitation was rejected', true, 'core'),
     (10070, 'external_data_updated',  'user_event', 'External Data Updated',  'User data was updated from external source', true, 'core'),
+    (10080, 'user_blacklisted',      'user_event', 'User Blacklisted',      'User was added to blacklist', true, 'core'),
+    (10081, 'user_unblacklisted',    'user_event', 'User Unblacklisted',    'User was removed from blacklist', true, 'core'),
+    (10082, 'user_creation_blocked', 'user_event', 'User Creation Blocked', 'User creation was blocked by blacklist', true, 'core'),
 
     -- Tenant events (11001-11999)
     (11001, 'tenant_created',         'tenant_event', 'Tenant Created',       'New tenant was created', true, 'core'),
@@ -246,6 +249,8 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     (33013, 'err_group_not_assignable',      'user_error', 'Group Not Assignable',   'User group is not assignable or is external', true, 'core'),
     (33014, 'err_group_is_system',           'user_error', 'Group Is System',        'User group is a system group', true, 'core'),
     (33015, 'err_not_owner',                 'user_error', 'Not Owner',              'User is not tenant or group owner', true, 'core'),
+    (33018, 'err_user_blacklisted',          'user_error', 'User Blacklisted',       'User is blacklisted and cannot be created', true, 'core'),
+    (33019, 'err_identity_blacklisted',      'user_error', 'Identity Blacklisted',   'User identity is blacklisted and cannot be created', true, 'core'),
 
     -- Tenant errors (34001-34999)
     (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true, 'core'),
@@ -303,6 +308,9 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (10061, 'en', 'Invitation was accepted by "{username}"'),
     (10062, 'en', 'Invitation was rejected by "{email}"'),
     (10070, 'en', 'User "{username}" data was updated from external source'),
+    (10080, 'en', 'User "{username}" was added to blacklist by {actor}: {reason}'),
+    (10081, 'en', 'User "{username}" was removed from blacklist by {actor}'),
+    (10082, 'en', 'User creation was blocked by blacklist: {username} {provider_code} {provider_uid}'),
 
     -- Tenant events (11001-11999)
     (11001, 'en', 'Tenant "{tenant_title}" was created by {actor}'),
@@ -384,7 +392,11 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (31011, 'en', 'Event code (event_id: {event_id}) does not exist'),
     (31012, 'en', 'Event category "{category_code}" still has event codes and cannot be deleted'),
     (31013, 'en', 'Event ID {event_id} is outside the allowed range ({range_start}-{range_end}) for category "{category_code}"'),
-    (31014, 'en', 'Event category "{category_code}" does not exist')
+    (31014, 'en', 'Event category "{category_code}" does not exist'),
+
+    -- Blacklist error messages (33018-33019)
+    (33018, 'en', 'User (username: {username}) is blacklisted and cannot be created'),
+    (33019, 'en', 'User identity (provider: {provider_code}, uid: {provider_uid}) is blacklisted and cannot be created')
 ON CONFLICT DO NOTHING;
 
 -- Create system user, primary tenant, and seed all permissions/providers/groups

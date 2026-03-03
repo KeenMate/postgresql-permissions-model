@@ -564,6 +564,32 @@ end;
 $$;
 
 /*
+ * Blacklist Errors (33018-33019)
+ */
+
+-- 33018: User is blacklisted
+create or replace function error.raise_33018(_username text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User (username: %) is blacklisted and cannot be created', _username
+        using errcode = '33018';
+end;
+$$;
+
+-- 33019: User identity is blacklisted
+create or replace function error.raise_33019(_provider_code text, _identifier text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User identity (provider: %, uid: %) is blacklisted and cannot be created', _provider_code, _identifier
+        using errcode = '33019';
+end;
+$$;
+
+/*
  * Backwards Compatibility Aliases
  * ===============================
  * These functions maintain the old naming convention for backwards compatibility.
@@ -623,4 +649,8 @@ create or replace function error.raise_52114(_provider_code text) returns void l
 
 -- Owner errors
 create or replace function error.raise_52401(_user_id bigint, _user_group_id integer, _tenant_id integer DEFAULT 1) returns void language sql as $$ select error.raise_33015(_user_id, _user_group_id, _tenant_id); $$;
+
+-- Blacklist errors
+create or replace function error.raise_52115(_username text) returns void language sql as $$ select error.raise_33018(_username); $$;
+create or replace function error.raise_52116(_provider_code text, _identifier text) returns void language sql as $$ select error.raise_33019(_provider_code, _identifier); $$;
 
