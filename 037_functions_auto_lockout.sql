@@ -65,11 +65,11 @@ begin
         return false;
     end if;
 
-    -- Count recent login failures within the window
+    -- Count recent login and MFA failures within the window
     select count(*)
     from auth.user_event ue
     where ue.target_user_id = _target_user_id
-      and ue.event_type_code = 'user_login_failed'
+      and ue.event_type_code in ('user_login_failed', 'mfa_challenge_failed')
       and ue.created_at >= now() - make_interval(mins => __window_minutes)
     into __failure_count;
 

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.1] - 2026-03-04
+
+### Changed
+
+#### MFA Failures Count Toward Auto-Lockout
+
+Failed MFA challenges now count toward the auto-lockout threshold alongside wrong password attempts. Previously, invalid TOTP codes only raised 38004 with no lockout consequence, making 6-digit TOTP codes a brute-force vector.
+
+**Changes:**
+
+- `unsecure.check_and_auto_lock_user` — now counts both `user_login_failed` and `mfa_challenge_failed` events within the lockout window
+- `auth.verify_mfa_challenge` — on failure (Case 3), logs `mfa_challenge_failed` event and calls `check_and_auto_lock_user`. Raises 33004 (user locked) if threshold exceeded, otherwise raises 38004 (MFA challenge failed)
+
 ## [2.19.0] - 2026-03-04
 
 ### Added

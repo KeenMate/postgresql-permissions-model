@@ -463,6 +463,22 @@ begin
         updated_by       = _updated_by
     where token_id = __token.token_id;
 
+    -- Log MFA failure event (counted by auto-lockout)
+    perform unsecure.create_user_event(
+        _updated_by, _user_id, _correlation_id, 'mfa_challenge_failed',
+        _target_user_id,
+        _request_context := _request_context,
+        _event_data := jsonb_build_object('mfa_type', __token.token_data ->> 'mfa_type',
+                                          'token_uid', _token_uid)
+    );
+
+    -- Check and possibly auto-lock (MFA failures count toward lockout threshold)
+    if unsecure.check_and_auto_lock_user(
+        _updated_by, _correlation_id, _target_user_id, _request_context
+    ) then
+        perform error.raise_33004(_target_user_id);
+    end if;
+
     perform error.raise_38004();
 end;
 $$;
