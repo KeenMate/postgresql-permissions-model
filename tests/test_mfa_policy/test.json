@@ -1,0 +1,6 @@
+{
+  "name": "MFA Policy",
+  "description": "Verifies MFA reset recovery codes, MFA policy CRUD, scope resolution (user > group > tenant > global), and error cases",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

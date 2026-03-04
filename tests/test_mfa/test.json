@@ -1,0 +1,6 @@
+{
+  "name": "MFA",
+  "description": "Verifies MFA enrollment, confirmation, challenge, verification (TOTP + recovery), disable, and error cases",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

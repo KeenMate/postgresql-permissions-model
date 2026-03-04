@@ -1,0 +1,31 @@
+set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
+
+-- ============================================================================
+-- SETUP: Create test user with email identity for auto-lockout tests
+-- ============================================================================
+DO $$
+DECLARE
+    __test_user_id   bigint;
+    __system_user_id bigint := 1;
+BEGIN
+    RAISE NOTICE '==========================================';
+    RAISE NOTICE 'Test: Auto-Lockout';
+    RAISE NOTICE '==========================================';
+    RAISE NOTICE '';
+    RAISE NOTICE '-- Setup --';
+
+    -- Create test user
+    INSERT INTO auth.user_info (created_by, updated_by, username, original_username, email, display_name, user_type_code, is_active, is_locked, can_login)
+    VALUES ('test', 'test', 'test_autolock_user', 'test_autolock_user', 'autolock@test.com', 'Test AutoLock User', 'normal', true, false, true)
+    RETURNING user_id INTO __test_user_id;
+
+    -- Create email identity for the user
+    INSERT INTO auth.user_identity (created_by, updated_by, provider_code, user_id, uid, provider_oid, is_active, password_hash, password_salt)
+    VALUES ('test', 'test', 'email', __test_user_id, 'autolock@test.com', 'autolock@test.com', true, 'fakehash', 'fakesalt');
+
+    -- Store IDs for subsequent test files
+    PERFORM set_config('test.autolock_user_id', __test_user_id::text, false);
+    PERFORM set_config('test.system_user_id', __system_user_id::text, false);
+
+    RAISE NOTICE 'Created test user: % (id: %)', 'autolock@test.com', __test_user_id;
+END $$;

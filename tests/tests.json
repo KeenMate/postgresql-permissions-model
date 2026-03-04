@@ -15,6 +15,9 @@
     "test_search_functions",
     "test_resource_access",
     "test_ensure_functions",
-    "test_user_blacklist"
+    "test_user_blacklist",
+    "test_auto_lockout",
+    "test_mfa",
+    "test_mfa_policy"
   ]
 }

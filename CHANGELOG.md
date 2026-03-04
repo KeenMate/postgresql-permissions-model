@@ -5,6 +5,150 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.19.0] - 2026-03-04
+
+### Added
+
+#### MFA Recovery Code Reset
+
+New function to regenerate recovery codes for a confirmed MFA enrollment, without requiring disable + re-enroll. Addresses the scenario where a user has lost their recovery codes but still has their TOTP authenticator.
+
+**New function:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `auth.reset_mfa(_updated_by, _user_id, _correlation_id, _target_user_id, _mfa_type_code, _request_context)` | auth | Generates 10 new recovery codes, replaces existing hashes. Returns plaintext codes (shown once). Validates enrollment exists (38002) and is confirmed (38003). Permission: `mfa.reset_mfa`. |
+
+**New permission:** `mfa.reset_mfa`
+
+**New event code:** 10097 `mfa_recovery_reset` — logged when recovery codes are regenerated.
+
+#### MFA Policy (Enforcement Rules)
+
+Scope-based rules table (`auth.mfa_policy`) to signal whether MFA is required for specific users, groups, tenants, or globally. Resolution: most-specific scope wins (user > group > tenant > global). Without any rules, MFA remains optional (default: `false`).
+
+**New table:** `auth.mfa_policy` — columns: `mfa_policy_id` (identity PK), `tenant_id` (FK → tenant, nullable), `user_group_id` (FK → user_group, nullable), `user_id` (FK → user_info, nullable), `mfa_required boolean`, audit columns. Unique index on `coalesce(tenant_id, -1), coalesce(user_group_id, -1), coalesce(user_id, -1)` for null-safe deduplication.
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `auth.create_mfa_policy(...)` | auth | Creates an MFA enforcement rule. Scope determined by which params are null (all null = global). Permission: `mfa.mfa_policy.create_mfa_policy`. |
+| `auth.delete_mfa_policy(...)` | auth | Deletes a policy rule. Validates existence (38007). Permission: `mfa.mfa_policy.delete_mfa_policy`. |
+| `auth.get_mfa_policies(...)` | auth | Lists policies filtered by optional scope params. Permission: `mfa.mfa_policy.get_mfa_policies`. |
+| `unsecure.is_mfa_required(_target_user_id, _tenant_id)` | unsecure | Resolves whether MFA is required. No permission check (login flow). Resolution: user-level → group-level (`bool_or` via `get_cached_group_ids`) → tenant-level → global → `false`. |
+| `auth.is_mfa_required(_user_id, _correlation_id, _target_user_id, _tenant_id)` | auth | Permission-checked wrapper (reuses `mfa.get_mfa_status` permission). |
+
+**New permissions** (hierarchy under `mfa.mfa_policy`):
+- `mfa.mfa_policy` (parent, not assignable)
+- `mfa.mfa_policy.create_mfa_policy`, `mfa.mfa_policy.delete_mfa_policy`, `mfa.mfa_policy.get_mfa_policies`
+
+**New event codes:**
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 10095 | mfa_policy_created | MFA policy rule was created |
+| 10096 | mfa_policy_deleted | MFA policy rule was deleted |
+
+**New error code:**
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 38007 | error.raise_38007 | MFA policy does not exist |
+
+**Tests:** `tests/test_mfa_policy/` — 10 test files covering reset MFA (happy path + error cases 38002/38003), global/tenant/group/user policy creation with scope resolution cascade, policy deletion with fallback verification, get_mfa_policies filtering, error cases (38007 not found, unique violation on duplicate scope).
+
+**Files:** `039_mfa_policy.sql`, `040_functions_mfa_policy.sql`
+
+## [2.18.0] - 2026-03-04
+
+### Added
+
+#### Auto-Lockout on Repeated Login Failures
+
+Automatic account lockout after too many failed login attempts within a configurable time window. Previously, locking was manual-only via `auth.lock_user()`.
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `unsecure.check_and_auto_lock_user(_updated_by, _correlation_id, _target_user_id, _request_context)` | unsecure | Counts recent `user_login_failed` events within the configured window. If threshold exceeded: sets `is_locked=true`, clears permission cache, logs `user_auto_locked` event. Returns true if locked, false otherwise. Skips if user already locked (no duplicate events). |
+| `auth.record_login_failure(_user_id, _correlation_id, _target_user_id, _email, _request_context)` | auth | Called by app after password hash mismatch (DB never sees raw passwords). Logs `user_login_failed` event with reason `wrong_password`, then calls `check_and_auto_lock_user()`. Raises 33004 (user locked) if auto-locked, otherwise raises 52103 (invalid credentials). Requires `authentication.get_data` permission. |
+
+**New system parameters** (`const.sys_param`):
+
+| group_code | code | default | description |
+|------------|------|---------|-------------|
+| `login_lockout` | `max_failed_attempts` | `5` | Number of failures before auto-lock |
+| `login_lockout` | `window_minutes` | `15` | Time window in minutes for counting failures |
+
+**New event code:** 10083 `user_auto_locked` — logged when auto-lockout triggers.
+
+**Login flow (app layer):**
+1. App calls `auth.get_user_by_email_for_authentication(email)` → gets user + password hash
+2. App verifies password hash
+3. If wrong: app calls `auth.record_login_failure()` → DB counts failures, maybe auto-locks
+4. If correct + MFA enabled: proceed to MFA challenge flow
+
+**Tests:** `tests/test_auto_lockout/` — 5 tests covering sys_param verification, single failure (no lock), threshold triggers lock + event, no duplicate events on already-locked user, window expiry (old failures not counted).
+
+**Files:** `036_tables_mfa.sql`, `037_functions_auto_lockout.sql`
+
+#### Multi-Factor Authentication (TOTP)
+
+Complete MFA implementation with two-step enrollment (enroll → confirm), TOTP verification, and one-time recovery codes. The DB stores app-encrypted TOTP secrets and SHA-256 hashed recovery codes — the DB never sees raw TOTP secrets or codes.
+
+**New tables:**
+
+| Table | Description |
+|-------|-------------|
+| `const.mfa_type` | MFA type lookup (currently `totp` only). Columns: `code` (PK), `title`, `is_active`. |
+| `auth.user_mfa` | User MFA enrollment. Columns: `user_mfa_id` (identity PK), `user_id` (FK → user_info, cascade), `mfa_type_code` (FK → mfa_type), `secret_encrypted`, `is_enabled`, `is_confirmed`, `recovery_codes text[]` (SHA-256 hashes), `enrolled_at`, `confirmed_at`, audit columns. Unique on `(user_id, mfa_type_code)`. |
+
+**New extension:** `pgcrypto` (schema `ext`) — used for `digest()` to hash recovery codes.
+
+**New token state:** `'invalid'` added to `const.token_state` — used for invalidating previous MFA tokens.
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `auth.enroll_mfa(...)` | auth | Initiates TOTP enrollment. App provides encrypted secret. Generates 10 recovery codes (returned plaintext once, stored as SHA-256 hashes). Rejects if already confirmed (38001), replaces pending enrollments. Permission: `mfa.enroll_mfa`. |
+| `auth.confirm_mfa_enrollment(...)` | auth | Confirms enrollment. App verifies TOTP code externally, passes `_code_is_valid boolean`. Sets `is_enabled=true, is_confirmed=true`. Permission: `mfa.confirm_mfa_enrollment`. |
+| `auth.disable_mfa(...)` | auth | Deletes MFA enrollment record. Logs `mfa_disabled` event. Permission: `mfa.disable_mfa`. |
+| `auth.get_mfa_status(...)` | auth | Returns enrollment state + `recovery_codes_remaining`. Permission: `mfa.get_mfa_status`. |
+| `auth.create_mfa_challenge(...)` | auth | Creates time-limited token (type=`mfa`, channel=`app`, 300s default). Invalidates previous valid MFA tokens. Validates MFA is enrolled + confirmed + enabled. Permission: `mfa.create_mfa_challenge`. |
+| `auth.verify_mfa_challenge(...)` | auth | Three-way verification: (1) `_code_is_valid=true` → TOTP passed, (2) `_code_is_valid=false` + `_recovery_code` → hash-match against stored codes (consumed on use), (3) neither → token marked failed + error 38004. Permission: `mfa.verify_mfa_challenge`. |
+
+**New permissions** (hierarchy under `mfa`):
+- `mfa` (parent, not assignable)
+- `mfa.enroll_mfa`, `mfa.confirm_mfa_enrollment`, `mfa.disable_mfa`, `mfa.get_mfa_status`, `mfa.create_mfa_challenge`, `mfa.verify_mfa_challenge`
+
+**New event codes:**
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 10090 | mfa_enrolled | MFA enrollment was initiated |
+| 10091 | mfa_enrollment_confirmed | MFA enrollment was confirmed with a valid code |
+| 10092 | mfa_challenge_created | MFA challenge token was created |
+| 10093 | mfa_challenge_passed | MFA challenge was successfully verified |
+| 10094 | mfa_recovery_used | MFA recovery code was used to pass challenge |
+
+**New error codes** (category `mfa_error`, range 38001-38999):
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 38001 | error.raise_38001 | MFA is already enrolled and confirmed for this type |
+| 38002 | error.raise_38002 | MFA is not enrolled for this type |
+| 38003 | error.raise_38003 | MFA enrollment is not confirmed |
+| 38004 | error.raise_38004 | The provided MFA code is not valid |
+| 38005 | error.raise_38005 | MFA verification is required |
+| 38006 | error.raise_38006 | MFA type does not exist or is inactive |
+
+**Tests:** `tests/test_mfa/` — 8 test files covering enrollment (recovery codes, pending state), re-enrollment blocking (38001), confirmation (valid + invalid code), status query, challenge + TOTP verification, recovery code verification (count decrement), disable (record deletion), error cases (non-existent token, invalid code, non-enrolled user, invalid MFA type).
+
+**Files:** `036_tables_mfa.sql`, `038_functions_mfa.sql`
+
 ## [2.17.0] - 2026-03-02
 
 ### Added

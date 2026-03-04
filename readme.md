@@ -18,6 +18,8 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
 - **App bootstrapping** with idempotent ensure functions and optional `_is_final_state` declarative sync
+- **Auto-lockout** on repeated login failures with configurable threshold and time window
+- **Multi-factor authentication (TOTP)** with two-step enrollment, recovery codes, challenge/verify flow, recovery reset, and policy-based enforcement
 - **User blacklist** for blocking re-creation of deleted/banned users (username + provider identity)
 - **Permission caching** for performance with automatic invalidation
 - **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
@@ -148,6 +150,8 @@ The `_source` parameter scopes deletions — each module manages only its own it
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
 - **`auth.resource_access`** - Resource-level ACL (list-partitioned by resource_type)
+- **`auth.user_mfa`** - MFA enrollment state, encrypted secrets, hashed recovery codes
+- **`auth.mfa_policy`** - MFA enforcement rules (scope: user > group > tenant > global)
 - **`auth.user_blacklist`** - Blacklist for deleted/banned user identities
 - **`auth.api_key`** - Service authentication with technical users
 - **`const.language`** / **`public.translation`** - Language registry and translation storage with full-text search
@@ -416,6 +420,8 @@ select auth.update_sys_param(1, 'journal', 'level', 'all');
 | `user_event` | `retention_days` | `365` | text (cast to int) | How many days of user events to keep. Used by `purge_audit_data()` |
 | `user_event` | `storage_mode` | `local` | text | Where user event data goes. Same modes as journal |
 | `partition` | `months_ahead` | `3` | number | How many future monthly partitions to pre-create for journal and user_event tables |
+| `login_lockout` | `max_failed_attempts` | `5` | number | Number of failed login attempts before auto-lock |
+| `login_lockout` | `window_minutes` | `15` | number | Time window in minutes for counting failed login attempts |
 | `auth` | `perm_cache_timeout_in_s` | `300` (fallback) | number | Permission cache TTL in seconds. Not seeded — uses hardcoded fallback if missing |
 
 ## Real-Time Permission Notifications
@@ -571,6 +577,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 35001-35999 | Resource Access Errors | Resource ACL errors |
 | 36001-36999 | Token Config Errors | Token configuration errors |
 | 37001-37999 | Language/Translation Errors | Language and translation errors |
+| 38001-38999 | MFA Errors | Multi-factor authentication errors |
 | 50000+ | Reserved | Application-specific events and errors |
 
 ### Informational Events (10xxx-21xxx)
@@ -608,6 +615,15 @@ The system uses structured event/error codes organized by category. Codes are st
 | 10080 | user_blacklisted | User was added to blacklist |
 | 10081 | user_unblacklisted | User was removed from blacklist |
 | 10082 | user_creation_blocked | User creation was blocked by blacklist |
+| 10083 | user_auto_locked | User auto-locked after too many failed login attempts |
+| 10090 | mfa_enrolled | MFA enrollment was initiated |
+| 10091 | mfa_enrollment_confirmed | MFA enrollment was confirmed with a valid code |
+| 10092 | mfa_challenge_created | MFA challenge token was created |
+| 10093 | mfa_challenge_passed | MFA challenge was successfully verified |
+| 10094 | mfa_recovery_used | MFA recovery code was used to pass challenge |
+| 10095 | mfa_policy_created | MFA policy rule was created |
+| 10096 | mfa_policy_deleted | MFA policy rule was deleted |
+| 10097 | mfa_recovery_reset | MFA recovery codes were regenerated |
 
 #### Tenant Events (11001-11999)
 
@@ -709,7 +725,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 21003 | translation_deleted | Translation was deleted |
 | 21004 | translations_copied | Translations were copied between languages |
 
-### Error Codes (30xxx-37xxx)
+### Error Codes (30xxx-38xxx)
 
 #### Security Errors (30001-30999)
 
@@ -786,6 +802,18 @@ The system uses structured event/error codes organized by category. Codes are st
 |------|----------|-------------|
 | 37001 | error.raise_37001 | Language does not exist |
 | 37002 | error.raise_37002 | Translation does not exist |
+
+#### MFA Errors (38001-38999)
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 38001 | error.raise_38001 | MFA is already enrolled and confirmed for this type |
+| 38002 | error.raise_38002 | MFA is not enrolled for this type |
+| 38003 | error.raise_38003 | MFA enrollment is not confirmed |
+| 38004 | error.raise_38004 | The provided MFA code is not valid |
+| 38005 | error.raise_38005 | MFA verification is required |
+| 38006 | error.raise_38006 | MFA type does not exist or is inactive |
+| 38007 | error.raise_38007 | MFA policy does not exist |
 
 ### Legacy Code Mapping (v1 Compatibility)
 

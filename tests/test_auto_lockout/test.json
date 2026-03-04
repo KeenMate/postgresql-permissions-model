@@ -1,0 +1,6 @@
+{
+  "name": "Auto-Lockout",
+  "description": "Verifies auto-lockout after repeated login failures: sys_param config, threshold detection, event logging, window expiry",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}
