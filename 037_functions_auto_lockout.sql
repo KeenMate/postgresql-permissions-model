@@ -13,6 +13,8 @@
  *   5. User provides TOTP, app verifies, calls auth.verify_mfa_challenge()
  */
 
+set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
+
 -- ---------------------------------------------------------------------------
 -- unsecure.check_and_auto_lock_user
 -- ---------------------------------------------------------------------------

@@ -10,6 +10,8 @@
  * - auth.verify_mfa_challenge()    — verify TOTP code or recovery code against challenge
  */
 
+set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
+
 -- ---------------------------------------------------------------------------
 -- auth.enroll_mfa
 -- ---------------------------------------------------------------------------

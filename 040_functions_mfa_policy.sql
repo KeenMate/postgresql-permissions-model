@@ -10,6 +10,8 @@
  * - auth.is_mfa_required()     — permission-checked wrapper
  */
 
+set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
+
 -- ---------------------------------------------------------------------------
 -- auth.reset_mfa
 -- ---------------------------------------------------------------------------
