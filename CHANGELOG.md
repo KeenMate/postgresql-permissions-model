@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.20.0] - 2026-03-05
+
+### Added
+
+#### Single-Call Email/Password Verification
+
+New function `auth.verify_user_by_email` that combines email lookup, status validation, password hash comparison, failure recording, and auto-lockout into a single DB call. Symmetric with `auth.verify_mfa_challenge` which already handles everything in one call.
+
+**New function:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `auth.verify_user_by_email(_user_id, _correlation_id, _email, _password_hash, _request_context)` | auth | Looks up user by email, validates status, compares password hash. Returns user data on success. On mismatch: logs `user_login_failed` (reason: `wrong_password`), triggers auto-lockout check. Raises 33004 if auto-locked, 52103 otherwise. Permission: `authentication.get_data`. |
+
+**Key difference from `get_user_by_email_for_authentication`:** Only logs `user_logged_in` after a confirmed hash match (cleaner audit trail). Does not return `password_hash`/`password_salt` since the DB does the comparison. The existing two-step flow (`get_user_by_email_for_authentication` + `record_login_failure`) remains unchanged for apps that prefer it.
+
 ## [2.19.1] - 2026-03-04
 
 ### Changed
