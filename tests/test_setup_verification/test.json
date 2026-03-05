@@ -1,0 +1,6 @@
+{
+  "name": "Setup Verification",
+  "description": "Verifies database setup completed successfully: all schemas exist, core tables present, seed data loaded, all permissions created, event codes registered",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

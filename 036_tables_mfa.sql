@@ -91,6 +91,8 @@ insert into const.event_code (event_id, code, category_code, title, description,
     (10092, 'mfa_challenge_created',      'user_event', 'MFA Challenge Created',      'MFA challenge token was created', true, 'core'),
     (10093, 'mfa_challenge_passed',       'user_event', 'MFA Challenge Passed',       'MFA challenge was successfully verified', true, 'core'),
     (10094, 'mfa_recovery_used',          'user_event', 'MFA Recovery Code Used',     'MFA recovery code was used to pass challenge', true, 'core'),
+    (10098, 'mfa_disabled',              'user_event', 'MFA Disabled',               'MFA was disabled for a user', true, 'core'),
+    (10099, 'mfa_challenge_failed',      'user_event', 'MFA Challenge Failed',       'MFA challenge verification failed (wrong code)', true, 'core'),
     -- MFA errors (38001-38999)
     (38001, 'err_mfa_already_enrolled',   'mfa_error', 'MFA Already Enrolled',       'MFA is already enrolled and confirmed for this type', true, 'core'),
     (38002, 'err_mfa_not_enrolled',       'mfa_error', 'MFA Not Enrolled',           'MFA is not enrolled for this type', true, 'core'),

@@ -27,12 +27,12 @@ BEGIN
     RETURNING user_id INTO __user2_id;
 
     -- Create test group and add user1
-    INSERT INTO auth.user_group (created_by, updated_by, tenant_id, title, code, is_active, group_type_code)
-    VALUES ('test', 'test', 1, 'MFA Policy Test Group', 'mfapol_test_group', true, 'internal')
+    INSERT INTO auth.user_group (created_by, updated_by, tenant_id, title, code, is_active, is_external)
+    VALUES ('test', 'test', 1, 'MFA Policy Test Group', 'mfapol_test_group', true, false)
     RETURNING user_group_id INTO __group_id;
 
-    INSERT INTO auth.user_group_member (created_by, updated_by, user_group_id, user_id)
-    VALUES ('test', 'test', __group_id, __user1_id);
+    INSERT INTO auth.user_group_member (created_by, user_group_id, user_id)
+    VALUES ('test', __group_id, __user1_id);
 
     -- Enroll + confirm MFA for user1 (needed for reset tests)
     SELECT * INTO __enroll
@@ -47,4 +47,29 @@ BEGIN
 
     RAISE NOTICE 'Created user1: % (id: %), user2: % (id: %), group: % (id: %)',
         'mfapol1@test.com', __user1_id, 'mfapol2@test.com', __user2_id, 'mfapol_test_group', __group_id;
+END $$;
+
+-- ============================================================================
+-- Verify all MFA Policy permissions exist (created by 036 + 039)
+-- ============================================================================
+DO $$
+DECLARE
+    __missing text;
+BEGIN
+    SELECT string_agg(p, ', ')
+    FROM unnest(ARRAY[
+        'mfa', 'mfa.enroll_mfa', 'mfa.confirm_mfa_enrollment', 'mfa.get_mfa_status',
+        'mfa.reset_mfa', 'mfa.mfa_policy',
+        'mfa.mfa_policy.create_mfa_policy', 'mfa.mfa_policy.delete_mfa_policy',
+        'mfa.mfa_policy.get_mfa_policies'
+    ]) AS p
+    WHERE NOT EXISTS (
+        SELECT 1 FROM auth.permission perm WHERE perm.full_code::text = p
+    )
+    INTO __missing;
+
+    IF __missing IS NOT NULL THEN
+        RAISE EXCEPTION 'FAIL: Missing MFA Policy permissions (from 036/039): %. Did setup run without errors?', __missing;
+    END IF;
+    RAISE NOTICE 'PASS: All required MFA Policy permissions exist';
 END $$;

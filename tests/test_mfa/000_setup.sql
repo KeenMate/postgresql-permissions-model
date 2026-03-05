@@ -24,3 +24,26 @@ BEGIN
 
     RAISE NOTICE 'Created test user: % (id: %)', 'mfa@test.com', __test_user_id;
 END $$;
+
+-- ============================================================================
+-- Verify all MFA permissions exist (created by 036_tables_mfa.sql)
+-- ============================================================================
+DO $$
+DECLARE
+    __missing text;
+BEGIN
+    SELECT string_agg(p, ', ')
+    FROM unnest(ARRAY[
+        'mfa', 'mfa.enroll_mfa', 'mfa.confirm_mfa_enrollment', 'mfa.disable_mfa',
+        'mfa.get_mfa_status', 'mfa.create_mfa_challenge', 'mfa.verify_mfa_challenge'
+    ]) AS p
+    WHERE NOT EXISTS (
+        SELECT 1 FROM auth.permission perm WHERE perm.full_code::text = p
+    )
+    INTO __missing;
+
+    IF __missing IS NOT NULL THEN
+        RAISE EXCEPTION 'FAIL: Missing MFA permissions (from 036_tables_mfa.sql): %. Did setup run without errors?', __missing;
+    END IF;
+    RAISE NOTICE 'PASS: All required MFA permissions exist';
+END $$;

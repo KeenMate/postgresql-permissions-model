@@ -28,4 +28,20 @@ BEGIN
     PERFORM set_config('test.system_user_id', __system_user_id::text, false);
 
     RAISE NOTICE 'Created test user: % (id: %)', 'autolock@test.com', __test_user_id;
+
+    -- Verify required permissions exist
+    PERFORM 1 FROM auth.permission WHERE full_code::text = 'authentication';
+    IF NOT FOUND THEN RAISE EXCEPTION 'FAIL: Missing permission: authentication'; END IF;
+    PERFORM 1 FROM auth.permission WHERE full_code::text = 'authentication.get_data';
+    IF NOT FOUND THEN RAISE EXCEPTION 'FAIL: Missing permission: authentication.get_data'; END IF;
+    RAISE NOTICE 'PASS: All required permissions exist';
+
+    -- Verify required event codes exist
+    PERFORM 1 FROM const.event_code WHERE code = 'user_login_failed';
+    IF NOT FOUND THEN RAISE EXCEPTION 'FAIL: Missing event code: user_login_failed'; END IF;
+    PERFORM 1 FROM const.event_code WHERE code = 'user_auto_locked';
+    IF NOT FOUND THEN RAISE EXCEPTION 'FAIL: Missing event code: user_auto_locked'; END IF;
+    PERFORM 1 FROM const.event_code WHERE code = 'mfa_challenge_failed';
+    IF NOT FOUND THEN RAISE EXCEPTION 'FAIL: Missing event code: mfa_challenge_failed'; END IF;
+    RAISE NOTICE 'PASS: All required event codes exist';
 END $$;

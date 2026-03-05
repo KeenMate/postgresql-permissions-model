@@ -1,6 +1,7 @@
 {
   "order": [
     "test_connection",
+    "test_setup_verification",
     "test_connectivity",
     "test_provider_crud",
     "test_registration_login_events",
