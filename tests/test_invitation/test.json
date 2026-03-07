@@ -1,0 +1,6 @@
+{
+  "name": "Invitation System Integration Test Suite",
+  "description": "Tests invitation lifecycle: create, accept, reject, revoke, template-based creation, phase processing, condition evaluation, payload schema resolution, backend action success/failure reporting",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

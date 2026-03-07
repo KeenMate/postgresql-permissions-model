@@ -60,8 +60,7 @@ BEGIN
 
     SELECT count(*) INTO __event_count
     FROM const.event_code
-    WHERE event_id BETWEEN 20001 AND 21999
-       OR event_id BETWEEN 37001 AND 37999;
+    WHERE category_code IN ('language_event', 'translation_event', 'language_error');
 
     IF __category_count = 3 AND __event_count = 9 THEN
         RAISE NOTICE '  PASS: 3 categories and 9 event codes exist';

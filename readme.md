@@ -20,6 +20,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **App bootstrapping** with idempotent ensure functions and optional `_is_final_state` declarative sync
 - **Auto-lockout** on repeated login failures with configurable threshold and time window
 - **Multi-factor authentication (TOTP)** with two-step enrollment, recovery codes, challenge/verify flow, recovery reset, and policy-based enforcement
+- **Invitation system** with phases, conditions, templates, payload schema resolution, and backend/external action orchestration
 - **User blacklist** for blocking re-creation of deleted/banned users (username + provider identity)
 - **Permission caching** for performance with automatic invalidation
 - **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
@@ -152,6 +153,8 @@ The `_source` parameter scopes deletions — each module manages only its own it
 - **`auth.resource_access`** - Resource-level ACL (list-partitioned by resource_type)
 - **`auth.user_mfa`** - MFA enrollment state, encrypted secrets, hashed recovery codes
 - **`auth.mfa_policy`** - MFA enforcement rules (scope: user > group > tenant > global)
+- **`auth.invitation`** - Invitation lifecycle with phases, conditions, and action orchestration
+- **`auth.invitation_template`** - Reusable invitation templates with action definitions
 - **`auth.user_blacklist`** - Blacklist for deleted/banned user identities
 - **`auth.api_key`** - Service authentication with technical users
 - **`const.language`** / **`public.translation`** - Language registry and translation storage with full-text search
@@ -289,6 +292,7 @@ SELECT * FROM search_journal(
 | `resource_event` | Resource access (ACL) operations |
 | `language_event` | Language CRUD |
 | `translation_event` | Translation CRUD and copy operations |
+| `invitation_event` | Invitation lifecycle, actions, and templates |
 
 ### Audit Summary Queries
 
@@ -569,6 +573,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 19001-19999 | Token Config Events | Token configuration changes |
 | 20001-20999 | Language Events | Language CRUD |
 | 21001-21999 | Translation Events | Translation CRUD and copy operations |
+| 22001-22999 | Invitation Events | Invitation lifecycle, actions, and templates |
 | 30001-30999 | Security Errors | Authentication and token errors |
 | 31001-31999 | Validation Errors | Missing required parameters |
 | 32001-32999 | Permission Errors | Permission not found, not assignable |
@@ -578,6 +583,7 @@ The system uses structured event/error codes organized by category. Codes are st
 | 36001-36999 | Token Config Errors | Token configuration errors |
 | 37001-37999 | Language/Translation Errors | Language and translation errors |
 | 38001-38999 | MFA Errors | Multi-factor authentication errors |
+| 39001-39999 | Invitation Errors | Invitation lifecycle errors |
 | 50000+ | Reserved | Application-specific events and errors |
 
 ### Informational Events (10xxx-21xxx)
@@ -608,9 +614,6 @@ The system uses structured event/error codes organized by category. Codes are st
 | 10041 | phone_verified | User phone was verified |
 | 10050 | mfa_enabled | Multi-factor authentication was enabled |
 | 10051 | mfa_disabled | Multi-factor authentication was disabled |
-| 10060 | invitation_sent | User invitation was sent |
-| 10061 | invitation_accepted | User invitation was accepted |
-| 10062 | invitation_rejected | User invitation was rejected |
 | 10070 | external_data_updated | User data was updated from external source |
 | 10080 | user_blacklisted | User was added to blacklist |
 | 10081 | user_unblacklisted | User was removed from blacklist |
@@ -725,7 +728,24 @@ The system uses structured event/error codes organized by category. Codes are st
 | 21003 | translation_deleted | Translation was deleted |
 | 21004 | translations_copied | Translations were copied between languages |
 
-### Error Codes (30xxx-38xxx)
+#### Invitation Events (22001-22999)
+
+| Code | Event | Description |
+|------|-------|-------------|
+| 22001 | invitation_created | New invitation was created |
+| 22002 | invitation_accepted | Invitation was accepted by the recipient |
+| 22003 | invitation_rejected | Invitation was rejected by the recipient |
+| 22004 | invitation_revoked | Invitation was revoked by the inviter |
+| 22005 | invitation_expired | Invitation expired without response |
+| 22006 | invitation_action_completed | An invitation action was completed |
+| 22007 | invitation_action_failed | An invitation action failed |
+| 22008 | invitation_completed | All invitation actions were completed |
+| 22009 | invitation_failed | Invitation processing failed due to a required action failure |
+| 22010 | invitation_template_created | Invitation template was created |
+| 22011 | invitation_template_updated | Invitation template was updated |
+| 22012 | invitation_template_deleted | Invitation template was deleted |
+
+### Error Codes (30xxx-39xxx)
 
 #### Security Errors (30001-30999)
 
@@ -814,6 +834,17 @@ The system uses structured event/error codes organized by category. Codes are st
 | 38005 | error.raise_38005 | MFA verification is required |
 | 38006 | error.raise_38006 | MFA type does not exist or is inactive |
 | 38007 | error.raise_38007 | MFA policy does not exist |
+
+#### Invitation Errors (39001-39999)
+
+| Code | Function | Description |
+|------|----------|-------------|
+| 39001 | error.raise_39001 | Invitation does not exist |
+| 39002 | error.raise_39002 | Invitation is not in pending state |
+| 39003 | error.raise_39003 | Invitation has expired |
+| 39004 | error.raise_39004 | Invitation action does not exist |
+| 39005 | error.raise_39005 | Invitation action is not in pending or processing state |
+| 39006 | error.raise_39006 | Invitation template does not exist or is inactive |
 
 ### Legacy Code Mapping (v1 Compatibility)
 

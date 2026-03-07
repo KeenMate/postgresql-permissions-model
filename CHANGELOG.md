@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.0] - 2026-03-07
+
+### Added
+
+#### Invitation System
+
+A generic invitation system that supports inviting users to tenants, groups, permission sets, individual permissions, and resource-access-controlled entities (projects, documents, etc.). Invitations carry ordered, typed actions that are executed when accepted — database actions run immediately, while backend/external actions are returned to the caller for async processing.
+
+**New tables:**
+
+| Table | Schema | Description |
+|-------|--------|-------------|
+| `const.invitation_status` | const | Invitation status codes (pending, accepted, rejected, revoked, expired, processing, completed, failed) |
+| `const.invitation_action_status` | const | Action status codes (pending, processing, completed, failed, skipped) |
+| `const.invitation_executor` | const | Executor types: `database`, `backend`, `external` |
+| `const.invitation_phase` | const | Action phases: `on_create`, `on_accept`, `on_reject`, `on_expired` |
+| `const.invitation_condition` | const | Pre-execution conditions: `always`, `user_not_in_tenant`, `user_not_in_group`, `user_has_no_perm_set`, `user_has_no_resource_access` |
+| `const.invitation_action_type` | const | Registry of action types with executor binding and `payload_schema` (describes required fields and their sources for auto-population from invitation context) |
+| `auth.invitation` | auth | Main invitation table with uuid, target_email, status, message, expires_at, template reference |
+| `auth.invitation_action` | auth | 1:N ordered actions per invitation with phase_code, condition_code, sequence (ordering), is_required (failure handling), payload, result_data |
+| `auth.invitation_template` | auth | Reusable named templates (tenant-scoped or global) |
+| `auth.invitation_template_action` | auth | Template action definitions with phase_code, condition_code, payload_template |
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `unsecure.create_invitation` | unsecure | Creates a new invitation |
+| `unsecure.accept_invitation` | unsecure | Validates and accepts an invitation (pending → processing) |
+| `unsecure.reject_invitation` | unsecure | Rejects an invitation, skips all actions |
+| `unsecure.revoke_invitation` | unsecure | Revokes an invitation, skips all actions |
+| `unsecure.complete_invitation_action` | unsecure | Marks an action as completed |
+| `unsecure.fail_invitation_action` | unsecure | Marks an action as failed; if required, skips later sequences and fails invitation |
+| `unsecure.check_invitation_completion` | unsecure | Helper: checks if all actions done, marks invitation completed |
+| `unsecure.evaluate_invitation_condition` | unsecure | Evaluates a condition_code against current state (tenant membership, group membership, etc.) |
+| `unsecure.resolve_action_payload` | unsecure | Resolves payload_schema for backend/external actions — auto-populates fields from invitation context based on `source` mappings |
+| `unsecure.get_invitations` | unsecure | Lists invitations with filtering and action counts |
+| `unsecure.get_invitation_actions` | unsecure | Lists actions for an invitation |
+| `unsecure.create_invitation_from_template` | unsecure | Creates invitation from a template with payload overrides |
+| `unsecure.execute_database_action` | unsecure | Executes a single database action (add_tenant_user, add_group_member, etc.) |
+| `unsecure.process_invitation_actions` | unsecure | Processes all actions: executes database ones, returns backend/external as pending |
+| `unsecure.create_invitation_template` | unsecure | Creates a template with actions |
+| `unsecure.update_invitation_template` | unsecure | Updates template metadata |
+| `unsecure.delete_invitation_template` | unsecure | Deletes a template (cascades actions) |
+| `auth.create_invitation` | auth | Permission-checked invitation creation with inline action array |
+| `auth.accept_invitation` | auth | Permission-checked accept + process actions |
+| `auth.reject_invitation` | auth | Permission-checked reject |
+| `auth.revoke_invitation` | auth | Permission-checked revoke |
+| `auth.get_invitations` | auth | Permission-checked listing |
+| `auth.get_invitation_actions` | auth | Permission-checked action listing |
+| `auth.create_invitation_from_template` | auth | Permission-checked template-based creation |
+| `auth.create_invitation_template` | auth | Permission-checked template creation |
+| `auth.update_invitation_template` | auth | Permission-checked template update |
+| `auth.delete_invitation_template` | auth | Permission-checked template deletion |
+
+**New permissions:** `invitations` (parent), `invitations.create_invitation`, `invitations.accept_invitation`, `invitations.reject_invitation`, `invitations.revoke_invitation`, `invitations.get_invitations`, `invitations.manage_templates`
+
+**New event category:** `invitation_event` (22001-22999), `invitation_error` (39001-39999)
+
+**New event codes:** 22001-22012 (invitation lifecycle + template CRUD), 39001-39006 (invitation errors)
+
+**New error functions:** `error.raise_39001` through `error.raise_39006`
+
+**Execution model:**
+- Each action has a `phase_code` determining **when** it fires: `on_create` (immediate), `on_accept`, `on_reject`, `on_expired`
+- Each action has a `condition_code` evaluated at execution time: `always`, `user_not_in_tenant`, `user_not_in_group`, `user_has_no_perm_set`, `user_has_no_resource_access` — if condition is false, action is skipped
+- Actions are grouped by `sequence` (integer) and processed in order within their phase
+- `is_required = true`: failure stops processing of subsequent sequence groups and fails the invitation
+- `is_required = false`: failure is recorded but processing continues
+- `executor_code = 'database'`: executed immediately during phase processing
+- `executor_code = 'backend'`/`'external'`: returned to caller as pending for async handling
+- `auth.create_invitation` / `auth.create_invitation_from_template` process `on_create` actions immediately and return pending backend/external ones
+- `auth.reject_invitation` processes `on_reject` phase actions (e.g. notify inviter of rejection)
+
+**Files:** `041_tables_invitation.sql`, `042_functions_invitation.sql`
+
+---
+
 ## [2.21.0] - 2026-03-07
 
 ### Added

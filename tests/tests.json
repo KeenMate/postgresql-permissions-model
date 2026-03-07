@@ -19,6 +19,7 @@
     "test_user_blacklist",
     "test_auto_lockout",
     "test_mfa",
-    "test_mfa_policy"
+    "test_mfa_policy",
+    "test_invitation"
   ]
 }
