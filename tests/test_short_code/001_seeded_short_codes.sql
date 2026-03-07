@@ -30,10 +30,12 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 2: Short codes follow hierarchical format';
 
-    -- All short_codes should match pattern: two-digit groups separated by dots
+    -- Auto-computed short_codes should match pattern: two-digit groups separated by dots
+    -- Permissions with explicit custom short_codes (non-core source) are excluded
     SELECT count(*) INTO __bad_count
     FROM auth.permission
-    WHERE short_code !~ '^[0-9]{2}(\.[0-9]{2})*$';
+    WHERE short_code !~ '^[0-9]{2}(\.[0-9]{2})*$'
+      AND (source IS NULL OR source = 'core');
 
     IF __bad_count = 0 THEN
         RAISE NOTICE '  PASS: All short_codes match NN.NN... format';
@@ -51,10 +53,12 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 3: Root permissions have single-segment short_code';
 
+    -- Exclude permissions with explicit custom short_codes (non-core source)
     SELECT count(*) INTO __bad_count
     FROM auth.permission
     WHERE nlevel(node_path) = 1
-      AND short_code LIKE '%.%';
+      AND short_code LIKE '%.%'
+      AND (source IS NULL OR source = 'core');
 
     IF __bad_count = 0 THEN
         RAISE NOTICE '  PASS: All root permissions have single-segment short_code';
@@ -73,9 +77,11 @@ BEGIN
     RAISE NOTICE 'TEST 4: Short code depth matches tree depth';
 
     -- Number of dot-separated segments should equal nlevel(node_path)
+    -- Exclude permissions with explicit custom short_codes (non-core source)
     SELECT count(*) INTO __bad_count
     FROM auth.permission
-    WHERE array_length(string_to_array(short_code, '.'), 1) <> nlevel(node_path);
+    WHERE array_length(string_to_array(short_code, '.'), 1) <> nlevel(node_path)
+      AND (source IS NULL OR source = 'core');
 
     IF __bad_count = 0 THEN
         RAISE NOTICE '  PASS: All short_code depths match tree depths';
