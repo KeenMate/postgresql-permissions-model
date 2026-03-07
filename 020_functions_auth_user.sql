@@ -152,6 +152,25 @@ begin
 end;
 $$;
 
+create or replace function auth.verify_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
+    _request_context jsonb default null)
+    returns void
+    language plpgsql
+as
+$$
+begin
+	perform
+		auth.has_permission(_user_id, _correlation_id, 'users.verify_user_identity');
+
+	perform
+		unsecure.verify_user_identity(_updated_by, _user_id, _correlation_id, _target_user_id, _provider_code);
+
+	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id,
+		'identity_verified', _target_user_id, _request_context := _request_context,
+		_event_data := jsonb_build_object('provider_code', _provider_code));
+end;
+$$;
+
 create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
     _request_context jsonb default null)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
@@ -388,7 +407,7 @@ end;
 $$;
 
 create or replace function auth.get_user_identity(_user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
-    returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb)
+    returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb, __is_verified boolean)
     language plpgsql
 as
 $$
@@ -404,6 +423,7 @@ begin
 				 , uid.provider_groups
 				 , uid.provider_roles
 				 , uid.user_data
+				 , uid.is_verified
 		from auth.user_identity uid
 		where user_id = _target_user_id
 			and provider_code = _provider_code;
@@ -411,7 +431,7 @@ end;
 $$;
 
 create or replace function auth.get_user_identity_by_email(_user_id bigint, _correlation_id text, _email text, _provider_code text)
-    returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb)
+    returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb, __is_verified boolean)
     language plpgsql
 as
 $$
@@ -427,6 +447,7 @@ begin
 				 , uid.provider_groups
 				 , uid.provider_roles
 				 , uid.user_data
+				 , uid.is_verified
 		from auth.user_info ui
 					 inner join auth.user_identity uid on ui.user_id = uid.user_id
 		where ui.email = _email
@@ -693,7 +714,7 @@ begin
 
 		perform
 			unsecure.create_user_identity(_created_by, _user_id, _correlation_id, __target_user_id
-				, _provider_code, _provider_uid, _provider_oid, _is_active := true);
+				, _provider_code, _provider_uid, _provider_oid, _is_active := true, _is_verified := true);
 
 		perform unsecure.create_user_event(_created_by, _user_id, _correlation_id, 'user_registered',
 			__target_user_id,

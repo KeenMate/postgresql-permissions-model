@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2026-03-07
+
+### Added
+
+#### Identity Verification (`is_verified`)
+
+New `is_verified` column on `auth.user_identity` to track whether an identity (e.g., email) has been verified. Defaults to `false`. OAuth identities created via `auth.ensure_user_from_provider` are automatically marked `is_verified := true` since the external provider already verified the identity.
+
+**Schema change:**
+- `auth.user_identity` — new column `is_verified boolean default false not null`
+
+**New functions:**
+
+| Function | Layer | Description |
+|----------|-------|-------------|
+| `unsecure.verify_user_identity(_updated_by, _user_id, _correlation_id, _target_user_id, _provider_code)` | unsecure | Sets `is_verified = true` on the identity. Validates user exists (52001) and identity exists (33009). |
+| `auth.verify_user_identity(_updated_by, _user_id, _correlation_id, _target_user_id, _provider_code, _request_context)` | auth | Permission-checked wrapper. Logs `identity_verified` user event. Permission: `users.verify_user_identity`. |
+
+**New permission:** `users.verify_user_identity`
+
+**New event code:** 10035 `identity_verified` — logged when an identity is marked as verified.
+
+**Updated functions:**
+- `unsecure.create_user_identity` — new optional parameter `_is_verified boolean default false`
+- `auth.ensure_user_from_provider` — passes `_is_verified := true` (OAuth identities are pre-verified)
+- `auth.register_user` — keeps default `_is_verified := false` (email needs verification)
+- `auth.get_user_identity` / `auth.get_user_identity_by_email` — now return `__is_verified`
+
+#### MFA Permissions Auto-Assignment
+
+New MFA permissions created in migrations 036/039 are now automatically added to all existing assignable permission sets, so users don't lose MFA access after migration.
+
+**Changes:**
+- `036_tables_mfa.sql` — after creating MFA permissions, loops through all assignable `perm_set` entries and adds the 6 core MFA permissions
+- `039_mfa_policy.sql` — same pattern for the 4 MFA policy permissions (`mfa.reset_mfa`, `mfa.mfa_policy.*`)
+
+### Fixed
+
+#### Test Fixes
+
+- `test_user_blacklist/000_setup.sql` — removed `updated_by` from `tenant_user` and `permission_assignment` inserts (columns don't exist on those tables), fixed `clear_permission_cache` call signature
+- `test_auto_lockout/006-008` — fixed test ordering issues: unlock user and clear failure events between lockout tests and verify_user_by_email tests; removed event checks from `BEGIN...EXCEPTION` blocks (PostgreSQL rolls back side effects on exception)
+
 ## [2.20.0] - 2026-03-05
 
 ### Added

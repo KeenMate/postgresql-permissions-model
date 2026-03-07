@@ -673,7 +673,8 @@ function Invoke-SuiteTransaction {
 			$suiteResult.PassCount += $sectionPassCount
 			$suiteResult.FailCount += $sectionFailCount
 
-			$sectionHasFailures = $sectionFailCount -gt 0
+			$sectionErrorCount = ([regex]::Matches($sectionText, "ERROR")).Count
+			$sectionHasFailures = $sectionFailCount -gt 0 -or $sectionErrorCount -gt 0
 
 			if ($ShowDetail) {
 				if ($sectionName -ne "(preamble)") {

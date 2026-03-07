@@ -13,6 +13,12 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '-- Test 6: verify_user_by_email — correct hash --';
 
+    -- Unlock the user (was locked by test 3) and clear old failure events
+    UPDATE auth.user_info SET is_locked = false WHERE user_id = __test_user_id;
+    DELETE FROM auth.user_event
+    WHERE target_user_id = __test_user_id
+      AND event_type_code IN ('user_login_failed', 'user_auto_locked', 'mfa_challenge_failed');
+
     -- Call with the correct hash ('fakehash' from setup)
     SELECT * FROM auth.verify_user_by_email(
         __system_user_id, 'test-corr-06', 'autolock@test.com', 'fakehash'

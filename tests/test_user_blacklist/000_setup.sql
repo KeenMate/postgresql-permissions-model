@@ -32,19 +32,19 @@ BEGIN
     FROM unsecure.create_user_info('test_bl', 1, 'test_blacklist', 'bl_admin_user@test.com', 'bl_admin@test.com', 'Blacklist Admin', null);
 
     -- Add to first tenant
-    INSERT INTO auth.tenant_user (created_by, updated_by, user_id, tenant_id)
-    VALUES ('test_bl', 'test_bl', __test_user_id, 1)
+    INSERT INTO auth.tenant_user (created_by, user_id, tenant_id)
+    VALUES ('test_bl', __test_user_id, 1)
     ON CONFLICT DO NOTHING;
 
     -- Assign manage_blacklist and search_blacklist permissions directly
-    INSERT INTO auth.permission_assignment (created_by, updated_by, tenant_id, user_id, permission_id)
-    SELECT 'test_bl', 'test_bl', 1, __test_user_id, p.permission_id
+    INSERT INTO auth.permission_assignment (created_by, tenant_id, user_id, permission_id)
+    SELECT 'test_bl', 1, __test_user_id, p.permission_id
     FROM auth.permission p
     WHERE p.full_code IN ('users.manage_blacklist'::ltree, 'users.search_blacklist'::ltree)
     ON CONFLICT DO NOTHING;
 
     -- Clear permission cache so it rebuilds with new permissions
-    PERFORM unsecure.clear_permission_cache(__test_user_id, 1);
+    PERFORM unsecure.clear_permission_cache('test_bl', __test_user_id, 1);
 
     PERFORM set_config('test_bl.admin_user_id', __test_user_id::text, false);
 

@@ -175,3 +175,27 @@ select * from unsecure.create_permission_as_system('Disable MFA', 'mfa', true, n
 select * from unsecure.create_permission_as_system('Get MFA Status', 'mfa', true, null, 'core');
 select * from unsecure.create_permission_as_system('Create MFA Challenge', 'mfa', true, null, 'core');
 select * from unsecure.create_permission_as_system('Verify MFA Challenge', 'mfa', true, null, 'core');
+
+-- ---------------------------------------------------------------------------
+-- 9. Add MFA permissions to all existing assignable permission sets
+-- ---------------------------------------------------------------------------
+do $$
+declare
+    __ps record;
+    __mfa_perms text[] := array[
+        'mfa.enroll_mfa', 'mfa.confirm_mfa_enrollment', 'mfa.disable_mfa',
+        'mfa.get_mfa_status', 'mfa.create_mfa_challenge', 'mfa.verify_mfa_challenge'
+    ];
+begin
+    for __ps in
+        select perm_set_id, tenant_id
+        from auth.perm_set
+        where is_assignable = true
+    loop
+        perform unsecure.add_perm_set_permissions(
+            'system', 1, null,
+            __ps.perm_set_id, __mfa_perms, __ps.tenant_id
+        );
+    end loop;
+end;
+$$;

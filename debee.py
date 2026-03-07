@@ -705,6 +705,8 @@ class DebeeOrchestrator:
                 suite_result.pass_count += section_pass
                 suite_result.fail_count += section_fail
 
+                section_errors = sum(1 for l in section_lines if "ERROR" in l)
+
                 if verbose:
                     if section_name != "(preamble)":
                         print()
@@ -716,7 +718,7 @@ class DebeeOrchestrator:
                             print(f"  {Colors.RED}{line}{Colors.NC}")
                         else:
                             print(f"  {line}")
-                elif section_fail > 0:
+                elif section_fail > 0 or section_errors > 0:
                     if section_name != "(preamble)":
                         print()
                         self.print_info(f"  -- {section_name} --")

@@ -1587,7 +1587,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.create_user_identity(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text, _password_hash text DEFAULT NULL::text, _user_data text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text, _is_active boolean DEFAULT false)
+create or replace function unsecure.create_user_identity(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_uid text, _provider_oid text, _password_hash text DEFAULT NULL::text, _user_data text DEFAULT NULL::text, _password_salt text DEFAULT NULL::text, _is_active boolean DEFAULT false, _is_verified boolean DEFAULT false)
     returns TABLE(__user_id bigint, __provider_code text, __provider_uid text)
     rows 1
     language plpgsql
@@ -1612,17 +1612,17 @@ begin
 	end if;
 
 	return query insert into auth.user_identity (created_by, updated_by, user_id, provider_code, uid, provider_oid,
-																							 user_data, password_hash, password_salt, is_active)
+																							 user_data, password_hash, password_salt, is_active, is_verified)
 		values ( _created_by, _created_by, _target_user_id, _provider_code, _provider_uid, _provider_oid, _user_data::jsonb
 					 , _password_hash
-					 , _password_salt, _is_active)
+					 , _password_salt, _is_active, _is_verified)
 		returning user_id, provider_code, uid;
 
 	perform create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10030  -- identity_created
 			, 'user', _target_user_id
 			, jsonb_build_object('username', __user_info.username, 'provider_code', _provider_code
-				, 'provider_uid', _provider_uid, 'provider_oid', _provider_oid, 'is_active', _is_active)
+				, 'provider_uid', _provider_uid, 'provider_oid', _provider_oid, 'is_active', _is_active, 'is_verified', _is_verified)
 			, 1);
 end;
 $$;
@@ -2027,6 +2027,38 @@ begin
 					, 'provider_oid', _provider_oid)
 				, 1);
 	end if;
+end;
+$$;
+
+create or replace function unsecure.verify_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
+    returns void
+    language plpgsql
+as
+$$
+declare
+	__username text;
+begin
+	select username from auth.user_info where user_id = _target_user_id into __username;
+
+	if __username is null then
+		perform error.raise_52001(_target_user_id);
+	end if;
+
+	if not exists(select from auth.user_identity where user_id = _target_user_id and provider_code = _provider_code) then
+		perform error.raise_33009(_target_user_id, _provider_code);
+	end if;
+
+	update auth.user_identity
+	set is_verified = true, updated_by = _updated_by, updated_at = now()
+	where user_id = _target_user_id
+		and provider_code = _provider_code
+		and not is_verified;
+
+	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+		, 10035  -- identity_verified
+		, 'user', _target_user_id
+		, jsonb_build_object('username', __username, 'provider_code', _provider_code)
+		, 1);
 end;
 $$;
 

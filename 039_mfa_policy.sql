@@ -74,3 +74,28 @@ select * from unsecure.create_permission_as_system('MFA Policy', 'mfa', false, n
 select * from unsecure.create_permission_as_system('Create MFA Policy', 'mfa.mfa_policy', true, null, 'core');
 select * from unsecure.create_permission_as_system('Delete MFA Policy', 'mfa.mfa_policy', true, null, 'core');
 select * from unsecure.create_permission_as_system('Get MFA Policies', 'mfa.mfa_policy', true, null, 'core');
+
+-- ---------------------------------------------------------------------------
+-- 5. Add MFA policy permissions to all existing assignable permission sets
+-- ---------------------------------------------------------------------------
+do $$
+declare
+    __ps record;
+    __mfa_policy_perms text[] := array[
+        'mfa.reset_mfa',
+        'mfa.mfa_policy.create_mfa_policy', 'mfa.mfa_policy.delete_mfa_policy',
+        'mfa.mfa_policy.get_mfa_policies'
+    ];
+begin
+    for __ps in
+        select perm_set_id, tenant_id
+        from auth.perm_set
+        where is_assignable = true
+    loop
+        perform unsecure.add_perm_set_permissions(
+            'system', 1, null,
+            __ps.perm_set_id, __mfa_policy_perms, __ps.tenant_id
+        );
+    end loop;
+end;
+$$;

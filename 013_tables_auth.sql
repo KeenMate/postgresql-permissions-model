@@ -187,8 +187,9 @@ create table auth.user_identity
     user_data        jsonb,
     password_hash    text,
     password_salt    text,
-    is_active        boolean default true not null,
-    provider_oid     text                 not null
+    is_active        boolean default true  not null,
+    is_verified      boolean default false not null,
+    provider_oid     text                  not null
         constraint uq_user_identity_provider_oid
             unique,
     constraint user_identity_created_by_check

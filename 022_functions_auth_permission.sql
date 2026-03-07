@@ -447,6 +447,7 @@ begin
 	perform unsecure.create_permission_as_system('Get user identity', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Enable user identity', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Disable user identity', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Verify user identity', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Change password', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Read user events', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Update user data', 'users', _source := 'core');

@@ -655,6 +655,9 @@ invoke_suite_transaction() {
         _SUITE_PASS_COUNT=$((_SUITE_PASS_COUNT + section_pass))
         _SUITE_FAIL_COUNT=$((_SUITE_FAIL_COUNT + section_fail))
 
+        local section_errors
+        section_errors=$(echo "${file_outputs[$section_name]}" | grep -c "ERROR" || true)
+
         if [[ "$TEST_VERBOSE" == true ]]; then
             if [[ "$section_name" != "(preamble)" ]]; then
                 echo ""
@@ -670,7 +673,7 @@ invoke_suite_transaction() {
                     echo "  $line"
                 fi
             done <<< "${file_outputs[$section_name]}"
-        elif [[ $section_fail -gt 0 ]]; then
+        elif [[ $section_fail -gt 0 ]] || [[ $section_errors -gt 0 ]]; then
             if [[ "$section_name" != "(preamble)" ]]; then
                 echo ""
                 print_info "  -- $section_name --"
