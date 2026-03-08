@@ -10,7 +10,7 @@ BEGIN
 
     -- Resource access rows are cleaned up by transaction rollback (isolation: transaction)
     -- but clean up explicitly for safety
-    DELETE FROM auth.resource_access WHERE root_type IN ('document', 'folder', 'project', 'ptf_untyped', 'ptf_ensured', 'ptf_created');
+    DELETE FROM auth.resource_access WHERE root_type IN ('document', 'folder', 'project', 'ptf_untyped', 'ptf_ensured', 'ptf_created', 'ptf_clearable');
     DELETE FROM auth.user_group_id_cache WHERE created_by IN ('cache', 'test');
     DELETE FROM auth.owner WHERE created_by = 'test';
     DELETE FROM auth.permission_assignment WHERE created_by = 'test';
@@ -24,6 +24,8 @@ BEGIN
     DELETE FROM auth.tenant WHERE code = 'ra_test_tenant_2';
     -- Delete per-type flag mappings before resource types
     DELETE FROM const.resource_type_flag WHERE resource_type_code IN (SELECT code FROM const.resource_type WHERE source = 'test');
+    -- Delete test access flags
+    DELETE FROM const.resource_access_flag WHERE source = 'test';
     -- Delete child types before parent types (FK constraint)
     DELETE FROM const.resource_type WHERE parent_code IS NOT NULL AND source = 'test';
     DELETE FROM const.resource_type WHERE source = 'test';
@@ -114,5 +116,11 @@ BEGIN
     RAISE NOTICE '    9. Hierarchical types — child validates its own flags';
     RAISE NOTICE '    10. Matrix respects per-type flags for system user';
     RAISE NOTICE '    11. Grant valid child-specific flag succeeds';
+    RAISE NOTICE '    12. ensure_access_flags creates new global flags';
+    RAISE NOTICE '    13. ensure_access_flags is idempotent';
+    RAISE NOTICE '    14. get_access_flags lists all flags';
+    RAISE NOTICE '    15. ensure_resource_type_flags sets exact flag set';
+    RAISE NOTICE '    16. ensure_resource_type_flags with empty array clears all';
+    RAISE NOTICE '    17. ensure_resource_type_flags with null is no-op';
     RAISE NOTICE '';
 END $$;

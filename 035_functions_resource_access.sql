@@ -17,6 +17,9 @@
  * - auth.update_resource_type         — update resource type title/description/active/source
  * - auth.ensure_resource_types        — bulk-ensure resource types from JSONB array
  * - auth.get_resource_types           — list registered resource types
+ * - auth.ensure_access_flags          — bulk-ensure global access flags
+ * - auth.ensure_resource_type_flags   — ensure per-type flag mappings (add/remove to match)
+ * - auth.get_access_flags             — list all global access flags
  *
  * v3: resource_id is jsonb (composite key).
  *     Containment queries (@>) for matching.
@@ -1448,6 +1451,160 @@ begin
       and (_source is null or rt.source = _source)
       and (_parent_code is null or rt.parent_code = _parent_code)
     order by rt.path;
+end;
+$$;
+
+-- ============================================================================
+-- auth.ensure_access_flags
+-- ============================================================================
+-- Bulk-ensure global access flags exist in const.resource_access_flag.
+-- Idempotent — existing flags are not modified.
+--
+-- Example:
+--   select * from auth.ensure_access_flags('[
+--       {"code": "comment", "title": "Comment"},
+--       {"code": "subscribe", "title": "Subscribe"}
+--   ]'::jsonb, _source := 'my_app');
+--
+create or replace function auth.ensure_access_flags(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _flags          jsonb,
+    _source         text    default null,
+    _tenant_id      integer default 1
+) returns table(__code text, __title text, __source text)
+    language plpgsql
+as
+$$
+declare
+    _item jsonb;
+    _code text;
+    _title text;
+    _item_source text;
+begin
+    -- Permission check (same as create_resource_type — admin-level operation)
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    for _item in select value from jsonb_array_elements(_flags)
+    loop
+        _code        := _item->>'code';
+        _title       := _item->>'title';
+        _item_source := coalesce(_item->>'source', _source);
+
+        if _code is null or _title is null then
+            raise exception 'Access flag requires both "code" and "title" fields'
+                using errcode = '35004';
+        end if;
+
+        insert into const.resource_access_flag (code, title, source)
+        values (_code, _title, _item_source)
+        on conflict do nothing;
+    end loop;
+
+    return query
+    select f.code, f.title, f.source
+    from const.resource_access_flag f
+    where f.code in (select value->>'code' from jsonb_array_elements(_flags))
+    order by f.code;
+end;
+$$;
+
+-- ============================================================================
+-- auth.ensure_resource_type_flags
+-- ============================================================================
+-- Ensure a resource type has exactly the specified set of valid access flags.
+--
+-- Adds missing flags and removes flags not in the list. All flags must exist
+-- in const.resource_access_flag (validated via unsecure.validate_access_flags).
+--
+-- Pass an empty array to remove all per-type mappings (allows all flags).
+-- Pass null to leave existing mappings unchanged (no-op).
+--
+-- Example:
+--   -- Set invoice to allow only read, write, approve
+--   select * from auth.ensure_resource_type_flags('invoice', array['read', 'write', 'approve']);
+--
+--   -- Remove all mappings (revert to "all flags allowed")
+--   select * from auth.ensure_resource_type_flags('invoice', array[]::text[]);
+--
+create or replace function auth.ensure_resource_type_flags(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _resource_type  text,
+    _access_flags   text[],
+    _tenant_id      integer default 1
+) returns table(__resource_type_code text, __access_flag_code text)
+    language plpgsql
+as
+$$
+declare
+    _flag text;
+begin
+    -- Permission check (same as create_resource_type — admin-level operation)
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    -- Null = no-op
+    if _access_flags is null then
+        return query
+        select rtf.resource_type_code, rtf.access_flag_code
+        from const.resource_type_flag rtf
+        where rtf.resource_type_code = _resource_type
+        order by rtf.access_flag_code;
+        return;
+    end if;
+
+    -- Validate resource type exists
+    if not exists (select 1 from const.resource_type where code = _resource_type) then
+        perform error.raise_35003(_resource_type);
+    end if;
+
+    -- Validate all flags exist in global registry
+    if array_length(_access_flags, 1) > 0 then
+        perform unsecure.validate_access_flags(_access_flags);
+    end if;
+
+    -- Remove flags not in the new list
+    delete from const.resource_type_flag
+    where resource_type_code = _resource_type
+      and access_flag_code != all(_access_flags);
+
+    -- Add missing flags
+    foreach _flag in array _access_flags
+    loop
+        insert into const.resource_type_flag (resource_type_code, access_flag_code)
+        values (_resource_type, _flag)
+        on conflict do nothing;
+    end loop;
+
+    return query
+    select rtf.resource_type_code, rtf.access_flag_code
+    from const.resource_type_flag rtf
+    where rtf.resource_type_code = _resource_type
+    order by rtf.access_flag_code;
+end;
+$$;
+
+-- ============================================================================
+-- auth.get_access_flags
+-- ============================================================================
+-- Lists all globally registered access flags.
+-- No RBAC check — access flags are public metadata.
+--
+create or replace function auth.get_access_flags(
+    _source text default null
+) returns table(__code text, __title text, __source text)
+    stable
+    language plpgsql
+as
+$$
+begin
+    return query
+    select f.code, f.title, f.source
+    from const.resource_access_flag f
+    where (_source is null or f.source = _source)
+    order by f.code;
 end;
 $$;
 

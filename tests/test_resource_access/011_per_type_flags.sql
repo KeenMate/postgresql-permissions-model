@@ -423,12 +423,247 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- Cleanup test-specific resource types
+-- TEST 12: ensure_access_flags creates new global flags
+-- ============================================================================
+DO $$
+DECLARE
+    __user_id_1 bigint;
+    __count integer;
+BEGIN
+    RAISE NOTICE 'TEST 12: ensure_access_flags creates new global flags';
+
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
+
+    PERFORM auth.ensure_access_flags('test', __user_id_1, 'test-ptf-12', '[
+        {"code": "ptf_comment", "title": "Comment"},
+        {"code": "ptf_subscribe", "title": "Subscribe"}
+    ]'::jsonb, _source := 'test');
+
+    SELECT count(*) FROM const.resource_access_flag
+    WHERE code IN ('ptf_comment', 'ptf_subscribe')
+    INTO __count;
+
+    IF __count = 2 THEN
+        RAISE NOTICE '  PASS: 2 custom flags created';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 2 flags, got %', __count;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- TEST 13: ensure_access_flags is idempotent
+-- ============================================================================
+DO $$
+DECLARE
+    __user_id_1 bigint;
+    __count integer;
+BEGIN
+    RAISE NOTICE 'TEST 13: ensure_access_flags is idempotent';
+
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
+
+    -- Run again with same flags + one existing core flag
+    PERFORM auth.ensure_access_flags('test', __user_id_1, 'test-ptf-13', '[
+        {"code": "ptf_comment", "title": "Comment"},
+        {"code": "read", "title": "Read"}
+    ]'::jsonb, _source := 'test');
+
+    -- Should still be exactly 2 test flags (no duplicates)
+    SELECT count(*) FROM const.resource_access_flag
+    WHERE code IN ('ptf_comment', 'ptf_subscribe')
+    INTO __count;
+
+    IF __count = 2 THEN
+        RAISE NOTICE '  PASS: Idempotent — no duplicates created';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 2 flags, got %', __count;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- TEST 14: get_access_flags lists all flags
+-- ============================================================================
+DO $$
+DECLARE
+    __count integer;
+    __test_count integer;
+BEGIN
+    RAISE NOTICE 'TEST 14: get_access_flags lists all flags';
+
+    SELECT count(*) FROM auth.get_access_flags()
+    INTO __count;
+
+    -- 6 core + 2 test = at least 8
+    IF __count >= 8 THEN
+        RAISE NOTICE '  PASS: get_access_flags returned % flags', __count;
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected >= 8 flags, got %', __count;
+    END IF;
+
+    -- Filter by source
+    SELECT count(*) FROM auth.get_access_flags(_source := 'test')
+    INTO __test_count;
+
+    IF __test_count = 2 THEN
+        RAISE NOTICE '  PASS: get_access_flags filtered by source returned 2';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 2 flags for source=test, got %', __test_count;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- TEST 15: ensure_resource_type_flags sets exact flag set
+-- ============================================================================
+DO $$
+DECLARE
+    __user_id_1 bigint;
+    __count integer;
+    __has_approve boolean;
+    __has_share boolean;
+BEGIN
+    RAISE NOTICE 'TEST 15: ensure_resource_type_flags sets exact flag set';
+
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
+
+    -- folder currently has: read, write, delete, share
+    -- Change to: read, write, approve (removes delete+share, adds approve)
+    PERFORM auth.ensure_resource_type_flags('test', __user_id_1, 'test-ptf-15', 'folder', array['read', 'write', 'approve']);
+
+    SELECT count(*) FROM const.resource_type_flag
+    WHERE resource_type_code = 'folder'
+    INTO __count;
+
+    IF __count = 3 THEN
+        RAISE NOTICE '  PASS: folder now has exactly 3 flags';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 3 flags for folder, got %', __count;
+    END IF;
+
+    -- Verify share was removed
+    SELECT exists(
+        SELECT 1 FROM const.resource_type_flag
+        WHERE resource_type_code = 'folder' AND access_flag_code = 'share'
+    ) INTO __has_share;
+
+    IF NOT __has_share THEN
+        RAISE NOTICE '  PASS: share was removed from folder';
+    ELSE
+        RAISE EXCEPTION '  FAIL: share should have been removed from folder';
+    END IF;
+
+    -- Verify approve was added
+    SELECT exists(
+        SELECT 1 FROM const.resource_type_flag
+        WHERE resource_type_code = 'folder' AND access_flag_code = 'approve'
+    ) INTO __has_approve;
+
+    IF __has_approve THEN
+        RAISE NOTICE '  PASS: approve was added to folder';
+    ELSE
+        RAISE EXCEPTION '  FAIL: approve should have been added to folder';
+    END IF;
+
+    -- Restore original: read, write, delete, share
+    PERFORM auth.ensure_resource_type_flags('test', __user_id_1, 'test-ptf-15r', 'folder', array['read', 'write', 'delete', 'share']);
+END $$;
+
+-- ============================================================================
+-- TEST 16: ensure_resource_type_flags with empty array clears all mappings
+-- ============================================================================
+DO $$
+DECLARE
+    __user_id_1 bigint;
+    __user_id_2 bigint;
+    __count integer;
+BEGIN
+    RAISE NOTICE 'TEST 16: ensure_resource_type_flags with empty array clears all mappings';
+
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
+
+    -- Create a test type with flags
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('ptf_clearable', 'PTF Clearable', 'Type for clear test', 'test', null,
+        'ptf_clearable'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    ON CONFLICT DO NOTHING;
+
+    PERFORM unsecure.ensure_resource_access_partition('ptf_clearable');
+
+    PERFORM auth.ensure_resource_type_flags('test', __user_id_1, 'test-ptf-16a', 'ptf_clearable', array['read', 'write']);
+
+    SELECT count(*) FROM const.resource_type_flag WHERE resource_type_code = 'ptf_clearable'
+    INTO __count;
+
+    IF __count = 2 THEN
+        RAISE NOTICE '  PASS: ptf_clearable has 2 flags initially';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 2 flags initially, got %', __count;
+    END IF;
+
+    -- Clear all mappings
+    PERFORM auth.ensure_resource_type_flags('test', __user_id_1, 'test-ptf-16b', 'ptf_clearable', array[]::text[]);
+
+    SELECT count(*) FROM const.resource_type_flag WHERE resource_type_code = 'ptf_clearable'
+    INTO __count;
+
+    IF __count = 0 THEN
+        RAISE NOTICE '  PASS: All flag mappings cleared — type now allows all flags';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 0 flags after clear, got %', __count;
+    END IF;
+
+    -- Verify all flags are now accepted (backward compat mode)
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-16', 'ptf_clearable',
+        '{"id": 900}'::jsonb,
+        _target_user_id := __user_id_2, _access_flags := array['approve', 'export']);
+
+    SELECT count(*) FROM auth.resource_access
+    WHERE resource_type = 'ptf_clearable' AND resource_id = '{"id": 900}'::jsonb AND user_id = __user_id_2
+    INTO __count;
+
+    IF __count = 2 THEN
+        RAISE NOTICE '  PASS: Cleared type accepts any flags';
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected 2 grant rows, got %', __count;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- TEST 17: ensure_resource_type_flags with null is no-op
+-- ============================================================================
+DO $$
+DECLARE
+    __user_id_1 bigint;
+    __count_before integer;
+    __count_after integer;
+BEGIN
+    RAISE NOTICE 'TEST 17: ensure_resource_type_flags with null is no-op';
+
+    SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
+
+    SELECT count(*) FROM const.resource_type_flag WHERE resource_type_code = 'document'
+    INTO __count_before;
+
+    PERFORM auth.ensure_resource_type_flags('test', __user_id_1, 'test-ptf-17', 'document', null);
+
+    SELECT count(*) FROM const.resource_type_flag WHERE resource_type_code = 'document'
+    INTO __count_after;
+
+    IF __count_before = __count_after THEN
+        RAISE NOTICE '  PASS: Null is no-op (% flags unchanged)', __count_before;
+    ELSE
+        RAISE EXCEPTION '  FAIL: Expected % flags, got % after null call', __count_before, __count_after;
+    END IF;
+END $$;
+
+-- ============================================================================
+-- Cleanup test-specific resource types and flags
 -- ============================================================================
 DO $$
 BEGIN
-    DELETE FROM auth.resource_access WHERE root_type IN ('ptf_untyped', 'ptf_ensured', 'ptf_created');
-    DELETE FROM const.resource_type_flag WHERE resource_type_code IN ('ptf_untyped', 'ptf_ensured', 'ptf_created');
-    DELETE FROM const.resource_type WHERE code IN ('ptf_untyped', 'ptf_ensured', 'ptf_created') AND source = 'test';
-    RAISE NOTICE '  Cleanup: per-type flag test types removed';
+    DELETE FROM auth.resource_access WHERE root_type IN ('ptf_untyped', 'ptf_ensured', 'ptf_created', 'ptf_clearable');
+    DELETE FROM const.resource_type_flag WHERE resource_type_code IN ('ptf_untyped', 'ptf_ensured', 'ptf_created', 'ptf_clearable');
+    DELETE FROM const.resource_type WHERE code IN ('ptf_untyped', 'ptf_ensured', 'ptf_created', 'ptf_clearable') AND source = 'test';
+    DELETE FROM const.resource_access_flag WHERE code IN ('ptf_comment', 'ptf_subscribe');
+    RAISE NOTICE '  Cleanup: per-type flag test types and custom flags removed';
 END $$;
