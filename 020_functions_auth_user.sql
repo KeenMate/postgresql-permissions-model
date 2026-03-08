@@ -11,7 +11,7 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 create or replace function auth.enable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -19,7 +19,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.enable_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.enable_user', _tenant_id);
 
 	return query
 		update auth.user_info
@@ -45,7 +45,7 @@ end;
 $$;
 
 create or replace function auth.disable_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -53,7 +53,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.disable_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.disable_user', _tenant_id);
 
 	return query
 		update auth.user_info
@@ -82,7 +82,7 @@ end;
 $$;
 
 create or replace function auth.unlock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -90,7 +90,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.unlock_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.unlock_user', _tenant_id);
 
 	return query
 		update auth.user_info
@@ -116,7 +116,7 @@ end;
 $$;
 
 create or replace function auth.lock_user(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __is_active boolean, __is_locked boolean)
     rows 1
     language plpgsql
@@ -124,7 +124,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.lock_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.lock_user', _tenant_id);
 
 	return query
 		update auth.user_info
@@ -153,14 +153,14 @@ end;
 $$;
 
 create or replace function auth.verify_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.verify_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.verify_user_identity', _tenant_id);
 
 	perform
 		unsecure.verify_user_identity(_updated_by, _user_id, _correlation_id, _target_user_id, _provider_code);
@@ -172,7 +172,7 @@ end;
 $$;
 
 create or replace function auth.enable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -182,7 +182,7 @@ declare
 	__user_identity_id bigint;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.enable_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.enable_user_identity', _tenant_id);
 
 	select user_identity_id
 	from auth.user_identity uid
@@ -219,7 +219,7 @@ end;
 $$;
 
 create or replace function auth.disable_user_identity(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
-    _request_context jsonb default null)
+    _request_context jsonb default null, _tenant_id integer default 1)
     returns TABLE(__user_identity_id bigint, __is_active boolean)
     rows 1
     language plpgsql
@@ -229,7 +229,7 @@ declare
 	__user_identity_id bigint;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.disable_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.disable_user_identity', _tenant_id);
 
 	select user_identity_id
 	from auth.user_identity uid
@@ -265,14 +265,14 @@ begin
 end;
 $$;
 
-create or replace function auth.create_service_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _email text DEFAULT NULL::text, _display_name text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint)
+create or replace function auth.create_service_user_info(_created_by text, _user_id bigint, _correlation_id text, _username text, _email text DEFAULT NULL::text, _display_name text DEFAULT NULL::text, _custom_service_user_id bigint DEFAULT NULL::bigint, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __username text, __email text, __display_name text)
     rows 1
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, _correlation_id, 'users.create_service_user');
+	perform auth.has_permission(_user_id, _correlation_id, 'users.create_service_user', _tenant_id);
 
 	return query
 		select user_id, username, email, display_name
@@ -282,7 +282,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_password(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _password_hash text, _request_context jsonb, _password_salt text DEFAULT NULL::text)
+create or replace function auth.update_user_password(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _password_hash text, _request_context jsonb, _password_salt text DEFAULT NULL::text, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __provider_code text, __provider_uid text)
     rows 1
     language plpgsql
@@ -292,7 +292,7 @@ begin
 
 	if
 		_user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, _correlation_id, 'users.change_password');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.change_password', _tenant_id);
 	end if;
 
 	perform unsecure.create_user_event(_updated_by, _user_id, _correlation_id, 'change_password',
@@ -306,7 +306,7 @@ begin
 end;
 $$;
 
-create or replace function auth.register_user(_created_by text, _user_id bigint, _correlation_id text, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb, _request_context jsonb DEFAULT NULL::jsonb)
+create or replace function auth.register_user(_created_by text, _user_id bigint, _correlation_id text, _email text, _password_hash text, _display_name text, _user_data jsonb DEFAULT NULL::jsonb, _request_context jsonb DEFAULT NULL::jsonb, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text)
     rows 1
     language plpgsql
@@ -318,7 +318,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.register_user');
+		auth.has_permission(_user_id, _correlation_id, 'users.register_user', _tenant_id);
 
 	__normalized_email := lower(trim(_email));
 
@@ -406,14 +406,15 @@ end;
 
 $$;
 
-create or replace function auth.get_user_identity(_user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text)
+create or replace function auth.get_user_identity(_user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text,
+    _tenant_id integer default 1)
     returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb, __is_verified boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity', _tenant_id);
 
 	return query
 		select uid.user_identity_id
@@ -430,14 +431,15 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_identity_by_email(_user_id bigint, _correlation_id text, _email text, _provider_code text)
+create or replace function auth.get_user_identity_by_email(_user_id bigint, _correlation_id text, _email text, _provider_code text,
+    _tenant_id integer default 1)
     returns TABLE(__user_identity_id bigint, __provider_code text, __uid text, __user_id bigint, __provider_groups text[], __provider_roles text[], __user_data jsonb, __is_verified boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity');
+		auth.has_permission(_user_id, _correlation_id, 'users.get_user_identity', _tenant_id);
 
 	return query
 		select uid.user_identity_id
@@ -455,7 +457,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _correlation_id text, _email text, _request_context jsonb DEFAULT NULL::jsonb)
+create or replace function auth.get_user_by_email_for_authentication(_user_id bigint, _correlation_id text, _email text, _request_context jsonb DEFAULT NULL::jsonb, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __code text, __uuid text, __username text, __email text, __display_name text, __provider text, __password_hash text, __password_salt text)
     language plpgsql
 as
@@ -471,7 +473,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'authentication.get_data');
+		auth.has_permission(_user_id, _correlation_id, 'authentication.get_data', _tenant_id);
 
 	perform
 		auth.validate_provider_is_active('email');
@@ -610,7 +612,8 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_data(_user_id bigint, _correlation_id text, _target_user_id bigint) returns SETOF auth.user_data
+create or replace function auth.get_user_data(_user_id bigint, _correlation_id text, _target_user_id bigint,
+    _tenant_id integer default 1) returns SETOF auth.user_data
     language plpgsql
 as
 $$
@@ -618,7 +621,7 @@ begin
 
 	if
 		_user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.get_data', _tenant_id);
 	end if;
 
 	select *
@@ -792,7 +795,8 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_preferences(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text)
+create or replace function auth.update_user_preferences(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text,
+    _tenant_id integer default 1)
     returns TABLE(__updated_at timestamp with time zone, __updated_by character varying)
     rows 1
     language plpgsql
@@ -801,7 +805,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, _correlation_id, 'users.update_user_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_user_data', _tenant_id);
     end if;
 
     return query
@@ -815,7 +819,8 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_preferences(_user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.get_user_preferences(_user_id bigint, _correlation_id text, _target_user_id bigint,
+    _tenant_id integer default 1)
     returns TABLE(__value text)
     stable
     rows 1
@@ -825,7 +830,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data', _tenant_id);
     end if;
 
     return query

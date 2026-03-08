@@ -923,7 +923,7 @@ declare
     ___action jsonb;
     ___pending_actions jsonb;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.create_invitation');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.create_invitation', _tenant_id);
 
     select * from unsecure.create_invitation(
         _created_by, _user_id, _correlation_id, _tenant_id, _target_email,
@@ -979,7 +979,8 @@ create or replace function auth.accept_invitation(
     _correlation_id  text,
     _invitation_id   bigint,
     _target_user_id  bigint,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns table(
     __invitation_action_id bigint,
     __action_type_code     text,
@@ -991,7 +992,7 @@ create or replace function auth.accept_invitation(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.accept_invitation');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.accept_invitation', _tenant_id);
 
     perform unsecure.accept_invitation(
         _updated_by, _user_id, _correlation_id, _invitation_id, _target_user_id
@@ -1016,7 +1017,8 @@ create or replace function auth.reject_invitation(
     _user_id         bigint,
     _correlation_id  text,
     _invitation_id   bigint,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns table(
     __invitation_action_id bigint,
     __action_type_code     text,
@@ -1028,7 +1030,7 @@ create or replace function auth.reject_invitation(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.reject_invitation');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.reject_invitation', _tenant_id);
 
     perform unsecure.reject_invitation(
         _updated_by, _user_id, _correlation_id, _invitation_id
@@ -1053,13 +1055,14 @@ create or replace function auth.revoke_invitation(
     _user_id         bigint,
     _correlation_id  text,
     _invitation_id   bigint,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.revoke_invitation');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.revoke_invitation', _tenant_id);
 
     perform unsecure.revoke_invitation(
         _updated_by, _user_id, _correlation_id, _invitation_id
@@ -1105,7 +1108,7 @@ create or replace function auth.get_invitations(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations', _tenant_id);
 
     return query select * from unsecure.get_invitations(
         _requested_by, _user_id, _correlation_id, _tenant_id,
@@ -1121,7 +1124,8 @@ create or replace function auth.get_invitation_actions(
     _requested_by    text,
     _user_id         bigint,
     _correlation_id  text,
-    _invitation_id   bigint
+    _invitation_id   bigint,
+    _tenant_id       integer default 1
 ) returns table(
     __invitation_action_id bigint,
     __action_type_code     text,
@@ -1141,7 +1145,7 @@ create or replace function auth.get_invitation_actions(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations', _tenant_id);
 
     return query select * from unsecure.get_invitation_actions(
         _requested_by, _user_id, _correlation_id, _invitation_id
@@ -1173,7 +1177,7 @@ declare
     ___uuid uuid;
     ___pending_actions jsonb;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.create_invitation');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.create_invitation', _tenant_id);
 
     select * from unsecure.create_invitation_from_template(
         _created_by, _user_id, _correlation_id, _tenant_id, _template_code,
@@ -1344,7 +1348,7 @@ create or replace function auth.create_invitation_template(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates', _tenant_id);
 
     return query select * from unsecure.create_invitation_template(
         _created_by, _user_id, _correlation_id, _tenant_id, _code, _title,
@@ -1365,13 +1369,14 @@ create or replace function auth.update_invitation_template(
     _description     text default null,
     _default_message text default null,
     _is_active       boolean default null,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates', _tenant_id);
 
     perform unsecure.update_invitation_template(
         _updated_by, _user_id, _correlation_id, _template_id,
@@ -1388,13 +1393,14 @@ create or replace function auth.delete_invitation_template(
     _user_id         bigint,
     _correlation_id  text,
     _template_id     integer,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates');
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates', _tenant_id);
 
     perform unsecure.delete_invitation_template(
         _deleted_by, _user_id, _correlation_id, _template_id

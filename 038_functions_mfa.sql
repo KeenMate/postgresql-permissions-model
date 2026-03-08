@@ -29,7 +29,8 @@ create or replace function auth.enroll_mfa(
     _target_user_id   bigint,
     _mfa_type_code    text,
     _secret_encrypted text,
-    _request_context  jsonb default null
+    _request_context  jsonb default null,
+    _tenant_id        integer default 1
 ) returns table (
     __user_mfa_id    bigint,
     __mfa_type_code  text,
@@ -47,7 +48,7 @@ declare
     __last_item          auth.user_mfa;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.enroll_mfa');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.enroll_mfa', _tenant_id);
 
     -- Validate MFA type exists and is active
     if not exists (select 1 from const.mfa_type where code = _mfa_type_code and is_active) then
@@ -114,7 +115,8 @@ create or replace function auth.confirm_mfa_enrollment(
     _target_user_id  bigint,
     _mfa_type_code   text,
     _code_is_valid   boolean,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
@@ -123,7 +125,7 @@ declare
     __user_mfa_id bigint;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.confirm_mfa_enrollment');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.confirm_mfa_enrollment', _tenant_id);
 
     -- Verify enrollment exists and is pending
     select um.user_mfa_id
@@ -172,7 +174,8 @@ create or replace function auth.disable_mfa(
     _correlation_id  text,
     _target_user_id  bigint,
     _mfa_type_code   text,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
@@ -181,7 +184,7 @@ declare
     __user_mfa_id bigint;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.disable_mfa');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.disable_mfa', _tenant_id);
 
     -- Verify enrollment exists
     select um.user_mfa_id
@@ -216,7 +219,8 @@ $$;
 create or replace function auth.get_mfa_status(
     _user_id         bigint,
     _correlation_id  text,
-    _target_user_id  bigint
+    _target_user_id  bigint,
+    _tenant_id       integer default 1
 ) returns table (
     __user_mfa_id             bigint,
     __mfa_type_code           text,
@@ -231,7 +235,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.get_mfa_status');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.get_mfa_status', _tenant_id);
 
     return query
         select um.user_mfa_id,
@@ -258,7 +262,8 @@ create or replace function auth.create_mfa_challenge(
     _correlation_id  text,
     _target_user_id  bigint,
     _mfa_type_code   text,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns table (
     __token_uid  text,
     __expires_at timestamp with time zone
@@ -273,7 +278,7 @@ declare
     __token_record    record;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.create_mfa_challenge');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.create_mfa_challenge', _tenant_id);
 
     -- Validate MFA is enrolled, confirmed, and enabled
     select um.user_mfa_id, um.is_confirmed, um.is_enabled
@@ -344,7 +349,8 @@ create or replace function auth.verify_mfa_challenge(
     _token_uid       text,
     _code_is_valid   boolean,
     _recovery_code   text default null,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
@@ -357,7 +363,7 @@ declare
     __user_mfa_id    bigint;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.verify_mfa_challenge');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.verify_mfa_challenge', _tenant_id);
 
     -- Fetch and validate the token
     select t.*

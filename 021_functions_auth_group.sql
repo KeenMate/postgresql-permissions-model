@@ -645,7 +645,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer)
     stable
     language plpgsql
@@ -654,7 +654,7 @@ $$
 begin
 
 	if (_user_id != _target_user_id) then
-		perform auth.has_permission(_user_id, _correlation_id, 'users.read_user_group_memberships');
+		perform auth.has_permission(_user_id, _correlation_id, 'users.read_user_group_memberships', _tenant_id);
 	end if;
 
 	return query
@@ -667,13 +667,13 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_groups_to_sync(_user_id bigint, _correlation_id text)
+create or replace function auth.get_user_groups_to_sync(_user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer, __user_group_mapping_id integer, __title text, __code text, __provider_code text, __mapped_object_id text, __mapped_object_name text)
     language plpgsql
 as
 $$
 begin
-	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_groups');
+	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_groups', _tenant_id);
 
 	return query
 		select ug.user_group_id,

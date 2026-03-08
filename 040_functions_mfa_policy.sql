@@ -25,7 +25,8 @@ create or replace function auth.reset_mfa(
     _correlation_id  text,
     _target_user_id  bigint,
     _mfa_type_code   text,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns table (
     __user_mfa_id    bigint,
     __recovery_codes text[]
@@ -40,7 +41,7 @@ declare
     __code           text;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.reset_mfa');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.reset_mfa', _tenant_id);
 
     -- Verify enrollment exists
     select um.*
@@ -112,7 +113,7 @@ declare
     __last_item auth.mfa_policy;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.create_mfa_policy');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.create_mfa_policy', _tenant_id);
 
     insert into auth.mfa_policy (created_by, updated_by, tenant_id, user_group_id, user_id, mfa_required)
     values (_created_by, _created_by, _tenant_id, _user_group_id, _target_user_id, _mfa_required)
@@ -146,7 +147,8 @@ create or replace function auth.delete_mfa_policy(
     _user_id         bigint,
     _correlation_id  text,
     _mfa_policy_id   bigint,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
@@ -155,7 +157,7 @@ declare
     __existing auth.mfa_policy;
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.delete_mfa_policy');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.delete_mfa_policy', _tenant_id);
 
     -- Validate policy exists
     select mp.*
@@ -213,7 +215,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.get_mfa_policies');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.mfa_policy.get_mfa_policies', _tenant_id);
 
     return query
         select mp.mfa_policy_id,
@@ -331,7 +333,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'mfa.get_mfa_status');
+        auth.has_permission(_user_id, _correlation_id, 'mfa.get_mfa_status', _tenant_id);
 
     return unsecure.is_mfa_required(_target_user_id, _tenant_id);
 end;

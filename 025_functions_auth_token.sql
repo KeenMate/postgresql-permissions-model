@@ -10,7 +10,7 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.create_token(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _target_user_oid text, _user_event_id integer, _token_type_code text, _token_channel_code text, _token text, _expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _token_data jsonb DEFAULT NULL::jsonb)
+create or replace function auth.create_token(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _target_user_oid text, _user_event_id integer, _token_type_code text, _token_channel_code text, _token text, _expires_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _token_data jsonb DEFAULT NULL::jsonb, _tenant_id integer default 1)
     returns TABLE(___token_id bigint, ___token_uid text, ___expires_at timestamp with time zone)
     language plpgsql
 as
@@ -24,7 +24,7 @@ declare
 	__target_username               text;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tokens.create_token');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.create_token', _tenant_id);
 
 	if
 		_expires_at is null then
@@ -91,7 +91,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb)
+create or replace function auth.set_token_as_used(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb, _tenant_id integer default 1)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -102,7 +102,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used', _tenant_id);
 
 	select *
 	from auth.token
@@ -170,7 +170,7 @@ begin
 end;
 $$;
 
-create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb)
+create or replace function auth.set_token_as_failed(_updated_by text, _user_id bigint, _correlation_id text, _token_uid text, _token text, _token_type_code text, _request_context jsonb, _tenant_id integer default 1)
     returns TABLE(__token_id bigint, __token_uid text, __token_state_code text, __used_at timestamp with time zone, __user_id bigint, __user_oid text, __token_data jsonb)
     language plpgsql
 as
@@ -181,7 +181,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.set_as_used', _tenant_id);
 
 	select token_id, uid
 	from auth.token
@@ -250,7 +250,7 @@ begin
 end;
 $$;
 
-create or replace function auth.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _request_context jsonb, _set_as_used boolean DEFAULT false)
+create or replace function auth.validate_token(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _token_uid text, _token text, _token_type_code text, _request_context jsonb, _set_as_used boolean DEFAULT false, _tenant_id integer default 1)
     returns TABLE(___token_id bigint, ___token_uid text, ___token_state_code text, ___used_at timestamp with time zone, ___user_id bigint, ___user_oid text, ___token_data jsonb)
     language plpgsql
 as
@@ -260,7 +260,7 @@ declare
 	__last_item       auth.token;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tokens.validate_token');
+		auth.has_permission(_user_id, _correlation_id, 'tokens.validate_token', _tenant_id);
 
 	select *
 	from auth.token

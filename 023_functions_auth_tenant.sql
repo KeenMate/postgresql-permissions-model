@@ -10,14 +10,14 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.get_tenants(_user_id bigint, _correlation_id text)
+create or replace function auth.get_tenants(_user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
     returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants', _tenant_id);
 
 	return query
 		select created_at
@@ -137,7 +137,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid)
+create or replace function auth.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
     language plpgsql
@@ -145,7 +145,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
+        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant', _tenant_id);
 
     return query
         select dt.__tenant_id, dt.__uuid, dt.__code
@@ -155,7 +155,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid)
+create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
     language plpgsql
@@ -163,7 +163,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant');
+        auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant', _tenant_id);
 
     return query
         select dt.__tenant_id, dt.__uuid, dt.__code
@@ -173,7 +173,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_available_tenants(_user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.get_user_available_tenants(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __tenant_uuid text, __tenant_code text, __tenant_title text, __tenant_is_default boolean)
     language plpgsql
 as
@@ -182,7 +182,7 @@ declare
     __necessary_permission_code text := 'users.get_available_tenants';
 begin
 
-    if _user_id <> _target_user_id and not auth.has_permission(_user_id, _correlation_id, __necessary_permission_code)
+    if _user_id <> _target_user_id and not auth.has_permission(_user_id, _correlation_id, __necessary_permission_code, _tenant_id)
     then
         perform internal.throw_no_permission(_user_id, __necessary_permission_code);
     end if;
@@ -252,7 +252,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_last_selected_tenant(_user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.get_user_last_selected_tenant(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __tenant_uuid text, __tenant_code text, __tenant_title text)
     stable
     rows 1
@@ -262,7 +262,7 @@ $$
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.get_data', _tenant_id);
     end if;
 
     return query
@@ -277,7 +277,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_last_selected_tenant(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_uuid text)
+create or replace function auth.update_user_last_selected_tenant(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_uuid text, _tenant_id integer DEFAULT 1)
     returns TABLE(__used_id bigint, __tenant_id integer)
     rows 1
     language plpgsql
@@ -288,7 +288,7 @@ declare
 begin
     if _user_id <> _target_user_id
     then
-        perform auth.has_permission(_user_id, _correlation_id, 'users.update_last_selected_tenant');
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_last_selected_tenant', _tenant_id);
     end if;
 
     select t.tenant_id
@@ -338,7 +338,7 @@ from auth.tenant
 order by title
 $$;
 
-create or replace function auth.create_tenant(_created_by text, _user_id bigint, _correlation_id text, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT true, _is_assignable boolean DEFAULT true, _tenant_owner_id bigint DEFAULT NULL::bigint)
+create or replace function auth.create_tenant(_created_by text, _user_id bigint, _correlation_id text, _title text, _code text DEFAULT NULL::text, _is_removable boolean DEFAULT true, _is_assignable boolean DEFAULT true, _tenant_owner_id bigint DEFAULT NULL::bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __uuid uuid, __title text, __code text, __is_removable boolean, __is_assignable boolean, __access_type_code text, __is_default boolean)
     rows 1
     language plpgsql
@@ -352,7 +352,7 @@ declare
 							int;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.create_tenant');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.create_tenant', _tenant_id);
 
 	insert into auth.tenant (created_by, updated_by, title, code, is_removable, is_assignable)
 	values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
@@ -420,7 +420,7 @@ as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.update_tenant');
+		auth.has_permission(_user_id, _correlation_id, 'tenants.update_tenant', _tenant_id);
 
 	update auth.tenant
 	set title         = _title
@@ -463,7 +463,8 @@ create or replace function auth.search_tenants(
     _correlation_id text,
     _search_text text default null,
     _page integer default 1,
-    _page_size integer default 30
+    _page_size integer default 30,
+    _tenant_id integer default 1
 )
     returns TABLE(
         __tenant_id integer,
@@ -483,7 +484,7 @@ $$
 declare
     __search_text text;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'tenants.read_tenants');
+    perform auth.has_permission(_user_id, _correlation_id, 'tenants.read_tenants', _tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 

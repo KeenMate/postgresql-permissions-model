@@ -40,7 +40,8 @@ create or replace function auth.search_user_events(
     _from timestamptz default null,
     _to timestamptz default null,
     _page integer default 1,
-    _page_size integer default 10
+    _page_size integer default 10,
+    _tenant_id integer default 1
 )
     returns table(
         __user_event_id bigint,
@@ -62,7 +63,7 @@ create or replace function auth.search_user_events(
 as
 $$
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events');
+    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
 
     return query
         with filtered_rows as (
@@ -113,7 +114,8 @@ create or replace function auth.get_user_audit_trail(
     _from timestamptz default null,
     _to timestamptz default null,
     _page integer default 1,
-    _page_size integer default 20
+    _page_size integer default 20,
+    _tenant_id integer default 1
 ) returns table(
     __source text,
     __event_id integer,
@@ -135,7 +137,7 @@ declare
     __from timestamptz;
     __to timestamptz;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events');
+    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
 
     __from := coalesce(_from, now() - interval '100 years');
     __to := coalesce(_to, now() + interval '100 years');
@@ -218,7 +220,8 @@ create or replace function auth.get_security_events(
     _from timestamptz default null,
     _to timestamptz default null,
     _page integer default 1,
-    _page_size integer default 20
+    _page_size integer default 20,
+    _tenant_id integer default 1
 ) returns table(
     __source text,
     __event_type_code text,
@@ -240,7 +243,7 @@ declare
     __from timestamptz;
     __to timestamptz;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events');
+    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
 
     __from := coalesce(_from, now() - interval '100 years');
     __to := coalesce(_to, now() + interval '100 years');

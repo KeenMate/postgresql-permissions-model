@@ -48,7 +48,7 @@ begin
 end;
 $$;
 
-create or replace function auth.ensure_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean default true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false)
+create or replace function auth.ensure_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean default true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false, _tenant_id integer default 1)
     returns table(__provider_id integer, __is_new boolean)
     rows 1
     language plpgsql
@@ -69,14 +69,14 @@ begin
     end if;
 
     select p.__provider_id
-    from auth.create_provider(_created_by, _user_id, _correlation_id, _provider_code, _provider_name, _is_active, _allows_group_mapping, _allows_group_sync) p
+    from auth.create_provider(_created_by, _user_id, _correlation_id, _provider_code, _provider_name, _is_active, _allows_group_mapping, _allows_group_sync, _tenant_id) p
     into __new_id;
 
     return query select __new_id, true;
 end;
 $$;
 
-create or replace function auth.create_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean DEFAULT true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false)
+create or replace function auth.create_provider(_created_by text, _user_id bigint, _correlation_id text, _provider_code text, _provider_name text, _is_active boolean DEFAULT true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false, _tenant_id integer default 1)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -87,7 +87,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers.create_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.create_provider', _tenant_id);
 
 	insert into auth.provider (created_by, updated_by, code, name, is_active, allows_group_mapping, allows_group_sync)
 	values (_created_by, _created_by, _provider_code, _provider_name, _is_active, _allows_group_mapping, _allows_group_sync)
@@ -107,7 +107,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_id integer, _provider_code text, _provider_name text, _is_active boolean DEFAULT true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false)
+create or replace function auth.update_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_id integer, _provider_code text, _provider_name text, _is_active boolean DEFAULT true, _allows_group_mapping boolean default false, _allows_group_sync boolean default false, _tenant_id integer default 1)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -117,7 +117,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider', _tenant_id);
 
 	return query
 		update auth.provider
@@ -137,7 +137,7 @@ begin
 end;
 $$;
 
-create or replace function auth.delete_provider(_deleted_by text, _user_id bigint, _correlation_id text, _provider_code text)
+create or replace function auth.delete_provider(_deleted_by text, _user_id bigint, _correlation_id text, _provider_code text, _tenant_id integer default 1)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -148,7 +148,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers.delete_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.delete_provider', _tenant_id);
 
 	delete
 		from auth.provider
@@ -167,7 +167,7 @@ begin
 end;
 $$;
 
-create or replace function auth.enable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text)
+create or replace function auth.enable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text, _tenant_id integer default 1)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -178,7 +178,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider', _tenant_id);
 
 	update auth.provider
 		set is_active = true
@@ -197,7 +197,7 @@ begin
 end;
 $$;
 
-create or replace function auth.disable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text)
+create or replace function auth.disable_provider(_updated_by text, _user_id bigint, _correlation_id text, _provider_code text, _tenant_id integer default 1)
     returns TABLE(__provider_id integer)
     rows 1
     language plpgsql
@@ -208,7 +208,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider');
+		auth.has_permission(_user_id, _correlation_id, 'providers.update_provider', _tenant_id);
 
 	update auth.provider
 		set is_active = false
@@ -227,7 +227,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_provider_users(_requested_by text, _user_id bigint, _correlation_id text, _provider_code text)
+create or replace function auth.get_provider_users(_requested_by text, _user_id bigint, _correlation_id text, _provider_code text, _tenant_id integer default 1)
     returns TABLE(__user_id bigint, __user_identity_id bigint, __username text, __display_name text)
     language plpgsql
 as
@@ -236,7 +236,7 @@ declare
 	__provider_id int;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'manage_provider.get_users');
+		auth.has_permission(_user_id, _correlation_id, 'manage_provider.get_users', _tenant_id);
 
 	select provider_id
 	from auth.provider
@@ -254,14 +254,14 @@ begin
 end;
 $$;
 
-create or replace function auth.get_providers(_user_id bigint, _correlation_id text, _is_active boolean default null, _allows_group_mapping boolean default null, _allows_group_sync boolean default null, _search text default null)
+create or replace function auth.get_providers(_user_id bigint, _correlation_id text, _is_active boolean default null, _allows_group_mapping boolean default null, _allows_group_sync boolean default null, _search text default null, _tenant_id integer default 1)
     returns table(__provider_id integer, __code text, __name text, __is_active boolean, __allows_group_mapping boolean, __allows_group_sync boolean)
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'providers');
+		auth.has_permission(_user_id, _correlation_id, 'providers', _tenant_id);
 
 	return query
 		select p.provider_id

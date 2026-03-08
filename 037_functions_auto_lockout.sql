@@ -125,7 +125,8 @@ create or replace function auth.record_login_failure(
     _correlation_id  text,
     _target_user_id  bigint,
     _email           text,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns void
     language plpgsql
 as
@@ -135,7 +136,7 @@ declare
 begin
     -- Permission check (same as get_user_by_email_for_authentication)
     perform
-        auth.has_permission(_user_id, _correlation_id, 'authentication.get_data');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.get_data', _tenant_id);
 
     -- Log the login failure event
     perform unsecure.create_user_event(
@@ -179,7 +180,8 @@ create or replace function auth.verify_user_by_email(
     _correlation_id  text,
     _email           text,
     _password_hash   text,
-    _request_context jsonb default null
+    _request_context jsonb default null,
+    _tenant_id       integer default 1
 ) returns table (
     __user_id      bigint,
     __code         text,
@@ -204,7 +206,7 @@ declare
 begin
     -- Permission check
     perform
-        auth.has_permission(_user_id, _correlation_id, 'authentication.get_data');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.get_data', _tenant_id);
 
     -- Validate email provider is active
     perform

@@ -176,13 +176,13 @@ begin
 end;
 $$;
 
-create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true) returns SETOF auth.permission_assignment
+create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission');
+		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission', _tenant_id);
 
 	return query
 		select *
@@ -224,7 +224,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text) returns SETOF auth.permission
+create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission
     rows 1
     language plpgsql
 as
@@ -237,7 +237,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission');
+		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
 
 	return query
 		select * from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable, _short_code, _source);
@@ -642,7 +642,7 @@ begin
 end;
 $$;
 
-create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_groups text[] DEFAULT NULL::text[], _provider_roles text[] DEFAULT NULL::text[])
+create or replace function auth.ensure_groups_and_permissions(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _provider_groups text[] DEFAULT NULL::text[], _provider_roles text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[], __short_code_permissions text[])
     rows 1
     language plpgsql
@@ -650,7 +650,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'authentication.ensure_permissions');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.ensure_permissions', _tenant_id);
 
     update auth.user_identity
     set updated_by      = _created_by
@@ -680,7 +680,7 @@ begin
 end;
 $$;
 
-create or replace function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint)
+create or replace function auth.get_users_groups_and_permissions(_requested_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __tenant_uuid uuid, __groups text[], __permissions text[], __short_code_permissions text[])
     rows 1
     language plpgsql
@@ -688,7 +688,7 @@ as
 $$
 begin
     perform
-        auth.has_permission(_user_id, _correlation_id, 'authentication.get_users_groups_and_permissions');
+        auth.has_permission(_user_id, _correlation_id, 'authentication.get_users_groups_and_permissions', _tenant_id);
 
     return query
         select up.__tenant_id
@@ -878,7 +878,8 @@ create or replace function auth.ensure_permissions(
     _correlation_id  text,
     _permissions     jsonb,
     _source          text    default null,
-    _is_final_state  boolean default false
+    _is_final_state  boolean default false,
+    _tenant_id       integer default 1
 ) returns setof auth.permission
     language plpgsql
 as
@@ -896,10 +897,10 @@ declare
     _perm_to_delete record;
 begin
     -- Single permission check for the batch
-    perform auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission');
+    perform auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
 
     if _is_final_state then
-        perform auth.has_permission(_user_id, _correlation_id, 'permissions.delete_permission');
+        perform auth.has_permission(_user_id, _correlation_id, 'permissions.delete_permission', _tenant_id);
 
         if _source is null then
             raise exception '_source is required when _is_final_state is true';
