@@ -13,20 +13,36 @@ BEGIN
 
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
 
-    -- Create root type 'project' (code = hierarchy path for root types)
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
-    VALUES ('project', 'Project', 'Test project root type', 'test', null, 'project'::ext.ltree)
+    -- Create root type 'project' with key_schema
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('project', 'Project', 'Test project root type', 'test', null, 'project'::ext.ltree,
+        '{"project_id": "bigint"}'::jsonb)
+    ON CONFLICT DO NOTHING;
+
+    -- Register per-type access flags for project types
+    INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
+        ('project', 'read'), ('project', 'write'), ('project', 'delete'), ('project', 'share')
     ON CONFLICT DO NOTHING;
 
     PERFORM unsecure.ensure_resource_access_partition('project');
 
-    -- Create child types (code uses dots to encode hierarchy)
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
-    VALUES ('project.documents', 'Project Documents', 'Documents sub-type', 'test', 'project', 'project.documents'::ext.ltree)
+    -- Create child types with composite key_schema
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('project.documents', 'Project Documents', 'Documents sub-type', 'test', 'project', 'project.documents'::ext.ltree,
+        '{"project_id": "bigint", "folder_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
-    VALUES ('project.invoices', 'Project Invoices', 'Invoices sub-type', 'test', 'project', 'project.invoices'::ext.ltree)
+    INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
+        ('project.documents', 'read'), ('project.documents', 'write'), ('project.documents', 'delete'), ('project.documents', 'export')
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('project.invoices', 'Project Invoices', 'Invoices sub-type', 'test', 'project', 'project.invoices'::ext.ltree,
+        '{"project_id": "bigint", "invoice_id": "bigint"}'::jsonb)
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
+        ('project.invoices', 'read'), ('project.invoices', 'write'), ('project.invoices', 'approve')
     ON CONFLICT DO NOTHING;
 
     -- Children share parent's partition (ensure_resource_access_partition extracts root via split_part)
@@ -70,13 +86,14 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Grant read on 'project' (parent) for resource_id 1000
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-2', 'project', 1000,
+    -- Grant read on 'project' (parent) for resource_id {"project_id": 1000}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-2', 'project', '{"project_id": 1000}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Check child type access — should inherit from parent
-    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-2', 'project.documents', 1000,
-        'read', 1, false);
+    -- Child resource_id has composite key; ancestor key extraction uses parent's key_schema
+    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-2', 'project.documents',
+        '{"project_id": 1000, "folder_id": 1}'::jsonb, 'read', 1, false);
 
     IF __has_access THEN
         RAISE NOTICE '  PASS: Child type inherited read from parent grant';
@@ -85,8 +102,8 @@ BEGIN
     END IF;
 
     -- Also check the other child type
-    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-2', 'project.invoices', 1000,
-        'read', 1, false);
+    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-2', 'project.invoices',
+        '{"project_id": 1000, "invoice_id": 1}'::jsonb, 'read', 1, false);
 
     IF __has_access THEN
         RAISE NOTICE '  PASS: Second child type also inherited read from parent grant';
@@ -110,12 +127,13 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
     -- Grant write only on child type for user_3
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-3', 'project.documents', 1000,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-3', 'project.documents',
+        '{"project_id": 1000, "folder_id": 1}'::jsonb,
         _target_user_id := __user_id_3, _access_flags := array['write']);
 
     -- User 3 should have write on project.documents
-    __has_access := auth.has_resource_access(__user_id_3, 'test-hier-3', 'project.documents', 1000,
-        'write', 1, false);
+    __has_access := auth.has_resource_access(__user_id_3, 'test-hier-3', 'project.documents',
+        '{"project_id": 1000, "folder_id": 1}'::jsonb, 'write', 1, false);
 
     IF __has_access THEN
         RAISE NOTICE '  PASS: Direct child grant works (write on project.documents)';
@@ -124,8 +142,8 @@ BEGIN
     END IF;
 
     -- User 3 should NOT have write on parent (grant doesn't propagate up)
-    __has_access := auth.has_resource_access(__user_id_3, 'test-hier-3', 'project', 1000,
-        'write', 1, false);
+    __has_access := auth.has_resource_access(__user_id_3, 'test-hier-3', 'project',
+        '{"project_id": 1000}'::jsonb, 'write', 1, false);
 
     IF NOT __has_access THEN
         RAISE NOTICE '  PASS: Child grant does NOT propagate up to parent';
@@ -150,12 +168,13 @@ BEGIN
 
     -- User 2 already has read on 'project' from TEST 2
     -- Deny read on specific child type
-    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-hier-4', 'project.invoices', 1000,
+    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-hier-4', 'project.invoices',
+        '{"project_id": 1000, "invoice_id": 1}'::jsonb,
         __user_id_2, array['read']);
 
     -- User 2 should NOT have read on project.invoices (deny overrides parent grant)
-    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-4', 'project.invoices', 1000,
-        'read', 1, false);
+    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-4', 'project.invoices',
+        '{"project_id": 1000, "invoice_id": 1}'::jsonb, 'read', 1, false);
 
     IF NOT __has_access THEN
         RAISE NOTICE '  PASS: Deny on child overrides parent grant';
@@ -164,8 +183,8 @@ BEGIN
     END IF;
 
     -- User 2 should still have read on project.documents (deny only on invoices)
-    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-4', 'project.documents', 1000,
-        'read', 1, false);
+    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-4', 'project.documents',
+        '{"project_id": 1000, "folder_id": 1}'::jsonb, 'read', 1, false);
 
     IF __has_access THEN
         RAISE NOTICE '  PASS: Deny on one child does not affect sibling';
@@ -191,12 +210,12 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant write on 'project' to group (user_2 is member of group_id_1)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-5', 'project', 2000,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-5', 'project', '{"project_id": 2000}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['write']);
 
     -- User 2 (member of editors group) should inherit write on child via group + hierarchy
-    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-5', 'project.documents', 2000,
-        'write', 1, false);
+    __has_access := auth.has_resource_access(__user_id_2, 'test-hier-5', 'project.documents',
+        '{"project_id": 2000, "folder_id": 1}'::jsonb, 'write', 1, false);
 
     IF __has_access THEN
         RAISE NOTICE '  PASS: Group grant on parent cascades to child';

@@ -10,7 +10,7 @@ BEGIN
 
     -- Resource access rows are cleaned up by transaction rollback (isolation: transaction)
     -- but clean up explicitly for safety
-    DELETE FROM auth.resource_access WHERE root_type IN ('document', 'folder', 'project');
+    DELETE FROM auth.resource_access WHERE root_type IN ('document', 'folder', 'project', 'ptf_untyped', 'ptf_ensured', 'ptf_created');
     DELETE FROM auth.user_group_id_cache WHERE created_by IN ('cache', 'test');
     DELETE FROM auth.owner WHERE created_by = 'test';
     DELETE FROM auth.permission_assignment WHERE created_by = 'test';
@@ -22,6 +22,8 @@ BEGIN
     DELETE FROM auth.tenant_user WHERE created_by = 'test';
     DELETE FROM auth.user_info WHERE code LIKE 'ra_test_%' OR code LIKE 'ra_temp_%';
     DELETE FROM auth.tenant WHERE code = 'ra_test_tenant_2';
+    -- Delete per-type flag mappings before resource types
+    DELETE FROM const.resource_type_flag WHERE resource_type_code IN (SELECT code FROM const.resource_type WHERE source = 'test');
     -- Delete child types before parent types (FK constraint)
     DELETE FROM const.resource_type WHERE parent_code IS NOT NULL AND source = 'test';
     DELETE FROM const.resource_type WHERE source = 'test';
@@ -100,5 +102,17 @@ BEGIN
     RAISE NOTICE '    2. Cache hit on second access';
     RAISE NOTICE '    3. Soft invalidation on group member change';
     RAISE NOTICE '    4. Hard invalidation on user disable';
+    RAISE NOTICE '  011 Per-Type Access Flags:';
+    RAISE NOTICE '    1. Grant with invalid flag raises 35006';
+    RAISE NOTICE '    2. Deny with invalid flag raises 35006';
+    RAISE NOTICE '    3. Grant with valid flags succeeds';
+    RAISE NOTICE '    4. Mixed valid + invalid flags — entire grant fails';
+    RAISE NOTICE '    5. Type with no flag mappings allows all flags (backward compat)';
+    RAISE NOTICE '    6. get_resource_types returns access_flags';
+    RAISE NOTICE '    7. ensure_resource_types registers per-type flags';
+    RAISE NOTICE '    8. create_resource_type registers per-type flags';
+    RAISE NOTICE '    9. Hierarchical types — child validates its own flags';
+    RAISE NOTICE '    10. Matrix respects per-type flags for system user';
+    RAISE NOTICE '    11. Grant valid child-specific flag succeeds';
     RAISE NOTICE '';
 END $$;

@@ -172,7 +172,7 @@ insert into const.invitation_action_type (code, title, description, executor_cod
      'database',
      '{"fields": {
          "resource_type":  {"type": "string",  "required": true,  "source": null},
-         "resource_id":    {"type": "integer", "required": true,  "source": null},
+         "resource_id":    {"type": "object",  "required": true,  "source": null},
          "access_flags":   {"type": "array",   "required": false, "source": null},
          "target_user_id": {"type": "integer", "required": true,  "source": "invitation.target_user_id"},
          "tenant_id":      {"type": "integer", "required": true,  "source": "invitation.tenant_id"}

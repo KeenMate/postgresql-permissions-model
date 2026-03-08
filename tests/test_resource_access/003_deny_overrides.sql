@@ -16,12 +16,12 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    -- Grant read to editors group on document 700
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-1a', 'document', 700,
+    -- Grant read to editors group on document {"id": 700}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-1a', 'document', '{"id": 700}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read']);
 
     -- Verify user_2 (member of editors) can read
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-1b', 'document', 700, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-1b', 'document', '{"id": 700}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = false THEN
@@ -29,11 +29,11 @@ BEGIN
     END IF;
 
     -- Deny read for user_2 specifically
-    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-1c', 'document', 700,
+    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-1c', 'document', '{"id": 700}'::jsonb,
         __user_id_2, _access_flags := array['read']);
 
     -- Verify deny overrides group grant
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-1d', 'document', 700, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-1d', 'document', '{"id": 700}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = false THEN
@@ -60,19 +60,19 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    -- Grant read+write to editors group on document 710
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-2a', 'document', 710,
+    -- Grant read+write to editors group on document {"id": 710}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-2a', 'document', '{"id": 710}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read', 'write']);
 
     -- Deny only read for user_2
-    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-2b', 'document', 710,
+    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-2b', 'document', '{"id": 710}'::jsonb,
         __user_id_2, _access_flags := array['read']);
 
     -- Check: read should be denied, write should still be allowed
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-2c', 'document', 710, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-2c', 'document', '{"id": 710}'::jsonb, 'read', 1, false)
     INTO __result_read;
 
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-2d', 'document', 710, 'write', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-2d', 'document', '{"id": 710}'::jsonb, 'write', 1, false)
     INTO __result_write;
 
     IF __result_read = false AND __result_write = true THEN
@@ -99,9 +99,9 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    -- Document 700 has: group grant (read) + user deny (read) from TEST 1
+    -- Document {"id": 700} has: group grant (read) + user deny (read) from TEST 1
     -- Verify currently denied
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-3a', 'document', 700, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-3a', 'document', '{"id": 700}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -109,12 +109,12 @@ BEGIN
     END IF;
 
     -- Revoke the deny (removes the deny row)
-    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-deny-3b', 'document', 700,
+    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-deny-3b', 'document', '{"id": 700}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'])
     INTO __deleted;
 
     -- Now group grant should take effect again
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-3c', 'document', 700, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-3c', 'document', '{"id": 700}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -140,27 +140,27 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Set up a deny
-    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-4a', 'document', 720,
+    PERFORM auth.deny_resource_access('test', __user_id_1, 'test-corr-deny-4a', 'document', '{"id": 720}'::jsonb,
         __user_id_2, _access_flags := array['read']);
 
     -- Verify denied
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-4b', 'document', 720, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-4b', 'document', '{"id": 720}'::jsonb, 'read', 1, false)
     INTO __result;
     IF __result = true THEN
         RAISE EXCEPTION '  FAIL: Should be denied initially';
     END IF;
 
     -- Now grant (should flip is_deny to false)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-4c', 'document', 720,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-4c', 'document', '{"id": 720}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Verify the row was flipped, not duplicated
     SELECT ra.is_deny FROM auth.resource_access ra
-    WHERE ra.resource_type = 'document' AND ra.resource_id = 720
+    WHERE ra.resource_type = 'document' AND ra.resource_id = '{"id": 720}'::jsonb
       AND ra.user_id = __user_id_2 AND ra.access_flag = 'read'
     INTO __is_deny;
 
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-4d', 'document', 720, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-deny-4d', 'document', '{"id": 720}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true AND __is_deny = false THEN

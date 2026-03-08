@@ -14,12 +14,12 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Grant read to user_2 on document 500
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-1', 'document', 500,
+    -- Grant read to user_2 on document {"id": 500}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-1', 'document', '{"id": 500}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Check access
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-1', 'document', 500, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-1', 'document', '{"id": 500}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -41,8 +41,8 @@ BEGIN
 
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
-    -- User_3 has no grant on document 500
-    SELECT auth.has_resource_access(__user_id_3, 'test-corr-hra-2', 'document', 500, 'read', 1, false)
+    -- User_3 has no grant on document {"id": 500}
+    SELECT auth.has_resource_access(__user_id_3, 'test-corr-hra-2', 'document', '{"id": 500}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = false THEN
@@ -64,7 +64,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
     BEGIN
-        PERFORM auth.has_resource_access(__user_id_3, 'test-corr-hra-3', 'document', 500, 'read', 1, true);
+        PERFORM auth.has_resource_access(__user_id_3, 'test-corr-hra-3', 'document', '{"id": 500}'::jsonb, 'read', 1, true);
         RAISE EXCEPTION '  FAIL: Expected exception but none was thrown';
     EXCEPTION WHEN OTHERS THEN
         IF SQLERRM LIKE '%has no access to resource%' THEN
@@ -91,12 +91,12 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    -- Grant read to editors group on document 600
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-4', 'document', 600,
+    -- Grant read to editors group on document {"id": 600}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-4', 'document', '{"id": 600}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read']);
 
     -- User_2 is a member of editors group
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-4', 'document', 600, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-4', 'document', '{"id": 600}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -115,8 +115,8 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 5: System user bypasses all resource access checks';
 
-    -- No grants exist for system user on document 999, but system user should still pass
-    SELECT auth.has_resource_access(1, 'test-corr-hra-5', 'document', 999, 'read', 1, false)
+    -- No grants exist for system user on document {"id": 999}, but system user should still pass
+    SELECT auth.has_resource_access(1, 'test-corr-hra-5', 'document', '{"id": 999}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -143,7 +143,7 @@ BEGIN
     VALUES ('test', 1, __user_id_1);
 
     -- No direct grants exist for this resource, but owner should pass
-    SELECT auth.has_resource_access(__user_id_1, 'test-corr-hra-6', 'document', 888, 'delete', 1, false)
+    SELECT auth.has_resource_access(__user_id_1, 'test-corr-hra-6', 'document', '{"id": 888}'::jsonb, 'delete', 1, false)
     INTO __result;
 
     IF __result = true THEN
@@ -168,8 +168,8 @@ BEGIN
 
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- User_2 has 'read' on document 500, but not 'write'
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-7', 'document', 500, 'write', 1, false)
+    -- User_2 has 'read' on document {"id": 500}, but not 'write'
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-hra-7', 'document', '{"id": 500}'::jsonb, 'write', 1, false)
     INTO __result;
 
     IF __result = false THEN

@@ -494,12 +494,12 @@ $$;
  */
 
 -- 35001: No access to resource
-create or replace function error.raise_35001(_user_id bigint, _resource_type text, _resource_id bigint, _tenant_id integer default 1) returns void
+create or replace function error.raise_35001(_user_id bigint, _resource_type text, _resource_id jsonb, _tenant_id integer default 1) returns void
     language plpgsql
 as
 $$
 begin
-    raise exception 'User (uid: %) has no access to resource (type: %, id: %) in tenant (id: %)', _user_id, _resource_type, _resource_id, _tenant_id
+    raise exception 'User (uid: %) has no access to resource (type: %, id: %) in tenant (id: %)', _user_id, _resource_type, _resource_id::text, _tenant_id
         using errcode = '35001';
 end;
 $$;

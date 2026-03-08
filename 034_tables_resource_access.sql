@@ -5,10 +5,12 @@
  * Lookup tables, partitioned ACL table, indexes, and partition helper
  * for resource-based authorization.
  *
- * v2: Hierarchical resource types (ltree), root-type partitioning,
+ * v3: resource_id is jsonb (composite key support).
+ *     const.resource_type has key_schema defining expected key fields.
+ *     Hierarchical resource types (ltree), root-type partitioning,
  *     and group membership cache table.
  *
- * This file is part of the PostgreSQL Permissions Model v2
+ * This file is part of the PostgreSQL Permissions Model v3
  */
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
@@ -22,6 +24,12 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
  *   'project.invoices'     → child type (parent_code = 'project', path = 'project.invoices')
  *
  * A grant on 'project' cascades to all 'project.*' sub-types at check time.
+ *
+ * key_schema defines the expected resource_id jsonb structure:
+ *   'project':           {"project_id": "bigint"}
+ *   'project.documents': {"project_id": "bigint", "folder_id": "bigint"}
+ *
+ * Used for validation at grant/deny time and for documentation.
  */
 create table const.resource_type
 (
@@ -32,7 +40,8 @@ create table const.resource_type
     is_active   boolean not null default true,
     source      text    default null,
     parent_code text    references const.resource_type(code),
-    path        ext.ltree not null
+    path        ext.ltree not null,
+    key_schema  jsonb   not null default '{}'::jsonb
 );
 
 create index ix_resource_type_path on const.resource_type using gist (path);
@@ -48,17 +57,44 @@ create table const.resource_access_flag
 );
 
 insert into const.resource_access_flag (code, title, source) values
-    ('read',   'Read',   'core'),
-    ('write',  'Write',  'core'),
-    ('delete', 'Delete', 'core'),
-    ('share',  'Share',  'core')
+    ('read',    'Read',    'core'),
+    ('write',   'Write',   'core'),
+    ('delete',  'Delete',  'core'),
+    ('share',   'Share',   'core'),
+    ('approve', 'Approve', 'core'),
+    ('export',  'Export',  'core')
 on conflict do nothing;
+
+/*
+ * const.resource_type_flag — Per-type access flag mapping
+ *
+ * Defines which access flags are valid for each resource type.
+ * If a resource type has no entries here, ALL flags are allowed (backward compat).
+ * When entries exist, only those flags can be used in grant/deny operations.
+ *
+ * Applications register their resource types with their valid flags on startup
+ * via create_resource_type() or ensure_resource_types().
+ */
+create table const.resource_type_flag
+(
+    resource_type_code text not null references const.resource_type(code) on delete cascade,
+    access_flag_code   text not null references const.resource_access_flag(code) on delete cascade,
+    primary key (resource_type_code, access_flag_code)
+);
 
 /*
  * auth.resource_access — Partitioned ACL table (root-type partitioning)
  *
  * One row = one flag for one user/group on one resource.
  * A user can have multiple rows per resource (one per flag).
+ *
+ * resource_id is a jsonb composite key whose structure is defined by
+ * the resource_type's key_schema.
+ *
+ * Examples:
+ *   resource_type = 'project',           resource_id = {"project_id": 42}
+ *   resource_type = 'project.documents', resource_id = {"project_id": 42, "folder_id": 100}
+ *   resource_type = 'project.invoices',  resource_id = {"project_id": 42}
  *
  * Partitioned by root_type (first segment of resource_type):
  *   resource_type = 'project.documents' → root_type = 'project'
@@ -74,7 +110,7 @@ create table auth.resource_access
     tenant_id          integer     not null references auth.tenant on delete cascade,
     resource_type      text        not null references const.resource_type,
     root_type          text        not null,
-    resource_id        bigint      not null,
+    resource_id        jsonb       not null,
     user_id            bigint      references auth.user_info on delete cascade,
     user_group_id      integer     references auth.user_group on delete cascade,
     access_flag        text        not null references const.resource_access_flag,
@@ -86,6 +122,8 @@ create table auth.resource_access
         check ((user_id is not null) or (user_group_id is not null)),
     constraint ra_not_both_user_and_group
         check (not (user_id is not null and user_group_id is not null)),
+    constraint ra_resource_id_is_object
+        check (jsonb_typeof(resource_id) = 'object'),
     primary key (resource_access_id, root_type)
 ) partition by list (root_type);
 
@@ -97,15 +135,23 @@ create table auth.resource_access_default
  * Indexes
  *
  * All indexes include root_type for partition pruning + resource_type for specificity.
+ * resource_id uses GIN for jsonb containment (@>) queries.
  */
 
+-- GIN index for containment queries: "all grants where resource_id @> {"project_id": 42}"
+create index ix_ra_resource_id
+    on auth.resource_access using gin (resource_id);
+
 -- Primary lookup: "does user X have flag Y on resource Z?"
+-- With jsonb we cannot have a traditional unique btree index, so we use
+-- a unique index on (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, access_flag)
+-- md5 hash gives us a fixed-width key for uniqueness enforcement.
 create unique index uq_ra_user_flag
-    on auth.resource_access (root_type, resource_type, tenant_id, resource_id, user_id, access_flag)
+    on auth.resource_access (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, access_flag)
     where user_id is not null;
 
 create unique index uq_ra_group_flag
-    on auth.resource_access (root_type, resource_type, tenant_id, resource_id, user_group_id, access_flag)
+    on auth.resource_access (root_type, resource_type, tenant_id, md5(resource_id::text), user_group_id, access_flag)
     where user_group_id is not null;
 
 -- Reverse: "what resources can user X access?"
@@ -118,9 +164,10 @@ create index ix_ra_group_resources
     on auth.resource_access (root_type, resource_type, tenant_id, user_group_id)
     where user_group_id is not null;
 
--- "Who has access to resource Y?"
+-- "Who has access to resource Y?" — uses GIN on resource_id
+-- Combined with root_type/resource_type btree filtering
 create index ix_ra_resource_grants
-    on auth.resource_access (root_type, resource_type, tenant_id, resource_id);
+    on auth.resource_access (root_type, resource_type, tenant_id);
 
 /*
  * Partition helper — creates a partition for a root resource type
@@ -146,6 +193,36 @@ begin
             _partition_name, _root_type
         );
     end if;
+end;
+$$;
+
+/*
+ * unsecure.validate_resource_id — Validates resource_id against key_schema
+ *
+ * Checks that all required keys from the resource_type's key_schema
+ * are present in the resource_id jsonb.
+ */
+create or replace function unsecure.validate_resource_id(_resource_type text, _resource_id jsonb)
+returns void language plpgsql as $$
+declare
+    _schema jsonb;
+    _key text;
+begin
+    select key_schema from const.resource_type where code = _resource_type into _schema;
+
+    -- No schema → no validation
+    if _schema is null or _schema = '{}'::jsonb then
+        return;
+    end if;
+
+    -- Check each required key is present
+    for _key in select jsonb_object_keys(_schema)
+    loop
+        if not (_resource_id ? _key) then
+            raise exception 'resource_id missing required key "%" for resource type "%"', _key, _resource_type
+                using errcode = '35005';
+        end if;
+    end loop;
 end;
 $$;
 

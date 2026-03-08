@@ -62,12 +62,25 @@ BEGIN
     VALUES ('test', __tenant_id_2, __user_id_1);
 
     -- Create resource types (with ltree path for hierarchy support)
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
-    VALUES ('document', 'Document', 'Test document resource type', 'test', null, 'document'::ext.ltree)
+    -- key_schema defines the expected jsonb structure for resource_id
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('document', 'Document', 'Test document resource type', 'test', null, 'document'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path)
-    VALUES ('folder', 'Folder', 'Test folder resource type', 'test', null, 'folder'::ext.ltree)
+    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    VALUES ('folder', 'Folder', 'Test folder resource type', 'test', null, 'folder'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    ON CONFLICT DO NOTHING;
+
+    -- Register per-type access flags
+    -- 'document' allows: read, write, delete, share, export
+    INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
+        ('document', 'read'), ('document', 'write'), ('document', 'delete'),
+        ('document', 'share'), ('document', 'export')
+    ON CONFLICT DO NOTHING;
+
+    -- 'folder' allows: read, write, delete, share
+    INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
+        ('folder', 'read'), ('folder', 'write'), ('folder', 'delete'), ('folder', 'share')
     ON CONFLICT DO NOTHING;
 
     -- Create partitions for test resource types

@@ -259,6 +259,8 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
     (35002, 'err_resource_grant_no_target',       'resource_error', 'No Grant Target',                'Either target user or group must be specified', true, 'core'),
     (35003, 'err_resource_type_not_found',        'resource_error', 'Resource Type Not Found',        'Resource type does not exist or is inactive', true, 'core'),
     (35004, 'err_resource_access_flag_not_found', 'resource_error', 'Access Flag Not Found',          'Access flag does not exist', true, 'core'),
+    (35005, 'err_resource_id_invalid',             'resource_error', 'Invalid Resource ID',            'Resource ID is missing a required key for this resource type', true, 'core'),
+    (35006, 'err_resource_flag_not_valid',         'resource_error', 'Flag Not Valid For Type',        'Access flag is not valid for this resource type', true, 'core'),
 
     -- Token config errors (36001-36999)
     (36001, 'err_token_type_not_found',      'token_config_error', 'Token Type Not Found', 'Token type does not exist', true, 'core'),
@@ -380,6 +382,8 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (35002, 'en', 'Either target user_id or user_group_id must be provided'),
     (35003, 'en', 'Resource type "{resource_type}" does not exist or is not active'),
     (35004, 'en', 'Access flag "{access_flag}" does not exist'),
+    (35005, 'en', 'Resource ID is missing required key "{key}" for resource type "{resource_type}"'),
+    (35006, 'en', 'Access flag "{access_flag}" is not valid for resource type "{resource_type}"'),
 
     -- Token config error messages (36xxx)
     (36001, 'en', 'Token type "{token_type_code}" does not exist'),

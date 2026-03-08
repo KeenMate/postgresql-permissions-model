@@ -16,21 +16,21 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Grant read access to user_2 on document 100
+    -- Grant read access to user_2 on document {"id": 100}
     SELECT __resource_access_id, __access_flag
-    FROM auth.grant_resource_access('test', __user_id_1, 'test-corr-1', 'document', 100,
+    FROM auth.grant_resource_access('test', __user_id_1, 'test-corr-1', 'document', '{"id": 100}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'])
     INTO __ra_id, __flag;
 
     IF __ra_id IS NOT NULL AND __flag = 'read' THEN
-        RAISE NOTICE '  PASS: Granted read to user_2 on document 100 (ra_id=%)', __ra_id;
+        RAISE NOTICE '  PASS: Granted read to user_2 on document {"id": 100} (ra_id=%)', __ra_id;
     ELSE
         RAISE EXCEPTION '  FAIL: Expected grant to return id and flag, got ra_id=%, flag=%', __ra_id, __flag;
     END IF;
 
     -- Verify row exists in resource_access
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 100 AND user_id = __user_id_2
+    WHERE resource_type = 'document' AND resource_id = '{"id": 100}'::jsonb AND user_id = __user_id_2
     INTO __count;
 
     IF __count = 1 THEN
@@ -54,12 +54,12 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Grant read, write, delete to user_2 on document 200
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-2', 'document', 200,
+    -- Grant read, write, delete to user_2 on document {"id": 200}
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-2', 'document', '{"id": 200}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read', 'write', 'delete']);
 
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 200 AND user_id = __user_id_2
+    WHERE resource_type = 'document' AND resource_id = '{"id": 200}'::jsonb AND user_id = __user_id_2
     INTO __count;
 
     IF __count = 3 THEN
@@ -83,11 +83,11 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-3', 'document', 300,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-3', 'document', '{"id": 300}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read', 'write']);
 
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 300 AND user_group_id = __group_id_1
+    WHERE resource_type = 'document' AND resource_id = '{"id": 300}'::jsonb AND user_group_id = __group_id_1
     INTO __count;
 
     IF __count = 2 THEN
@@ -112,8 +112,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Revoke 'delete' from user_2 on document 200 (was granted in TEST 2)
-    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-4', 'document', 200,
+    -- Revoke 'delete' from user_2 on document {"id": 200} (was granted in TEST 2)
+    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-4', 'document', '{"id": 200}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['delete'])
     INTO __deleted;
 
@@ -125,7 +125,7 @@ BEGIN
 
     -- Verify remaining flags
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 200 AND user_id = __user_id_2
+    WHERE resource_type = 'document' AND resource_id = '{"id": 200}'::jsonb AND user_id = __user_id_2
     INTO __count;
 
     IF __count = 2 THEN
@@ -150,8 +150,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
-    -- Revoke all remaining flags from user_2 on document 200
-    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-5', 'document', 200,
+    -- Revoke all remaining flags from user_2 on document {"id": 200}
+    SELECT auth.revoke_resource_access('test', __user_id_1, 'test-corr-5', 'document', '{"id": 200}'::jsonb,
         _target_user_id := __user_id_2)
     INTO __deleted;
 
@@ -162,7 +162,7 @@ BEGIN
     END IF;
 
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 200 AND user_id = __user_id_2
+    WHERE resource_type = 'document' AND resource_id = '{"id": 200}'::jsonb AND user_id = __user_id_2
     INTO __count;
 
     IF __count = 0 THEN
@@ -187,8 +187,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    -- Document 300 has group grants from TEST 3
-    SELECT auth.revoke_all_resource_access('test', __user_id_1, 'test-corr-6', 'document', 300)
+    -- Document {"id": 300} has group grants from TEST 3
+    SELECT auth.revoke_all_resource_access('test', __user_id_1, 'test-corr-6', 'document', '{"id": 300}'::jsonb)
     INTO __deleted;
 
     IF __deleted = 2 THEN
@@ -198,11 +198,11 @@ BEGIN
     END IF;
 
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 300
+    WHERE resource_type = 'document' AND resource_id = '{"id": 300}'::jsonb
     INTO __count;
 
     IF __count = 0 THEN
-        RAISE NOTICE '  PASS: No grants remain for document 300 (count=%)', __count;
+        RAISE NOTICE '  PASS: No grants remain for document {"id": 300} (count=%)', __count;
     ELSE
         RAISE EXCEPTION '  FAIL: Expected 0, got %', __count;
     END IF;
@@ -223,13 +223,13 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read twice
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7a', 'document', 400,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7a', 'document', '{"id": 400}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7b', 'document', 400,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7b', 'document', '{"id": 400}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     SELECT count(*) FROM auth.resource_access
-    WHERE resource_type = 'document' AND resource_id = 400 AND user_id = __user_id_2 AND access_flag = 'read'
+    WHERE resource_type = 'document' AND resource_id = '{"id": 400}'::jsonb AND user_id = __user_id_2 AND access_flag = 'read'
     INTO __count;
 
     IF __count = 1 THEN

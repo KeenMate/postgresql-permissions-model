@@ -403,7 +403,7 @@ declare
     ___group_id integer;
     ___perm_set_code text;
     ___resource_type text;
-    ___resource_id bigint;
+    ___resource_id jsonb;
 begin
     case _condition_code
         when 'always' then
@@ -446,7 +446,7 @@ begin
                 return true;
             end if;
             ___resource_type := _payload->>'resource_type';
-            ___resource_id := (_payload->>'resource_id')::bigint;
+            ___resource_id := _payload->'resource_id';
             return not exists(
                 select 1 from auth.resource_access
                 where tenant_id = _tenant_id
@@ -715,7 +715,7 @@ declare
     ___perm_set_code text;
     ___perm_code text;
     ___resource_type text;
-    ___resource_id bigint;
+    ___resource_id jsonb;
     ___access_flags text[];
 begin
     case _action_type_code
@@ -747,7 +747,7 @@ begin
 
         when 'grant_resource_access' then
             ___resource_type := _payload->>'resource_type';
-            ___resource_id := (_payload->>'resource_id')::bigint;
+            ___resource_id := _payload->'resource_id';
             ___access_flags := array(select jsonb_array_elements_text(_payload->'access_flags'));
             if ___access_flags is null or array_length(___access_flags, 1) is null then
                 ___access_flags := array['read'];

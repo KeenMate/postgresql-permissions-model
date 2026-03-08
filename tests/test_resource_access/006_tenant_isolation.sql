@@ -16,12 +16,12 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
     SELECT val FROM _ra_test_data WHERE key = 'tenant_id_2' INTO __tenant_id_2;
 
-    -- Grant read to user_2 on document 3001 in tenant 1
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-1a', 'document', 3001,
+    -- Grant read to user_2 on document {"id": 3001} in tenant 1
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-1a', 'document', '{"id": 3001}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := 1);
 
     -- Verify access in tenant 1
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-iso-1b', 'document', 3001, 'read', 1, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-iso-1b', 'document', '{"id": 3001}'::jsonb, 'read', 1, false)
     INTO __result;
 
     IF __result = false THEN
@@ -29,7 +29,7 @@ BEGIN
     END IF;
 
     -- Verify NO access in tenant 2 (same resource_id, different tenant)
-    SELECT auth.has_resource_access(__user_id_2, 'test-corr-iso-1c', 'document', 3001, 'read', __tenant_id_2::integer, false)
+    SELECT auth.has_resource_access(__user_id_2, 'test-corr-iso-1c', 'document', '{"id": 3001}'::jsonb, 'read', __tenant_id_2::integer, false)
     INTO __result;
 
     IF __result = false THEN
@@ -47,8 +47,8 @@ DECLARE
     __user_id_1 bigint;
     __user_id_2 bigint;
     __tenant_id_2 integer;
-    __result_t1 bigint[];
-    __result_t2 bigint[];
+    __result_t1 jsonb[];
+    __result_t2 jsonb[];
 BEGIN
     RAISE NOTICE 'TEST 2: Filter respects tenant boundaries';
 
@@ -57,7 +57,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'tenant_id_2' INTO __tenant_id_2;
 
     -- Grant on different docs in different tenants
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2a', 'document', 3010,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2a', 'document', '{"id": 3010}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := 1);
 
     -- Create system_admin perm set in tenant 2 (only exists in tenant 1 by default)
@@ -67,25 +67,25 @@ BEGIN
     -- Give user_id_1 the system admin perms in tenant 2
     PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', _tenant_id := __tenant_id_2);
 
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2b', 'document', 3011,
+    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2b', 'document', '{"id": 3011}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := __tenant_id_2::integer);
 
     -- Filter in tenant 1
     SELECT array_agg(__resource_id)
     FROM auth.filter_accessible_resources(__user_id_2, 'test-corr-iso-2c', 'document',
-        array[3010, 3011]::bigint[], 'read', 1)
+        array['{"id": 3010}'::jsonb, '{"id": 3011}'::jsonb], 'read', 1)
     INTO __result_t1;
 
     -- Filter in tenant 2
     SELECT array_agg(__resource_id)
     FROM auth.filter_accessible_resources(__user_id_2, 'test-corr-iso-2d', 'document',
-        array[3010, 3011]::bigint[], 'read', __tenant_id_2::integer)
+        array['{"id": 3010}'::jsonb, '{"id": 3011}'::jsonb], 'read', __tenant_id_2::integer)
     INTO __result_t2;
 
-    IF __result_t1 = array[3010]::bigint[] AND __result_t2 = array[3011]::bigint[] THEN
+    IF __result_t1 = array['{"id": 3010}'::jsonb] AND __result_t2 = array['{"id": 3011}'::jsonb] THEN
         RAISE NOTICE '  PASS: Tenant 1 sees %, tenant 2 sees %', __result_t1, __result_t2;
     ELSE
-        RAISE EXCEPTION '  FAIL: Expected t1={3010}, t2={3011}, got t1=%, t2=%', __result_t1, __result_t2;
+        RAISE EXCEPTION '  FAIL: Expected t1={{"id":3010}}, t2={{"id":3011}}, got t1=%, t2=%', __result_t1, __result_t2;
     END IF;
 END $$;
 

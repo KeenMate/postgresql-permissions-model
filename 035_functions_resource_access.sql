@@ -18,13 +18,16 @@
  * - auth.ensure_resource_types        — bulk-ensure resource types from JSONB array
  * - auth.get_resource_types           — list registered resource types
  *
- * v2: Hierarchical resource types, root-type partitioning, group ID cache.
+ * v3: resource_id is jsonb (composite key).
+ *     Containment queries (@>) for matching.
+ *     Key schema validation at grant/deny time.
+ *     filter_accessible_resources accepts jsonb[] instead of bigint[].
  *
  * Note: Read-path functions (has_resource_access, filter_accessible_resources, etc.)
  * are NOT marked STABLE because they call unsecure.get_cached_group_ids() which
  * performs INSERT/UPDATE on auth.user_group_id_cache on cache miss.
  *
- * This file is part of the PostgreSQL Permissions Model v2
+ * This file is part of the PostgreSQL Permissions Model v3
  */
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
@@ -67,6 +70,46 @@ begin
 end;
 $$;
 
+/*
+ * unsecure.validate_access_flags_for_type — Validates flags against per-type mapping
+ *
+ * If the resource type has entries in const.resource_type_flag, only those flags
+ * are allowed. If no entries exist, all flags are permitted (backward compat).
+ * Throws error 35006 for invalid flags.
+ */
+create or replace function unsecure.validate_access_flags_for_type(_resource_type text, _access_flags text[])
+returns void
+    language plpgsql
+as
+$$
+declare
+    _flag text;
+    _has_type_flags boolean;
+begin
+    -- Check if this resource type has any flag mappings
+    select exists(
+        select 1 from const.resource_type_flag where resource_type_code = _resource_type
+    ) into _has_type_flags;
+
+    -- No mappings → all flags allowed (backward compat)
+    if not _has_type_flags then
+        return;
+    end if;
+
+    -- Validate each flag against the type's allowed flags
+    foreach _flag in array _access_flags
+    loop
+        if not exists (
+            select 1 from const.resource_type_flag
+            where resource_type_code = _resource_type and access_flag_code = _flag
+        ) then
+            raise exception 'Access flag "%" is not valid for resource type "%"', _flag, _resource_type
+                using errcode = '35006';
+        end if;
+    end loop;
+end;
+$$;
+
 -- ============================================================================
 -- Core check: auth.has_resource_access
 -- ============================================================================
@@ -81,11 +124,15 @@ $$;
 --    c. Group-level GRANT (via cached group IDs) → true
 -- 5. No grant found → false (or throw error)
 --
+-- resource_id is jsonb. Matching uses containment (@>):
+--   A grant on {"project_id": 42} matches checks for
+--   {"project_id": 42, "folder_id": 100} at ancestor type level.
+--
 create or replace function auth.has_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _required_flag  text default 'read',
     _tenant_id      integer default 1,
     _throw_err      boolean default true
@@ -97,6 +144,7 @@ declare
     _cached_group_ids integer[];
     _root_type        text;
     _ancestor         record;
+    _ancestor_key     jsonb;
 begin
     -- System user bypasses all checks
     if _user_id = 1 then
@@ -116,19 +164,37 @@ begin
 
     -- Walk up the type hierarchy (most specific first)
     for _ancestor in
-        select rt.code
+        select rt.code, rt.key_schema
         from const.resource_type rt
         where rt.path @> (select path from const.resource_type where code = _resource_type)
           and rt.is_active = true
         order by nlevel(rt.path) desc
     loop
+        -- Build the ancestor key by extracting only fields from ancestor's schema
+        -- e.g., for 'project' ancestor checking 'project.documents' resource_id:
+        --   resource_id = {"project_id": 42, "folder_id": 100}
+        --   ancestor key_schema = {"project_id": "bigint"}
+        --   ancestor_key = {"project_id": 42}
+        if _ancestor.key_schema is not null and _ancestor.key_schema <> '{}'::jsonb then
+            select jsonb_object_agg(k, _resource_id->k)
+            from jsonb_object_keys(_ancestor.key_schema) as k
+            where _resource_id ? k
+            into _ancestor_key;
+        else
+            _ancestor_key := _resource_id;
+        end if;
+
+        if _ancestor_key is null then
+            continue;
+        end if;
+
         -- User-level DENY overrides everything
         if exists (
             select 1 from auth.resource_access
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _resource_id
+              and resource_id = _ancestor_key
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = true
@@ -145,7 +211,7 @@ begin
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _resource_id
+              and resource_id = _ancestor_key
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = false
@@ -159,7 +225,7 @@ begin
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _resource_id
+              and resource_id = _ancestor_key
               and user_group_id = any(_cached_group_ids)
               and access_flag = _required_flag
               and is_deny = false
@@ -184,14 +250,16 @@ $$;
 -- Returns which resource_ids from a given array the user can access
 -- (with a given flag). Respects deny-overrides and hierarchy walk-up.
 --
+-- resource_ids is jsonb[] (array of jsonb composite keys).
+--
 create or replace function auth.filter_accessible_resources(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_ids   bigint[],
+    _resource_ids   jsonb[],
     _required_flag  text default 'read',
     _tenant_id      integer default 1
-) returns table(__resource_id bigint)
+) returns table(__resource_id jsonb)
     language plpgsql
 as
 $$
@@ -235,7 +303,7 @@ begin
             where root_type = _root_type
               and resource_type = any(_ancestor_types)
               and tenant_id = _tenant_id
-              and resource_id = r.id
+              and resource_id @> r.id
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = true
@@ -247,7 +315,7 @@ begin
                 where root_type = _root_type
                   and resource_type = any(_ancestor_types)
                   and tenant_id = _tenant_id
-                  and resource_id = r.id
+                  and resource_id @> r.id
                   and user_id = _user_id
                   and access_flag = _required_flag
                   and is_deny = false
@@ -259,7 +327,7 @@ begin
                 where root_type = _root_type
                   and resource_type = any(_ancestor_types)
                   and tenant_id = _tenant_id
-                  and resource_id = r.id
+                  and resource_id @> r.id
                   and user_group_id = any(_cached_group_ids)
                   and access_flag = _required_flag
                   and is_deny = false
@@ -280,7 +348,7 @@ create or replace function auth.get_resource_access_flags(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _tenant_id      integer default 1
 ) returns table(__access_flag text, __source text)
     language plpgsql
@@ -328,7 +396,7 @@ begin
         where ra.root_type = _root_type
           and ra.resource_type = any(_ancestor_types)
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
           and ra.is_deny = true
     ),
@@ -339,7 +407,7 @@ begin
         where ra.root_type = _root_type
           and ra.resource_type = any(_ancestor_types)
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
           and ra.is_deny = false
           and ra.access_flag not in (select df.access_flag from denied_flags df)
@@ -352,7 +420,7 @@ begin
         where ra.root_type = _root_type
           and ra.resource_type = any(_ancestor_types)
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_group_id = any(_cached_group_ids)
           and ra.is_deny = false
           and ra.access_flag not in (select df.access_flag from denied_flags df)
@@ -381,7 +449,7 @@ create or replace function auth.get_resource_access_matrix(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _tenant_id      integer default 1
 ) returns table(
     __resource_type text,
@@ -396,18 +464,21 @@ declare
     _root_type        text;
     _is_owner         boolean;
 begin
-    -- System user gets all flags on all descendant types
+    -- System user gets all valid flags on all descendant types
     if _user_id = 1 then
         return query
             select rt.code, raf.code, 'system'::text
             from const.resource_type rt
             cross join const.resource_access_flag raf
             where rt.path <@ (select path from const.resource_type where code = _resource_type)
-              and rt.is_active = true;
+              and rt.is_active = true
+              -- Only flags valid for this type (or all if no per-type mapping)
+              and (not exists (select 1 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+                   or exists (select 1 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code and rtf.access_flag_code = raf.code));
         return;
     end if;
 
-    -- Tenant owner gets all flags on all descendant types
+    -- Tenant owner gets all valid flags on all descendant types
     _is_owner := auth.is_owner(_user_id, _correlation_id, null, _tenant_id);
     if _is_owner then
         return query
@@ -415,7 +486,9 @@ begin
             from const.resource_type rt
             cross join const.resource_access_flag raf
             where rt.path <@ (select path from const.resource_type where code = _resource_type)
-              and rt.is_active = true;
+              and rt.is_active = true
+              and (not exists (select 1 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+                   or exists (select 1 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code and rtf.access_flag_code = raf.code));
         return;
     end if;
 
@@ -439,7 +512,7 @@ begin
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
           and ra.is_deny = true
           and ra.resource_type in (select dt.code from descendant_types dt)
@@ -450,7 +523,7 @@ begin
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
           and ra.is_deny = false
           and ra.resource_type in (select dt.code from descendant_types dt)
@@ -463,7 +536,7 @@ begin
         inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id = _resource_id
+          and ra.resource_id @> _resource_id
           and ra.user_group_id = any(_cached_group_ids)
           and ra.is_deny = false
           and ra.resource_type in (select dt.code from descendant_types dt)
@@ -522,13 +595,14 @@ $$;
 --
 -- Grant one or more flags to a user or group.
 -- UPSERT: if exists as deny, flips is_deny to false.
+-- resource_id is jsonb — validated against key_schema.
 --
 create or replace function auth.grant_resource_access(
     _created_by     text,
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _target_user_id bigint default null,
     _user_group_id  integer default null,
     _access_flags   text[] default array['read'],
@@ -552,9 +626,11 @@ begin
         perform error.raise_35002();
     end if;
 
-    -- Validate resource type and flags
+    -- Validate resource type, flags (global + per-type), and resource_id key schema
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_access_flags(_access_flags);
+    perform unsecure.validate_access_flags_for_type(_resource_type, _access_flags);
+    perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
     -- Compute root type
     _root_type := split_part(_resource_type, '.', 1);
@@ -576,7 +652,7 @@ begin
     loop
         __last_id := null;
 
-        -- Check if row already exists
+        -- Check if row already exists (exact match on resource_id jsonb)
         if _target_user_id is not null then
             select ra.resource_access_id from auth.resource_access ra
             where ra.root_type = _root_type
@@ -624,7 +700,7 @@ begin
     -- Journal
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18010  -- resource_access_granted
-        , 'resource_access', _resource_id
+        , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
             'target_type', _target_type, 'target_name', _target_name,
             'access_flags', _access_flags)
@@ -644,7 +720,7 @@ create or replace function auth.deny_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _target_user_id bigint,
     _access_flags   text[] default array['read'],
     _tenant_id      integer default 1
@@ -661,9 +737,11 @@ begin
     -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.deny_access', _tenant_id);
 
-    -- Validate resource type and flags
+    -- Validate resource type, flags (global + per-type), and resource_id key schema
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_access_flags(_access_flags);
+    perform unsecure.validate_access_flags_for_type(_resource_type, _access_flags);
+    perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
     -- Compute root type
     _root_type := split_part(_resource_type, '.', 1);
@@ -711,7 +789,7 @@ begin
     -- Journal
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18012  -- resource_access_denied
-        , 'resource_access', _resource_id
+        , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
             'target_type', 'user', 'target_name', _target_name,
             'access_flags', _access_flags)
@@ -731,7 +809,7 @@ create or replace function auth.revoke_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _target_user_id bigint default null,
     _user_group_id  integer default null,
     _access_flags   text[] default null,
@@ -792,7 +870,7 @@ begin
     -- Journal
     perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 18011  -- resource_access_revoked
-        , 'resource_access', _resource_id
+        , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
             'target_type', _target_type, 'target_name', _target_name,
             'access_flags', coalesce(_access_flags, array['*']),
@@ -808,13 +886,15 @@ $$;
 -- ============================================================================
 --
 -- Revoke ALL access for a resource (cleanup when resource is deleted).
+-- Uses containment (@>) so revoking 'project' with {"project_id": 42}
+-- also removes child-type grants containing that project_id.
 --
 create or replace function auth.revoke_all_resource_access(
     _deleted_by     text,
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _tenant_id      integer default 1
 ) returns bigint
     language plpgsql
@@ -833,18 +913,19 @@ begin
     -- Compute root type
     _root_type := split_part(_resource_type, '.', 1);
 
+    -- Delete all grants/denies that contain this resource_id
+    -- Uses @> so {"project_id": 42} matches {"project_id": 42, "folder_id": 100}
     delete from auth.resource_access
     where root_type = _root_type
-      and resource_type = _resource_type
       and tenant_id = _tenant_id
-      and resource_id = _resource_id;
+      and resource_id @> _resource_id;
 
     get diagnostics __deleted_count = row_count;
 
     -- Journal
     perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 18013  -- resource_access_bulk_revoked
-        , 'resource_access', _resource_id
+        , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
             'deleted_count', __deleted_count)
         , _tenant_id);
@@ -863,7 +944,7 @@ create or replace function auth.get_resource_grants(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    bigint,
+    _resource_id    jsonb,
     _tenant_id      integer default 1
 ) returns table(
     __resource_access_id bigint,
@@ -928,7 +1009,7 @@ create or replace function auth.get_user_accessible_resources(
     _access_flag     text default 'read',
     _tenant_id       integer default 1
 ) returns table(
-    __resource_id bigint,
+    __resource_id jsonb,
     __access_flags text[],
     __source text
 )
@@ -1059,16 +1140,22 @@ $$;
 --
 -- The code IS the hierarchy — path is always text2ltree(code).
 --
+-- key_schema defines expected resource_id structure:
+--   'project':           {"project_id": "bigint"}
+--   'project.documents': {"project_id": "bigint", "folder_id": "bigint"}
+--
 create or replace function auth.create_resource_type(
-    _created_by  text,
-    _user_id     bigint,
+    _created_by   text,
+    _user_id      bigint,
     _correlation_id text,
-    _code        text,
-    _title       text,
-    _parent_code text default null,
-    _description text default null,
-    _tenant_id   integer default 1,
-    _source      text default null
+    _code         text,
+    _title        text,
+    _parent_code  text default null,
+    _description  text default null,
+    _tenant_id    integer default 1,
+    _source       text default null,
+    _key_schema   jsonb default '{}'::jsonb,
+    _access_flags text[] default null
 ) returns setof const.resource_type
     rows 1
     language plpgsql
@@ -1076,6 +1163,7 @@ as
 $$
 declare
     _path ext.ltree;
+    _flag text;
 begin
     -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
@@ -1090,13 +1178,28 @@ begin
         end if;
     end if;
 
+    -- Validate flags exist in global registry
+    if _access_flags is not null then
+        perform unsecure.validate_access_flags(_access_flags);
+    end if;
+
     -- Path = text2ltree(code). The code itself encodes the hierarchy.
     _path := text2ltree(_code);
 
     -- Insert resource type (trigger updates full_title automatically)
-    insert into const.resource_type (code, title, description, source, parent_code, path)
-    values (_code, _title, _description, _source, _parent_code, _path)
+    insert into const.resource_type (code, title, description, source, parent_code, path, key_schema)
+    values (_code, _title, _description, _source, _parent_code, _path, coalesce(_key_schema, '{}'::jsonb))
     on conflict do nothing;
+
+    -- Register per-type access flags
+    if _access_flags is not null then
+        foreach _flag in array _access_flags
+        loop
+            insert into const.resource_type_flag (resource_type_code, access_flag_code)
+            values (_code, _flag)
+            on conflict do nothing;
+        end loop;
+    end if;
 
     -- Auto-create partition (only for root types; children share the root partition)
     perform unsecure.ensure_resource_access_partition(_code);
@@ -1110,7 +1213,8 @@ begin
         , 18001  -- resource_type_created
         , 'resource_type', 0
         , jsonb_build_object('resource_type', _code, 'title', _title,
-            'parent_code', _parent_code)
+            'parent_code', _parent_code, 'key_schema', _key_schema,
+            'access_flags', _access_flags)
         , _tenant_id);
 end;
 $$;
@@ -1174,20 +1278,25 @@ $$;
 -- Bulk-ensure resource types from a JSONB array.
 --
 -- Accepts an array of objects, each with:
---   code        (required) — resource type code, dots encode hierarchy
---   title       (required) — display title
---   parent_code (optional) — parent resource type code
---   description (optional) — description
---   source      (optional) — overrides the _source parameter per item
+--   code          (required) — resource type code, dots encode hierarchy
+--   title         (required) — display title
+--   parent_code   (optional) — parent resource type code
+--   description   (optional) — description
+--   source        (optional) — overrides the _source parameter per item
+--   key_schema    (optional) — jsonb schema for resource_id validation
+--   access_flags  (optional) — array of valid flag codes for this type
 --
 -- Items are automatically sorted by hierarchy depth (parents first),
 -- so callers don't need to worry about ordering.
 --
 -- Example:
 --   select * from auth.ensure_resource_types('app', 1, 'setup', '[
---       {"code": "project",           "title": "Project"},
---       {"code": "project.documents", "title": "Project Documents", "parent_code": "project"},
---       {"code": "project.invoices",  "title": "Project Invoices",  "parent_code": "project"}
+--       {"code": "project", "title": "Project",
+--        "key_schema": {"project_id": "bigint"},
+--        "access_flags": ["read", "write", "delete", "share"]},
+--       {"code": "project.documents", "title": "Project Documents", "parent_code": "project",
+--        "key_schema": {"project_id": "bigint", "folder_id": "bigint"},
+--        "access_flags": ["read", "write", "delete", "export"]}
 --   ]'::jsonb, _source := 'my_app');
 --
 create or replace function auth.ensure_resource_types(
@@ -1202,13 +1311,16 @@ create or replace function auth.ensure_resource_types(
 as
 $$
 declare
-    _item        jsonb;
-    _code        text;
-    _title       text;
-    _parent_code text;
-    _description text;
-    _item_source text;
-    _path        ext.ltree;
+    _item          jsonb;
+    _code          text;
+    _title         text;
+    _parent_code   text;
+    _description   text;
+    _item_source   text;
+    _key_schema    jsonb;
+    _access_flags  text[];
+    _flag          text;
+    _path          ext.ltree;
 begin
     -- Permission check (once for the batch)
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
@@ -1224,7 +1336,17 @@ begin
         _parent_code := _item->>'parent_code';
         _description := _item->>'description';
         _item_source := coalesce(_item->>'source', _source);
+        _key_schema  := coalesce(_item->'key_schema', '{}'::jsonb);
         _path        := text2ltree(_code);
+
+        -- Parse access_flags from jsonb array to text[]
+        if _item ? 'access_flags' and _item->'access_flags' is not null then
+            select array_agg(f.value::text)
+            from jsonb_array_elements_text(_item->'access_flags') as f(value)
+            into _access_flags;
+        else
+            _access_flags := null;
+        end if;
 
         -- Skip if already exists
         if exists (select 1 from const.resource_type where code = _code) then
@@ -1241,10 +1363,25 @@ begin
             end if;
         end if;
 
+        -- Validate flags exist in global registry
+        if _access_flags is not null then
+            perform unsecure.validate_access_flags(_access_flags);
+        end if;
+
         -- Insert (trigger updates full_title automatically)
-        insert into const.resource_type (code, title, description, source, parent_code, path)
-        values (_code, _title, _description, _item_source, _parent_code, _path)
+        insert into const.resource_type (code, title, description, source, parent_code, path, key_schema)
+        values (_code, _title, _description, _item_source, _parent_code, _path, _key_schema)
         on conflict do nothing;
+
+        -- Register per-type access flags
+        if _access_flags is not null then
+            foreach _flag in array _access_flags
+            loop
+                insert into const.resource_type_flag (resource_type_code, access_flag_code)
+                values (_code, _flag)
+                on conflict do nothing;
+            end loop;
+        end if;
 
         -- Auto-create partition (only root types get a new partition)
         perform unsecure.ensure_resource_access_partition(_code);
@@ -1254,7 +1391,8 @@ begin
             , 18001  -- resource_type_created
             , 'resource_type', 0
             , jsonb_build_object('resource_type', _code, 'title', _title,
-                'parent_code', _parent_code)
+                'parent_code', _parent_code, 'key_schema', _key_schema,
+                'access_flags', _access_flags)
             , _tenant_id);
     end loop;
 
@@ -1283,14 +1421,16 @@ create or replace function auth.get_resource_types(
     _parent_code text    default null,
     _active_only boolean default true
 ) returns table(
-    __code        text,
-    __title       text,
-    __full_title  text,
-    __description text,
-    __is_active   boolean,
-    __source      text,
-    __parent_code text,
-    __path        ext.ltree
+    __code         text,
+    __title        text,
+    __full_title   text,
+    __description  text,
+    __is_active    boolean,
+    __source       text,
+    __parent_code  text,
+    __path         ext.ltree,
+    __key_schema   jsonb,
+    __access_flags text[]
 )
     stable
     language plpgsql
@@ -1299,7 +1439,10 @@ $$
 begin
     return query
     select rt.code, rt.title, rt.full_title, rt.description, rt.is_active, rt.source,
-           rt.parent_code, rt.path
+           rt.parent_code, rt.path, rt.key_schema,
+           (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
+            from const.resource_type_flag rtf
+            where rtf.resource_type_code = rt.code)
     from const.resource_type rt
     where (_active_only = false or rt.is_active = true)
       and (_source is null or rt.source = _source)
