@@ -31,12 +31,16 @@ $$;
  * Paginated search of user events with optional filters.
  * Requires 'authentication.read_user_events' permission.
  */
+-- drop old overload (had no _filter_correlation_id parameter)
+drop function if exists auth.search_user_events(bigint, text, text, bigint, jsonb, timestamptz, timestamptz, integer, integer, integer, integer);
+
 create or replace function auth.search_user_events(
     _user_id bigint,
     _correlation_id text default null,
     _event_type_code text default null,
     _target_user_id bigint default null,
     _request_context_criteria jsonb default null,
+    _filter_correlation_id text default null,
     _from timestamptz default null,
     _to timestamptz default null,
     _page integer default 1,
@@ -78,7 +82,7 @@ begin
             where (_event_type_code is null or ue.event_type_code = _event_type_code)
               and (_target_user_id is null or ue.target_user_id = _target_user_id)
               and (_request_context_criteria is null or ue.request_context @> _request_context_criteria)
-              and (_correlation_id is null or ue.correlation_id = _correlation_id)
+              and (_filter_correlation_id is null or ue.correlation_id = _filter_correlation_id)
               and ue.created_at between coalesce(_from, now() - interval '100 years')
                                     and coalesce(_to, now() + interval '100 years')
             order by ue.created_at desc
