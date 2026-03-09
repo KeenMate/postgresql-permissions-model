@@ -92,7 +92,7 @@ begin
         from auth.perm_set
         where is_assignable = true
     loop
-        perform unsecure.add_perm_set_permissions(
+        perform unsecure.create_perm_set_permissions(
             'system', 1, null,
             __ps.perm_set_id, __mfa_policy_perms, __ps.tenant_id
         );

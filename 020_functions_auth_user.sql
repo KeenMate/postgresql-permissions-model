@@ -362,7 +362,7 @@ begin
 end;
 $$;
 
-create or replace function auth.add_user_to_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.assign_user_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text)
     language plpgsql
 as
@@ -374,7 +374,7 @@ begin
 
 	return query
 		select *
-		from unsecure.add_user_to_default_groups(_created_by, _user_id, _correlation_id, _target_user_id,
+		from unsecure.assign_user_default_groups(_created_by, _user_id, _correlation_id, _target_user_id,
 																						 _tenant_id);
 end;
 $$;
@@ -944,7 +944,7 @@ $$
     select unsecure.check_user_blacklist(_username, _provider_code, _provider_uid, _provider_oid);
 $$;
 
-create or replace function auth.add_to_blacklist(
+create or replace function auth.create_blacklist_user(
     _created_by text,
     _user_id bigint,
     _correlation_id text,
@@ -962,8 +962,35 @@ as
 $$
 declare
     __last_id bigint;
+    __system_user_id bigint;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'users.manage_blacklist', _tenant_id);
+
+    -- prevent blacklisting system users by username
+    if _username is not null then
+        select ui.user_id from auth.user_info ui
+        where ui.username = lower(trim(_username)) and ui.is_system
+        into __system_user_id;
+
+        if __system_user_id is not null then
+            perform error.raise_33002(__system_user_id);
+        end if;
+    end if;
+
+    -- prevent blacklisting system users by provider identity
+    if _provider_uid is not null or _provider_oid is not null then
+        select ui.user_id from auth.user_identity uid
+            inner join auth.user_info ui on ui.user_id = uid.user_id
+        where ui.is_system
+          and (_provider_code is null or uid.provider_code = _provider_code)
+          and (_provider_uid is null or uid.uid = _provider_uid)
+          and (_provider_oid is null or uid.provider_oid = _provider_oid)
+        into __system_user_id;
+
+        if __system_user_id is not null then
+            perform error.raise_33002(__system_user_id);
+        end if;
+    end if;
 
     insert into auth.user_blacklist (created_by, username, provider_code, provider_uid, provider_oid,
                                      reason, notes)
@@ -983,7 +1010,7 @@ begin
 end;
 $$;
 
-create or replace function auth.remove_from_blacklist(
+create or replace function auth.delete_blacklist_user(
     _deleted_by text,
     _user_id bigint,
     _correlation_id text,

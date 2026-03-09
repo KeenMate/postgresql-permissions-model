@@ -219,7 +219,7 @@ The user system uses three main tables for flexible multi-provider support and e
 - `auth.enable_user()` / `auth.disable_user()` - User status management
 - `auth.lock_user()` / `auth.unlock_user()` - Account security controls
 - `auth.update_user_password()` - Password management
-- `auth.add_user_to_default_groups()` - Automatic group assignment
+- `auth.assign_user_default_groups()` - Automatic group assignment
 
 **Identity Provider Management (`user_identity` table)**:
 - `auth.ensure_user_from_provider()` - User provisioning from external providers
@@ -251,7 +251,7 @@ Core permission checking for any PostgreSQL application:
 
 **Tenant-Specific Permission Sets**:
 - `auth.create_perm_set()` - Create tenant-specific permission sets (e.g., "Admin", "Manager", "Viewer")
-- `auth.add_perm_set_permissions()` - Add global permissions to tenant permission sets
+- `auth.create_perm_set_permissions()` - Add global permissions to tenant permission sets
 - `auth.copy_perm_set()` / `auth.duplicate_perm_set()` - Permission set duplication within/across tenants
 
 **Assignment to Users/Groups**:

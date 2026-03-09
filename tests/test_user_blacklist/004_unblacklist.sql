@@ -1,7 +1,7 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 -- ============================================================================
--- TEST 12: auth.remove_from_blacklist removes entry
+-- TEST 12: auth.delete_blacklist_user removes entry
 -- ============================================================================
 DO $$
 DECLARE
@@ -10,10 +10,10 @@ DECLARE
     __bl_id bigint := current_setting('test_bl.bl_username_id')::bigint;
     __result record;
 BEGIN
-    RAISE NOTICE 'TEST 12: auth.remove_from_blacklist removes entry';
+    RAISE NOTICE 'TEST 12: auth.delete_blacklist_user removes entry';
 
     SELECT * INTO __result
-    FROM auth.remove_from_blacklist('test_bl', __admin_id, __corr_id, __bl_id);
+    FROM auth.delete_blacklist_user('test_bl', __admin_id, __corr_id, __bl_id);
 
     IF __result.__removed_blacklist_id = __bl_id THEN
         RAISE NOTICE '  PASS: Blacklist entry % removed, username=%', __result.__removed_blacklist_id, __result.__username;

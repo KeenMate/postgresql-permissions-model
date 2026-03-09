@@ -1,7 +1,7 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 -- ============================================================================
--- TEST 9: add_perm_set_permissions invalidates affected users cache (soft invalidation)
+-- TEST 9: create_perm_set_permissions invalidates affected users cache (soft invalidation)
 -- ============================================================================
 DO $$
 DECLARE
@@ -10,7 +10,7 @@ DECLARE
     __valid_before int;
     __valid_after int;
 BEGIN
-    RAISE NOTICE 'TEST 9: add_perm_set_permissions invalidates affected users cache';
+    RAISE NOTICE 'TEST 9: create_perm_set_permissions invalidates affected users cache';
 
     SELECT user_id INTO __user_id FROM auth.user_info WHERE username = 'cache_test_user';
     SELECT perm_set_id INTO __perm_set_id FROM auth.perm_set WHERE code = 'cache_test_perm_set' AND tenant_id = 1;
@@ -31,7 +31,7 @@ BEGIN
     WHERE user_id = __user_id AND tenant_id = 1 AND expiration_date > now();
 
     -- Add permission to perm_set (triggers soft invalidation)
-    PERFORM unsecure.add_perm_set_permissions('test', 1, null, __perm_set_id, ARRAY['cache_test_perm'], 1);
+    PERFORM unsecure.create_perm_set_permissions('test', 1, null, __perm_set_id, ARRAY['cache_test_perm'], 1);
 
     -- Count valid cache entries after
     SELECT count(*) INTO __valid_after FROM auth.user_permission_cache

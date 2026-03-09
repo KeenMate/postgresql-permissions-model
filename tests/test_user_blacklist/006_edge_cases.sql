@@ -13,7 +13,7 @@ BEGIN
     RAISE NOTICE 'TEST 18: Blacklist same identity twice (creates separate entries)';
 
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _provider_code := 'test_bl_aad',
         _provider_uid := 'blacklisted-aad-uid-001',
         _reason := 'duplicate_test');
@@ -47,7 +47,7 @@ BEGIN
 
     -- first blacklist a service user name
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _username := 'svc_blacklisted_service',
         _reason := 'manual');
 
@@ -126,7 +126,7 @@ BEGIN
 
     -- blacklist lowercase
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _username := 'CaseTest@Test.COM',
         _reason := 'case_test');
 

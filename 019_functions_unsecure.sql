@@ -1184,7 +1184,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.add_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function unsecure.create_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -1414,7 +1414,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.add_user_to_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function unsecure.assign_user_default_groups(_created_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text)
     language plpgsql
 as

@@ -21,10 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `026`: `search_api_keys`, `get_outbound_api_key`, `get_outbound_api_key_by_id`, `get_outbound_api_key_secret`, `get_outbound_api_key_secret_by_id`, `search_outbound_api_keys` (6)
   - `028`: `search_user_events`, `get_user_audit_trail`, `get_security_events` (3)
 
+### Renamed
+
+- `auth.add_to_blacklist` → `auth.create_blacklist_user` — consistent create/delete naming
+- `auth.remove_from_blacklist` → `auth.delete_blacklist_user` — consistent create/delete naming
+- `auth.add_perm_set_permissions` → `auth.create_perm_set_permissions` (+ `unsecure.` counterpart)
+- `auth.add_user_to_default_groups` → `auth.assign_user_default_groups` (+ `unsecure.` counterpart)
+
 ### Removed
 
 - `users.search_all_blacklist` permission — blacklist data is app-wide (no `tenant_id` column), so cross-tenant access doesn't apply. `auth.search_blacklist` now uses a single `users.search_blacklist` permission check. Removed from System admin and Full admin permission sets.
 - `_target_tenant_id` parameter from `auth.search_blacklist` — function no longer participates in cross-tenant pattern.
+
+### Fixed
+
+- `auth.create_blacklist_user` now prevents blacklisting system users (checks `is_system` by username and provider identity, raises error 33002).
 
 ## [2.23.0] - 2026-03-09
 
@@ -389,8 +400,8 @@ New `auth.user_blacklist` table and supporting functions to prevent re-creation 
 | `unsecure.check_user_blacklist(_username, _provider_code, _provider_uid, _provider_oid)` | unsecure | Core check — returns true if any identifier matches a blacklist entry |
 | `unsecure.blacklist_user(...)` | unsecure | Inserts a single blacklist entry with journal event 10080 |
 | `unsecure.blacklist_user_identities(_target_user_id, _reason)` | unsecure | Bulk: reads user_info + all user_identity rows, blacklists each. Must be called before deletion. |
-| `auth.add_to_blacklist(...)` | auth | Permission-checked (`users.manage_blacklist`). Manual blacklisting with reason and notes. |
-| `auth.remove_from_blacklist(_blacklist_id)` | auth | Permission-checked (`users.manage_blacklist`). Deletes entry, journals event 10081. |
+| `auth.create_blacklist_user(...)` | auth | Permission-checked (`users.manage_blacklist`). Manual blacklisting with reason and notes. Prevents blacklisting system users. |
+| `auth.delete_blacklist_user(_blacklist_id)` | auth | Permission-checked (`users.manage_blacklist`). Deletes entry, journals event 10081. |
 | `auth.search_blacklist(_search_text, _reason, _page, _page_size)` | auth | Permission-checked (`users.search_blacklist`). Paginated search across username, provider_uid, provider_oid, notes. |
 | `auth.is_blacklisted(...)` | auth | Public wrapper around `unsecure.check_user_blacklist`. No permission check (used in creation paths). |
 
@@ -1566,7 +1577,7 @@ Permission cache is now properly invalidated when permissions are assigned, unas
 
 - `unsecure.assign_permission()` - Now clears cache for affected user or group members
 - `unsecure.unassign_permission()` - Now clears cache for affected user or group members
-- `unsecure.add_perm_set_permissions()` - Now clears cache for all users with this perm_set
+- `unsecure.create_perm_set_permissions()` - Now clears cache for all users with this perm_set
 - `unsecure.delete_perm_set_permissions()` - Now clears cache for all users with this perm_set
 
 **Impact:** Users now see permission changes immediately instead of waiting 15-300 seconds for cache expiry.

@@ -87,7 +87,7 @@ from auth.delete_perm_set_permissions('ondrej.valenta', 1::bigint, :correlation_
 
 -- Add correct permissions to My external partners permission set
 select *
-from auth.add_perm_set_permissions('ondrej.valenta', 1::bigint, :correlation_id, 6,
+from auth.create_perm_set_permissions('ondrej.valenta', 1::bigint, :correlation_id, 6,
 																	 array ['manage_tenants.get_users'], _tenant_id := 3);
 
 -- assign my_external_partners rule set to External group 1 in tenant: Jan Rada

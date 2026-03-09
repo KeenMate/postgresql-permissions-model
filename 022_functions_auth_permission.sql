@@ -311,7 +311,7 @@ begin
 end;
 $$;
 
-create or replace function auth.add_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
+create or replace function auth.create_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
     rows 1
     language plpgsql
@@ -324,7 +324,7 @@ begin
 
 	return query
 		select *
-		from unsecure.add_perm_set_permissions(_created_by, _user_id, _correlation_id
+		from unsecure.create_perm_set_permissions(_created_by, _user_id, _correlation_id
 			, _perm_set_id, _permissions, _tenant_id);
 end;
 $$;
@@ -1095,7 +1095,7 @@ begin
         if _existing_id is not null then
             -- Add any missing permissions to existing perm set
             if _permissions is not null and array_length(_permissions, 1) > 0 then
-                perform unsecure.add_perm_set_permissions(
+                perform unsecure.create_perm_set_permissions(
                     _created_by, _user_id, _correlation_id,
                     _existing_id, _permissions, _tenant_id
                 );

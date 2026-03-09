@@ -1,7 +1,7 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 -- ============================================================================
--- TEST 1: auth.add_to_blacklist for username
+-- TEST 1: auth.create_blacklist_user for username
 -- ============================================================================
 DO $$
 DECLARE
@@ -9,10 +9,10 @@ DECLARE
     __corr_id text := current_setting('test_bl.correlation_id');
     __result record;
 BEGIN
-    RAISE NOTICE 'TEST 1: auth.add_to_blacklist for username';
+    RAISE NOTICE 'TEST 1: auth.create_blacklist_user for username';
 
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _username := 'blacklisted_user@test.com',
         _reason := 'manual',
         _notes := 'Test blacklist entry');
@@ -26,7 +26,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 2: auth.add_to_blacklist for provider identity (uid)
+-- TEST 2: auth.create_blacklist_user for provider identity (uid)
 -- ============================================================================
 DO $$
 DECLARE
@@ -34,10 +34,10 @@ DECLARE
     __corr_id text := current_setting('test_bl.correlation_id');
     __result record;
 BEGIN
-    RAISE NOTICE 'TEST 2: auth.add_to_blacklist for provider identity (uid)';
+    RAISE NOTICE 'TEST 2: auth.create_blacklist_user for provider identity (uid)';
 
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _provider_code := 'test_bl_aad',
         _provider_uid := 'blacklisted-aad-uid-001',
         _reason := 'policy_violation',
@@ -52,7 +52,7 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 3: auth.add_to_blacklist for provider oid
+-- TEST 3: auth.create_blacklist_user for provider oid
 -- ============================================================================
 DO $$
 DECLARE
@@ -60,10 +60,10 @@ DECLARE
     __corr_id text := current_setting('test_bl.correlation_id');
     __result record;
 BEGIN
-    RAISE NOTICE 'TEST 3: auth.add_to_blacklist for provider oid';
+    RAISE NOTICE 'TEST 3: auth.create_blacklist_user for provider oid';
 
     SELECT * INTO __result
-    FROM auth.add_to_blacklist('test_bl', __admin_id, __corr_id,
+    FROM auth.create_blacklist_user('test_bl', __admin_id, __corr_id,
         _provider_code := 'test_bl_aad',
         _provider_oid := 'blacklisted-oid-001',
         _reason := 'security_incident');
