@@ -43,6 +43,39 @@ begin
 end;
 $$;
 
+-- Resolves cross-tenant access pattern: checks permissions and returns effective tenant_id for filtering.
+-- Returns: target_tenant_id (specific tenant), null (admin sees all), or _tenant_id (own tenant).
+create or replace function internal.resolve_cross_tenant_access(
+    _user_id bigint,
+    _correlation_id text,
+    _all_perm_code text,
+    _regular_perm_code text,
+    _tenant_id integer,
+    _target_tenant_id integer default null
+) returns integer
+    language plpgsql
+as
+$$
+begin
+    if _target_tenant_id is not null then
+        -- filtering by specific tenant - only allowed from admin console
+        if _tenant_id <> 1 then
+            perform error.raise_34002(_tenant_id);
+        end if;
+        perform auth.has_permission(_user_id, _correlation_id, _all_perm_code, _target_tenant_id);
+        return _target_tenant_id;
+    elsif _tenant_id = 1 then
+        -- admin console without target tenant - show all
+        perform auth.has_permission(_user_id, _correlation_id, _all_perm_code, _tenant_id);
+        return null;
+    else
+        -- regular tenant - filter by own tenant
+        perform auth.has_permission(_user_id, _correlation_id, _regular_perm_code, _tenant_id);
+        return _tenant_id;
+    end if;
+end;
+$$;
+
 -- Helper function to invalidate cache for all users with a specific perm_set assigned
 -- Uses soft invalidation (UPDATE expiration_date) instead of DELETE for better performance:
 -- - UPDATE is ~5-10x faster than DELETE (no index rebalancing)
@@ -1017,7 +1050,7 @@ begin
 		from auth.perm_set ps
 					 inner join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
 					 inner join auth.permission p on p.permission_id = psp.permission_id
-		where ps.tenant_id = _tenant_id
+		where (_tenant_id is null or ps.tenant_id = _tenant_id)
 		group by ps.perm_set_id, ps.title, ps.code, ps.is_system, ps.is_assignable, ps.source;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)

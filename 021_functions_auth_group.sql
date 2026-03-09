@@ -318,19 +318,98 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer DEFAULT 1) returns SETOF auth.user_group_mapping
+create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer default 1, _target_tenant_id integer default null) returns SETOF auth.user_group_mapping
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
 
-	perform auth.has_permission(_user_id, _correlation_id, 'groups.get_mapping', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'groups.get_all_mappings', 'groups.get_mapping', _tenant_id, _target_tenant_id);
 
-	return query select *
-							 from auth.user_group_mapping ugm
-							 where ugm.user_group_id = _user_group_id;
+	return query select ugm.*
+				 from auth.user_group_mapping ugm
+					 inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
+				 where ugm.user_group_id = _user_group_id
+				   and (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id);
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
+end;
+$$;
+
+create or replace function auth.search_user_group_mappings(
+	_user_id bigint,
+	_correlation_id text,
+	_provider_code text default null,
+	_mapped_object_id text default null,
+	_mapped_role text default null,
+	_search_text text default null,
+	_page integer default 1,
+	_page_size integer default 30,
+	_tenant_id integer default 1,
+	_target_tenant_id integer default null
+)
+	returns table(
+		__user_group_mapping_id integer,
+		__user_group_id integer,
+		__user_group_title text,
+		__user_group_code text,
+		__provider_code text,
+		__mapped_object_id text,
+		__mapped_object_name text,
+		__mapped_role text,
+		__total_items bigint
+	)
+	stable
+	rows 100
+	language plpgsql
+	set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers
+as
+$$
+declare
+	__search_text text;
+	__effective_tenant_id int;
+begin
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'groups.get_all_mappings', 'groups.get_mapping', _tenant_id, _target_tenant_id);
+
+	__search_text := helpers.normalize_text(_search_text);
+
+	_page := coalesce(_page, 1);
+	_page_size := least(coalesce(_page_size, 30), 100);
+
+	return query
+		with filtered_mappings as (
+			select ugm.user_group_mapping_id
+				 , count(*) over () as total_items
+			from auth.user_group_mapping ugm
+				inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
+			where (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
+			  and (_provider_code is null or ugm.provider_code = _provider_code)
+			  and (_mapped_object_id is null or ugm.mapped_object_id = _mapped_object_id)
+			  and (_mapped_role is null or ugm.mapped_role = _mapped_role)
+			  and (helpers.is_empty_string(__search_text)
+				   or ugm.mapped_object_id ilike '%' || __search_text || '%'
+				   or ugm.mapped_object_name ilike '%' || __search_text || '%'
+				   or ugm.mapped_role ilike '%' || __search_text || '%'
+				   or ug.title ilike '%' || __search_text || '%')
+			order by ug.title, ugm.provider_code, ugm.mapped_object_name
+			offset ((_page - 1) * _page_size) limit _page_size
+		)
+		select ugm.user_group_mapping_id
+			 , ugm.user_group_id
+			 , ug.title
+			 , ug.code
+			 , ugm.provider_code
+			 , ugm.mapped_object_id
+			 , ugm.mapped_object_name
+			 , ugm.mapped_role
+			 , fm.total_items
+		from filtered_mappings fm
+			inner join auth.user_group_mapping ugm on fm.user_group_mapping_id = ugm.user_group_mapping_id
+			inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id;
 end;
 $$;
 
@@ -645,16 +724,22 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer)
     stable
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
 
-	if (_user_id != _target_user_id) then
-		perform auth.has_permission(_user_id, _correlation_id, 'users.read_user_group_memberships', _tenant_id);
+	if (_user_id = _target_user_id) then
+		-- self-query: no permission check needed, no cross-tenant
+		__effective_tenant_id := _tenant_id;
+	else
+		__effective_tenant_id := internal.resolve_cross_tenant_access(
+			_user_id, _correlation_id, 'users.read_all_user_group_memberships', 'users.read_user_group_memberships', _tenant_id, _target_tenant_id);
 	end if;
 
 	return query
@@ -662,6 +747,7 @@ begin
 		from auth.user_group_member ugm
 					 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
 		where ugm.user_id = _target_user_id
+		  and (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
 		order by ug.title;
 
 end;
@@ -945,7 +1031,8 @@ create or replace function auth.search_user_groups(
     _is_system boolean default null,
     _page integer default 1,
     _page_size integer default 30,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __user_group_id integer,
@@ -967,8 +1054,10 @@ as
 $$
 declare
     __search_text text;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'groups.get_group', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'groups.get_all_groups', 'groups.get_group', _tenant_id, _target_tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -980,7 +1069,7 @@ begin
             select ug.user_group_id
                  , count(*) over () as total_items
             from auth.user_group ug
-            where ug.tenant_id = _tenant_id
+            where (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
               and (_is_active is null or ug.is_active = _is_active)
               and (_is_external is null or ug.is_external = _is_external)
               and (_is_system is null or ug.is_system = _is_system)

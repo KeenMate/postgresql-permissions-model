@@ -5,6 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.24.0] - 2026-03-09
+
+### Added
+
+- `internal.resolve_cross_tenant_access()` — helper function that encapsulates the 3-branch cross-tenant permission check pattern (`_target_tenant_id` specified → admin-only with `read_all_*`; tenant 1 → `read_all_*` + see all; else → regular permission + own tenant). Replaces ~15 lines of boilerplate per function across 22 call sites in 7 files.
+
+### Changed
+
+- Replaced cross-tenant if/elsif/else blocks in 22 functions with a single call to `internal.resolve_cross_tenant_access()`:
+  - `020`: `search_users` (2)
+  - `021`: `get_user_group_mappings`, `search_user_group_mappings`, `get_user_assigned_groups`, `search_user_groups` (4)
+  - `022`: `get_perm_sets`, `search_perm_sets` (2)
+  - `023`: `get_tenants`, `get_tenant_users`, `get_tenant_groups`, `get_tenant_members`, `search_tenants` (5)
+  - `026`: `search_api_keys`, `get_outbound_api_key`, `get_outbound_api_key_by_id`, `get_outbound_api_key_secret`, `get_outbound_api_key_secret_by_id`, `search_outbound_api_keys` (6)
+  - `028`: `search_user_events`, `get_user_audit_trail`, `get_security_events` (3)
+
+### Removed
+
+- `users.search_all_blacklist` permission — blacklist data is app-wide (no `tenant_id` column), so cross-tenant access doesn't apply. `auth.search_blacklist` now uses a single `users.search_blacklist` permission check. Removed from System admin and Full admin permission sets.
+- `_target_tenant_id` parameter from `auth.search_blacklist` — function no longer participates in cross-tenant pattern.
+
+## [2.23.0] - 2026-03-09
+
+### Added
+
+#### Tenant Isolation & Cross-Tenant Data Access
+
+All `auth.*` search/get functions now enforce tenant-scoped data access with a consistent cross-tenant pattern:
+
+- **`_tenant_id`** — caller's tenant, used for permission checking
+- **`_target_tenant_id`** — optional, specifies which tenant's data to query (admin console only)
+
+**Permission resolution:**
+
+| Caller | `_target_tenant_id` | Permission | Data |
+|--------|---------------------|------------|------|
+| `_tenant_id = 1` | `null` | `read_all_*` | All tenants |
+| `_tenant_id = 1` | `30` | `read_all_*` (checked against tenant 30) | Tenant 30 only |
+| `_tenant_id ≠ 1` | `null` | `read_*` | Own tenant only |
+| `_tenant_id ≠ 1` | any | Error 34002 | — |
+
+**New `read_all_*` permissions (13 total):**
+- `users.read_all_users`, `users.read_all_user_group_memberships`
+- `groups.get_all_groups`, `groups.get_all_mappings`
+- `permissions.get_all_perm_sets`, `permissions.read_all_perm_sets`
+- `tenants.get_all_tenants`, `tenants.get_all_users`, `tenants.get_all_groups`, `tenants.read_all_tenants`
+- `authentication.read_all_user_events`
+- `api_keys.search_all`
+- `invitations.get_all_invitations`
+
+All `read_all_*` permissions are included in the **System admin** and **Full admin** permission sets.
+
+**New error:**
+- `34002` — Cross-tenant access requires admin tenant (tenant_id = 1)
+
+**Functions updated (21 total across 10 files):**
+- `020`: `search_users`
+- `021`: `search_user_groups`, `get_user_assigned_groups`, `get_user_group_mappings`, **`search_user_group_mappings`** (new)
+- `022`: `get_perm_sets`, `search_perm_sets`
+- `023`: `get_tenants`, `get_tenant_users`, `get_tenant_groups`, `get_tenant_members`, `search_tenants`
+- `026`: `search_api_keys`, `search_outbound_api_keys`, `get_outbound_api_key`, `get_outbound_api_key_by_id`, `get_outbound_api_key_secret`, `get_outbound_api_key_secret_by_id`
+- `028`: `search_user_events`, `get_user_audit_trail`, `get_security_events`
+- `042`: `get_invitations`
+
+#### Tenant-Scoped Permission Checks
+
+All `auth.*` functions that call `has_permission` now accept `_tenant_id integer default 1` and pass it through to the permission check. Previously, 69 out of 154 `has_permission` calls defaulted to tenant 1 regardless of caller context. This affects functions across 11 files (020–042).
+
+### Changed
+
+- `unsecure.get_perm_sets` and `unsecure.get_invitations` now accept `null` tenant_id (returns all tenants)
+- Permission matrix documentation page added to docs site
+
 ## [2.22.0] - 2026-03-07
 
 ### Added

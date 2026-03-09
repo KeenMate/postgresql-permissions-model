@@ -10,14 +10,16 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function auth.get_tenants(_user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenants(_user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean)
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
-	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'tenants.get_all_tenants', 'tenants.get_tenants', _tenant_id, _target_tenant_id);
 
 	return query
 		select created_at
@@ -31,6 +33,7 @@ begin
 				 , is_removable
 				 , is_assignable
 		from auth.tenant t
+		where (__effective_tenant_id is null or t.tenant_id = __effective_tenant_id)
 		order by t.title;
 end;
 $$;
@@ -54,14 +57,16 @@ from auth.tenant t
 where tenant_id = _tenant_id;
 $$;
 
-create or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_users(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__user_id bigint, __username text, __display_name text, __user_groups text[])
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
-	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.get_users', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'tenants.get_all_users', 'tenants.get_users', _tenant_id, _target_tenant_id);
 
 	return query with tenant_users as (select ui.user_id
 																					, ui.username
@@ -73,7 +78,7 @@ begin
 																															 array ['user_group_id', ugs.user_group_id::text, 'code', ugs.group_code, 'title', ugs.group_title]) group_data
 																		 from auth.user_group_members ugs
 																						inner join auth.user_info ui on ugs.user_id = ui.user_id
-																		 where ugs.tenant_id = _tenant_id
+																		 where (__effective_tenant_id is null or ugs.tenant_id = __effective_tenant_id)
 																		 order by ui.display_name)
 							 select tu.user_id, tu.username, tu.display_name, array_agg(tu.group_data::text)
 							 from tenant_users tu
@@ -83,14 +88,16 @@ begin
 end;
 $$;
 
-create or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_groups(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__user_group_id integer, __group_code text, __group_title text, __is_external boolean, __is_assignable boolean, __is_active boolean, __members_count bigint)
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
-	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.get_groups', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'tenants.get_all_groups', 'tenants.get_groups', _tenant_id, _target_tenant_id);
 
 	return query
 		select ugs.user_group_id
@@ -101,7 +108,7 @@ begin
 				 , ugs.is_active
 				 , count(ugs.user_id)
 		from auth.user_group_members ugs
-		where ugs.tenant_id = _tenant_id
+		where (__effective_tenant_id is null or ugs.tenant_id = __effective_tenant_id)
 		group by ugs.user_group_id, ugs.group_title, ugs.group_code, ugs.is_external, ugs.is_assignable, ugs.is_active
 		order by ugs.group_title;
 
@@ -109,14 +116,16 @@ begin
 end;
 $$;
 
-create or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_tenant_members(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__user_id bigint, __user_display_name text, __user_code text, __user_uuid text, __user_tenant_groups text)
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
-	perform
-		auth.has_permission(_user_id, _correlation_id, 'tenants.get_tenants', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'tenants.get_all_tenants', 'tenants.get_tenants', _tenant_id, _target_tenant_id);
 
 	return query
 		select ugs.user_id
@@ -129,7 +138,7 @@ begin
 																											'group_code', ugs.group_code))) ::text
 		from auth.user_group_members ugs
 					 inner join auth.user_info ui on ugs.user_id = ui.user_id
-		where ugs.tenant_id = _tenant_id
+		where (__effective_tenant_id is null or ugs.tenant_id = __effective_tenant_id)
 		group by ugs.user_id, ui.display_name, ui.code, ui.uuid
 		order by ui.display_name;
 
@@ -464,7 +473,8 @@ create or replace function auth.search_tenants(
     _search_text text default null,
     _page integer default 1,
     _page_size integer default 30,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __tenant_id integer,
@@ -483,8 +493,10 @@ as
 $$
 declare
     __search_text text;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'tenants.read_tenants', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'tenants.read_all_tenants', 'tenants.read_tenants', _tenant_id, _target_tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -496,7 +508,8 @@ begin
             select t.tenant_id
                  , count(*) over () as total_items
             from auth.tenant t
-            where (helpers.is_empty_string(__search_text)
+            where (__effective_tenant_id is null or t.tenant_id = __effective_tenant_id)
+              and (helpers.is_empty_string(__search_text)
                    or t.nrm_search_data like '%' || __search_text || '%')
             order by t.title
             offset ((_page - 1) * _page_size) limit _page_size

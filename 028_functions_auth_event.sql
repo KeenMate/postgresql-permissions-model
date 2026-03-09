@@ -41,7 +41,8 @@ create or replace function auth.search_user_events(
     _to timestamptz default null,
     _page integer default 1,
     _page_size integer default 10,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 )
     returns table(
         __user_event_id bigint,
@@ -62,8 +63,11 @@ create or replace function auth.search_user_events(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
 
     return query
         with filtered_rows as (
@@ -115,7 +119,8 @@ create or replace function auth.get_user_audit_trail(
     _to timestamptz default null,
     _page integer default 1,
     _page_size integer default 20,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 ) returns table(
     __source text,
     __event_id integer,
@@ -136,8 +141,10 @@ $$
 declare
     __from timestamptz;
     __to timestamptz;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
 
     __from := coalesce(_from, now() - interval '100 years');
     __to := coalesce(_to, now() + interval '100 years');
@@ -165,6 +172,7 @@ begin
             from public.journal j
             left join const.event_code ec on ec.event_id = j.event_id
             where j.keys @> jsonb_build_object('user', _target_user_id)
+              and (__effective_tenant_id is null or j.tenant_id = __effective_tenant_id)
               and j.created_at between __from and __to
 
             union all
@@ -221,7 +229,8 @@ create or replace function auth.get_security_events(
     _to timestamptz default null,
     _page integer default 1,
     _page_size integer default 20,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 ) returns table(
     __source text,
     __event_type_code text,
@@ -242,8 +251,10 @@ $$
 declare
     __from timestamptz;
     __to timestamptz;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'authentication.read_user_events', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
 
     __from := coalesce(_from, now() - interval '100 years');
     __to := coalesce(_to, now() + interval '100 years');
@@ -286,6 +297,7 @@ begin
             from public.journal j
             inner join const.event_code ec on ec.event_id = j.event_id
             where j.event_id = 32001  -- err_no_permission
+              and (__effective_tenant_id is null or j.tenant_id = __effective_tenant_id)
               and j.created_at between __from and __to
         ),
         counted as (

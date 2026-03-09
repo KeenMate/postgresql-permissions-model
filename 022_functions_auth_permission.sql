@@ -256,15 +256,18 @@ begin
 end;
 $$;
 
-create or replace function auth.get_perm_sets(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1)
+create or replace function auth.get_perm_sets(_requested_by text, _user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__perm_set_id integer, __title text, __code text, __is_system boolean, __is_assignable boolean, __permissions jsonb, __source text)
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
-	perform auth.has_permission(_user_id, _correlation_id, 'permissions.get_perm_sets', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'permissions.get_all_perm_sets', 'permissions.get_perm_sets', _tenant_id, _target_tenant_id);
 
-	return query select * from unsecure.get_perm_sets(_requested_by, _user_id, _tenant_id);
+	return query select * from unsecure.get_perm_sets(_requested_by, _user_id, __effective_tenant_id);
 end;
 $$;
 
@@ -393,6 +396,7 @@ begin
 	perform unsecure.create_permission_as_system('Get data', 'authentication', _source := 'core');
 	perform unsecure.create_permission_as_system('Create auth event', 'authentication', _source := 'core');
 	perform unsecure.create_permission_as_system('Read user events', 'authentication', _source := 'core');
+	perform unsecure.create_permission_as_system('Read all user events', 'authentication', _source := 'core');
 	perform unsecure.create_permission_as_system('Ensure permissions', 'authentication', _source := 'core');
 	perform unsecure.create_permission_as_system('Get users groups and permissions', 'authentication', _source := 'core');
 
@@ -432,8 +436,10 @@ begin
 	perform unsecure.create_permission_as_system('Assign permission', 'permissions', _source := 'core');
 	perform unsecure.create_permission_as_system('Unassign permission', 'permissions', _source := 'core');
 	perform unsecure.create_permission_as_system('Get perm sets', 'permissions', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all perm sets', 'permissions', _source := 'core');
 	perform unsecure.create_permission_as_system('Read permissions', 'permissions', _source := 'core');
 	perform unsecure.create_permission_as_system('Read perm sets', 'permissions', _source := 'core');
+	perform unsecure.create_permission_as_system('Read all perm sets', 'permissions', _source := 'core');
 
 	-- Permissions: Users
 	perform unsecure.create_permission_as_system('Users', _source := 'core');
@@ -454,10 +460,12 @@ begin
 	perform unsecure.create_permission_as_system('Get data', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Get permissions', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Read users', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Read all users', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete system user info', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete user info', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete user identity', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Read user group memberships', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Read all user group memberships', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Update last selected tenant', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Get available tenants', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Get users groups and permissions', 'users', _source := 'core');
@@ -473,9 +481,13 @@ begin
 	perform unsecure.create_permission_as_system('Assign owner', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Assign group owner', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Get tenants', 'tenants', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all tenants', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Get users', 'tenants', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all users', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Get groups', 'tenants', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all groups', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Read tenants', 'tenants', _source := 'core');
+	perform unsecure.create_permission_as_system('Read all tenants', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete tenant', 'tenants', _source := 'core');
 
 	-- Permissions: Providers
@@ -488,6 +500,7 @@ begin
 	-- Permissions: Groups
 	perform unsecure.create_permission_as_system('Groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Get group', 'groups', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all groups', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Get permissions', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Create group', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Update group', 'groups', _source := 'core');
@@ -498,6 +511,7 @@ begin
 	perform unsecure.create_permission_as_system('Delete member', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Get members', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Get mapping', 'groups', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all mappings', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Create mapping', 'groups', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete mapping', 'groups', _source := 'core');
 
@@ -509,6 +523,7 @@ begin
 	perform unsecure.create_permission_as_system('Update api secret', 'api_keys', _source := 'core');
 	perform unsecure.create_permission_as_system('Validate api key', 'api_keys', _source := 'core');
 	perform unsecure.create_permission_as_system('Search', 'api_keys', _source := 'core');
+	perform unsecure.create_permission_as_system('Search all', 'api_keys', _source := 'core');
 	perform unsecure.create_permission_as_system('Update permissions', 'api_keys', _source := 'core');
 	perform unsecure.create_permission_as_system('Read outbound secret', 'api_keys', _source := 'core');
 
@@ -542,7 +557,13 @@ begin
 			'tokens.create_token', 'tokens.validate_token', 'tokens.set_as_used',
 			'authentication.get_data', 'authentication.create_auth_event', 'authentication.read_user_events',
 			'authentication.ensure_permissions', 'authentication.get_users_groups_and_permissions',
-			'resources'],
+			'resources',
+			'users.read_all_users', 'users.read_all_user_group_memberships',
+			'tenants.get_all_tenants', 'tenants.get_all_users', 'tenants.get_all_groups', 'tenants.read_all_tenants',
+			'authentication.read_all_user_events',
+			'api_keys.search_all',
+			'permissions.get_all_perm_sets', 'permissions.read_all_perm_sets',
+			'groups.get_all_groups', 'groups.get_all_mappings'],
 		_source := 'core');
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload'],
@@ -597,7 +618,13 @@ begin
 			'permissions.assign_permission', 'permissions.unassign_permission',
 			'permissions.get_perm_sets', 'permissions.read_permissions', 'permissions.read_perm_sets',
 			'tokens.create_token', 'tokens.validate_token', 'tokens.set_as_used',
-			'authentication.read_user_events', 'authentication.create_auth_event'],
+			'authentication.read_user_events', 'authentication.create_auth_event',
+			'users.read_all_users', 'users.read_all_user_group_memberships',
+			'tenants.get_all_tenants', 'tenants.get_all_users', 'tenants.get_all_groups', 'tenants.read_all_tenants',
+			'authentication.read_all_user_events',
+			'api_keys.search_all',
+			'permissions.get_all_perm_sets', 'permissions.read_all_perm_sets',
+			'groups.get_all_groups', 'groups.get_all_mappings'],
 		_source := 'core');
 
 	-- Service account permission sets
@@ -795,7 +822,8 @@ create or replace function auth.search_perm_sets(
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1,
-    _source text default null
+    _source text default null,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __perm_set_id integer,
@@ -815,8 +843,10 @@ as
 $$
 declare
     __search_text text;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'permissions.read_perm_sets', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'permissions.read_all_perm_sets', 'permissions.read_perm_sets', _tenant_id, _target_tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -828,7 +858,7 @@ begin
             select ps.perm_set_id
                  , count(*) over () as total_items
             from auth.perm_set ps
-            where ps.tenant_id = _tenant_id
+            where (__effective_tenant_id is null or ps.tenant_id = __effective_tenant_id)
               and (_is_assignable is null or ps.is_assignable = _is_assignable)
               and (_is_system is null or ps.is_system = _is_system)
               and (_source is null or ps.source = _source)

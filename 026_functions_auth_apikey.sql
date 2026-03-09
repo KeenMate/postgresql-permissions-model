@@ -107,7 +107,7 @@ begin
 end;
 $$;
 
-create or replace function auth.search_api_keys(_user_id bigint, _correlation_id text, _search_text text, _page integer DEFAULT 1, _page_size integer DEFAULT 10, _tenant_id integer DEFAULT 1)
+create or replace function auth.search_api_keys(_user_id bigint, _correlation_id text, _search_text text, _page integer DEFAULT 1, _page_size integer DEFAULT 10, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__created_by text, __created_at timestamp with time zone, __updated_by text, __updated_at timestamp with time zone, __api_key_id integer, __tenant_id integer, __title text, __description text, __api_key text, __expire_at timestamp with time zone, __notification_email text, __total_items bigint)
     stable
     rows 100
@@ -116,8 +116,10 @@ as
 $$
 declare
 	__search_text text;
+	__effective_tenant_id int;
 begin
-	perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
+	__effective_tenant_id := internal.resolve_cross_tenant_access(
+		_user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
 	__search_text := helpers.normalize_text(_search_text);
 
@@ -129,7 +131,7 @@ begin
 					 as (select ak.api_key_id
 										, count(*) over () as total_items
 							 from auth.api_key ak
-							 where (_tenant_id is null or ak.tenant_id = _tenant_id)
+							 where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
 								 and (helpers.is_empty_string(__search_text) or lower(ak.title) like '%' || __search_text || '%')
 							 order by ak.title, ak.api_key
 							 offset ((_page - 1) * _page_size) limit _page_size)
@@ -534,7 +536,8 @@ create or replace function auth.get_outbound_api_key(
     _user_id bigint,
     _correlation_id text,
     _service_code text,
-    _tenant_id integer DEFAULT 1
+    _tenant_id integer DEFAULT 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __api_key_id integer,
@@ -554,8 +557,11 @@ create or replace function auth.get_outbound_api_key(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
     return query
         select ak.api_key_id, ak.api_key, ak.title, ak.description,
@@ -563,7 +569,7 @@ begin
                ak.expire_at, ak.notification_email,
                ak.created_at, ak.updated_at
         from auth.api_key ak
-        where ak.tenant_id = _tenant_id
+        where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
           and ak.key_type = 'outbound'
           and ak.service_code = lower(_service_code);
 end;
@@ -573,7 +579,8 @@ create or replace function auth.get_outbound_api_key_by_id(
     _user_id bigint,
     _correlation_id text,
     _api_key_id integer,
-    _tenant_id integer DEFAULT 1
+    _tenant_id integer DEFAULT 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __api_key_id integer,
@@ -593,8 +600,11 @@ create or replace function auth.get_outbound_api_key_by_id(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
     return query
         select ak.api_key_id, ak.api_key, ak.title, ak.description,
@@ -602,7 +612,7 @@ begin
                ak.expire_at, ak.notification_email,
                ak.created_at, ak.updated_at
         from auth.api_key ak
-        where ak.tenant_id = _tenant_id
+        where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
           and ak.key_type = 'outbound'
           and ak.api_key_id = _api_key_id;
 end;
@@ -616,7 +626,8 @@ create or replace function auth.get_outbound_api_key_secret(
     _user_id bigint,
     _correlation_id text,
     _service_code text,
-    _tenant_id integer DEFAULT 1
+    _tenant_id integer DEFAULT 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __api_key_id integer,
@@ -630,14 +641,17 @@ create or replace function auth.get_outbound_api_key_secret(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'api_keys.read_outbound_secret', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.read_outbound_secret', _tenant_id, _target_tenant_id);
 
     return query
         select ak.api_key_id, ak.service_code, ak.service_url,
                ak.encrypted_secret, ak.extra_data
         from auth.api_key ak
-        where ak.tenant_id = _tenant_id
+        where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
           and ak.key_type = 'outbound'
           and ak.service_code = lower(_service_code)
           and (ak.expire_at is null or ak.expire_at > now());
@@ -652,7 +666,8 @@ create or replace function auth.get_outbound_api_key_secret_by_id(
     _user_id bigint,
     _correlation_id text,
     _api_key_id integer,
-    _tenant_id integer DEFAULT 1
+    _tenant_id integer DEFAULT 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __api_key_id integer,
@@ -666,14 +681,17 @@ create or replace function auth.get_outbound_api_key_secret_by_id(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'api_keys.read_outbound_secret', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.read_outbound_secret', _tenant_id, _target_tenant_id);
 
     return query
         select ak.api_key_id, ak.service_code, ak.service_url,
                ak.encrypted_secret, ak.extra_data
         from auth.api_key ak
-        where ak.tenant_id = _tenant_id
+        where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
           and ak.key_type = 'outbound'
           and ak.api_key_id = _api_key_id
           and (ak.expire_at is null or ak.expire_at > now());
@@ -797,7 +815,8 @@ create or replace function auth.search_outbound_api_keys(
     _service_code text DEFAULT NULL,
     _page integer DEFAULT 1,
     _page_size integer DEFAULT 10,
-    _tenant_id integer DEFAULT 1
+    _tenant_id integer DEFAULT 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __api_key_id integer,
@@ -820,8 +839,10 @@ as
 $$
 declare
     __search_text text;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'api_keys.search', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -832,7 +853,7 @@ begin
         with filtered_rows as (
             select ak.api_key_id, count(*) over () as total_items
             from auth.api_key ak
-            where ak.tenant_id = _tenant_id
+            where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
               and ak.key_type = 'outbound'
               and (_service_code is null or ak.service_code = lower(_service_code))
               and (helpers.is_empty_string(__search_text)

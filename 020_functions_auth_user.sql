@@ -869,7 +869,8 @@ create or replace function auth.search_users(
     _is_locked boolean default null,
     _page integer default 1,
     _page_size integer default 30,
-    _tenant_id integer default 1
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
 )
     returns TABLE(
         __user_id bigint,
@@ -891,8 +892,10 @@ as
 $$
 declare
     __search_text text;
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'users.read_users', _tenant_id);
+    __effective_tenant_id := internal.resolve_cross_tenant_access(
+        _user_id, _correlation_id, 'users.read_all_users', 'users.read_users', _tenant_id, _target_tenant_id);
 
     __search_text := helpers.normalize_text(_search_text);
 
@@ -909,6 +912,7 @@ begin
               and (_is_locked is null or ui.is_locked = _is_locked)
               and (helpers.is_empty_string(__search_text)
                    or ui.nrm_search_data like '%' || __search_text || '%')
+              and (__effective_tenant_id is null or exists(select 1 from auth.tenant_user tu where tu.user_id = ui.user_id and tu.tenant_id = __effective_tenant_id))
             order by ui.display_name
             offset ((_page - 1) * _page_size) limit _page_size
         )
