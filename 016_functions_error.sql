@@ -489,6 +489,17 @@ begin
 end;
 $$;
 
+-- 34002: Cross-tenant access requires admin tenant
+create or replace function error.raise_34002(_tenant_id integer) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Cross-tenant access requires admin tenant (tenant_id = 1), current tenant: %', _tenant_id
+        using errcode = '34002';
+end;
+$$;
+
 /*
  * Resource Access Errors (35001-35999)
  */

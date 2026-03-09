@@ -253,6 +253,7 @@ INSERT INTO const.event_code (event_id, code, category_code, title, description,
 
     -- Tenant errors (34001-34999)
     (34001, 'err_no_tenant_access',          'tenant_error', 'No Tenant Access',     'User has no access to this tenant', true, 'core'),
+    (34002, 'err_cross_tenant_requires_admin', 'tenant_error', 'Cross-Tenant Requires Admin', 'Cross-tenant access requires admin tenant', true, 'core'),
 
     -- Resource access errors (35001-35999)
     (35001, 'err_no_resource_access',             'resource_error', 'No Resource Access',             'User has no access to this resource', true, 'core'),

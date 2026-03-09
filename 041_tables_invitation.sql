@@ -469,6 +469,7 @@ select * from unsecure.create_permission_as_system('Accept invitation', 'invitat
 select * from unsecure.create_permission_as_system('Reject invitation', 'invitations', true, null, 'core');
 select * from unsecure.create_permission_as_system('Revoke invitation', 'invitations', true, null, 'core');
 select * from unsecure.create_permission_as_system('Get invitations', 'invitations', true, null, 'core');
+select * from unsecure.create_permission_as_system('Get all invitations', 'invitations', true, null, 'core');
 select * from unsecure.create_permission_as_system('Manage templates', 'invitations', true, null, 'core');
 
 -- ---------------------------------------------------------------------------
@@ -480,7 +481,8 @@ declare
     __inv_perms text[] := array[
         'invitations.create_invitation', 'invitations.accept_invitation',
         'invitations.reject_invitation', 'invitations.revoke_invitation',
-        'invitations.get_invitations', 'invitations.manage_templates'
+        'invitations.get_invitations', 'invitations.get_all_invitations',
+        'invitations.manage_templates'
     ];
 begin
     for __ps in

@@ -567,7 +567,7 @@ begin
                count(ia.invitation_action_id) filter (where ia.status_code in ('pending', 'processing'))
         from auth.invitation i
         left join auth.invitation_action ia on ia.invitation_id = i.invitation_id
-        where i.tenant_id = _tenant_id
+        where (_tenant_id is null or i.tenant_id = _tenant_id)
           and (_status_code is null or i.status_code = _status_code)
           and (_target_email is null or i.target_email ilike '%' || _target_email || '%')
           and (_inviter_user_id is null or i.inviter_user_id = _inviter_user_id)
@@ -1082,6 +1082,7 @@ create or replace function auth.get_invitations(
     _user_id         bigint,
     _correlation_id  text,
     _tenant_id       integer default 1,
+    _target_tenant_id integer default null,
     _status_code     text default null,
     _target_email    text default null,
     _inviter_user_id bigint default null
@@ -1107,11 +1108,28 @@ create or replace function auth.get_invitations(
     language plpgsql
 as
 $$
+declare
+    __effective_tenant_id int;
 begin
-    perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations', _tenant_id);
+    if _target_tenant_id is not null then
+        -- filtering by specific tenant - only allowed from admin console
+        if _tenant_id <> 1 then
+            perform error.raise_34002(_tenant_id);
+        end if;
+        perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_all_invitations', _target_tenant_id);
+        __effective_tenant_id := _target_tenant_id;
+    elsif _tenant_id = 1 then
+        -- admin console without target tenant - show all
+        perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_all_invitations', _tenant_id);
+        __effective_tenant_id := null;
+    else
+        -- regular tenant - filter by own tenant
+        perform auth.has_permission(_user_id, _correlation_id, 'invitations.get_invitations', _tenant_id);
+        __effective_tenant_id := _tenant_id;
+    end if;
 
     return query select * from unsecure.get_invitations(
-        _requested_by, _user_id, _correlation_id, _tenant_id,
+        _requested_by, _user_id, _correlation_id, __effective_tenant_id,
         _status_code, _target_email, _inviter_user_id
     );
 end;

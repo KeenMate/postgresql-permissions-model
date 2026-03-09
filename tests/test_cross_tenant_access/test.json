@@ -1,0 +1,6 @@
+{
+  "name": "Cross-Tenant Data Access",
+  "description": "Validates cross-tenant access pattern: admin tenant (1) can query other tenants with read_all_* permissions, regular tenants are restricted to own data, cross-tenant requests from non-admin tenants are denied with error 34002",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

@@ -8,7 +8,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 
 ## Key Features
 
-- **Multi-tenancy** with isolated permissions and data
+- **Multi-tenancy** with isolated permissions and data (tenant 1 reserved as admin tenant for cross-tenant access)
 - **Hierarchical permissions** using PostgreSQL ltree (e.g., `users.create_user.admin_level`)
 - **Flexible group types**: Internal, External (mapped to identity providers), and Hybrid
 - **Identity provider integration**: Works with any provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
@@ -165,6 +165,56 @@ The `_source` parameter scopes deletions — each module manages only its own it
 - **`public`** & **`auth`** - Always validate permissions
 - **`internal`** - For trusted contexts (no permission checks)
 - **`unsecure`** - Security system internals only
+
+### Multi-Tenant Data Access (Tenant 1 = Admin Tenant)
+
+Tenant 1 is reserved as the **admin/super tenant**. In single-tenant applications there is no difference — everything runs under tenant 1 and the system behaves as if multi-tenancy doesn't exist. In multi-tenant applications, tenant 1 serves as the admin console with cross-tenant visibility.
+
+Search and get functions that return tenant-scoped data use two tenant parameters:
+
+| Parameter | Purpose |
+|-----------|---------|
+| `_tenant_id` | Caller's tenant — used for permission checking |
+| `_target_tenant_id` | Which tenant's data to query (optional) |
+
+**Permission resolution:**
+
+| Caller's tenant | `_target_tenant_id` | Behavior |
+|----------------|---------------------|----------|
+| `_tenant_id = 1` | `null` | Admin console — show data from **all tenants** (requires `*.read_all_*` permission) |
+| `_tenant_id = 1` | `30` | Admin console — show data from **tenant 30 only** (requires `*.read_all_*` permission) |
+| `_tenant_id = 30` | `null` | Regular tenant — show data from **own tenant only** (requires `*.read_*` permission) |
+| `_tenant_id = 30` | any value | **Error 34002** — cross-tenant access requires admin tenant |
+
+Each domain has paired permissions — a regular permission for own-tenant access and an "all" variant for cross-tenant access from the admin tenant:
+
+```
+users.read_users          -- read users within own tenant
+users.read_all_users      -- read users across tenants (admin console only)
+
+invitations.get_invitations       -- list invitations within own tenant
+invitations.get_all_invitations   -- list invitations across tenants (admin console only)
+```
+
+**Example pattern** used in search/get functions:
+```sql
+-- Determine effective tenant for filtering
+if _target_tenant_id is not null then
+    -- cross-tenant: admin console only
+    if _tenant_id <> 1 then
+        perform error.raise_34002(_tenant_id);
+    end if;
+    perform auth.has_permission(_user_id, _correlation_id, 'domain.read_all_items', _target_tenant_id);
+    __effective_tenant_id := _target_tenant_id;
+elsif _tenant_id = 1 then
+    perform auth.has_permission(_user_id, _correlation_id, 'domain.read_all_items', _tenant_id);
+    __effective_tenant_id := null;  -- null = no tenant filter = all tenants
+else
+    perform auth.has_permission(_user_id, _correlation_id, 'domain.read_items', _tenant_id);
+    __effective_tenant_id := _tenant_id;
+end if;
+-- Then use __effective_tenant_id in WHERE clause (null = no filter)
+```
 
 ### Service Accounts
 

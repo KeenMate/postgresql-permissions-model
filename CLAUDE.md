@@ -34,8 +34,11 @@ The system uses multiple PostgreSQL schemas with distinct security boundaries:
 ### Core Entities
 This system manages the complete lifecycle of authorization entities:
 
-**Multi-Tenancy:**
+**Multi-Tenancy (Tenant 1 = Admin Tenant):**
 - **Tenants** (`auth.tenant`) - Multi-tenancy support with isolated permissions and data
+- **Tenant 1** is reserved as the admin/super tenant. In single-tenant apps there's no difference. In multi-tenant apps, tenant 1 is the admin console with cross-tenant visibility.
+- Search/get functions use `_tenant_id` (caller's tenant for permission checks) + `_target_tenant_id` (which tenant's data to query). If `_tenant_id = 1`, cross-tenant access is allowed with `read_all_*` permissions. If `_tenant_id != 1`, only own-tenant data is returned.
+- Each domain has paired permissions: `domain.read_*` (own tenant) + `domain.read_all_*` (cross-tenant from admin).
 - **Tenant Users** (`auth.tenant_user`) - Links users to tenants they have access to
 - **User Tenant Preferences** (`auth.user_tenant_preference`) - Per-tenant user settings/preferences
 - **Ownership** (`auth.owner`) - Tracks tenant owners and group owners
