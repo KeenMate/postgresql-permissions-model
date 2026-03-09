@@ -76,6 +76,151 @@ begin
 end;
 $$;
 
+-- Resolves a user identifier (bigint-as-text, uuid, or code) to user_id.
+-- Lookup order: 1) bigint cast, 2) uuid match, 3) code match.
+-- Raises 33020 if no match found.
+create or replace function internal.resolve_user(_identifier text) returns bigint
+    language plpgsql
+as
+$$
+declare
+    __user_id bigint;
+begin
+    if _identifier is null or trim(_identifier) = '' then
+        perform error.raise_33020(_identifier);
+    end if;
+
+    -- try bigint (direct user_id)
+    begin
+        __user_id := _identifier::bigint;
+        if exists (select 1 from auth.user_info where user_id = __user_id) then
+            return __user_id;
+        end if;
+    exception when invalid_text_representation or numeric_value_out_of_range then
+        null; -- not a bigint, continue
+    end;
+
+    -- try uuid
+    begin
+        select ui.user_id into __user_id
+        from auth.user_info ui
+        where ui.uuid = _identifier::uuid;
+        if __user_id is not null then
+            return __user_id;
+        end if;
+    exception when invalid_text_representation then
+        null; -- not a uuid, continue
+    end;
+
+    -- try code
+    select ui.user_id into __user_id
+    from auth.user_info ui
+    where ui.code = _identifier;
+    if __user_id is not null then
+        return __user_id;
+    end if;
+
+    perform error.raise_33020(_identifier);
+    return null; -- unreachable
+end;
+$$;
+
+-- Resolves a tenant identifier (integer-as-text, uuid, or code) to tenant_id.
+-- Lookup order: 1) integer cast, 2) uuid match, 3) code match.
+-- Raises 34003 if no match found.
+create or replace function internal.resolve_tenant(_identifier text) returns integer
+    language plpgsql
+as
+$$
+declare
+    __tenant_id integer;
+begin
+    if _identifier is null or trim(_identifier) = '' then
+        perform error.raise_34003(_identifier);
+    end if;
+
+    -- try integer (direct tenant_id)
+    begin
+        __tenant_id := _identifier::integer;
+        if exists (select 1 from auth.tenant where tenant_id = __tenant_id) then
+            return __tenant_id;
+        end if;
+    exception when invalid_text_representation or numeric_value_out_of_range then
+        null;
+    end;
+
+    -- try uuid
+    begin
+        select t.tenant_id into __tenant_id
+        from auth.tenant t
+        where t.uuid = _identifier::uuid;
+        if __tenant_id is not null then
+            return __tenant_id;
+        end if;
+    exception when invalid_text_representation then
+        null;
+    end;
+
+    -- try code
+    select t.tenant_id into __tenant_id
+    from auth.tenant t
+    where t.code = _identifier;
+    if __tenant_id is not null then
+        return __tenant_id;
+    end if;
+
+    perform error.raise_34003(_identifier);
+    return null; -- unreachable
+end;
+$$;
+
+-- Resolves a group identifier (integer-as-text or code) to user_group_id.
+-- Code lookup requires _tenant_id since group codes are unique per tenant.
+-- Lookup order: 1) integer cast, 2) code match (within tenant).
+-- Raises 33021 if no match found.
+create or replace function internal.resolve_group(_identifier text, _tenant_id integer default null) returns integer
+    language plpgsql
+as
+$$
+declare
+    __user_group_id integer;
+begin
+    if _identifier is null or trim(_identifier) = '' then
+        perform error.raise_33021(_identifier);
+    end if;
+
+    -- try integer (direct user_group_id)
+    begin
+        __user_group_id := _identifier::integer;
+        if exists (select 1 from auth.user_group where user_group_id = __user_group_id) then
+            return __user_group_id;
+        end if;
+    exception when invalid_text_representation or numeric_value_out_of_range then
+        null;
+    end;
+
+    -- try code (requires tenant_id for uniqueness)
+    if _tenant_id is not null then
+        select ug.user_group_id into __user_group_id
+        from auth.user_group ug
+        where ug.code = _identifier and ug.tenant_id = _tenant_id;
+    else
+        -- without tenant_id, try code across all tenants (return first match)
+        select ug.user_group_id into __user_group_id
+        from auth.user_group ug
+        where ug.code = _identifier
+        limit 1;
+    end if;
+
+    if __user_group_id is not null then
+        return __user_group_id;
+    end if;
+
+    perform error.raise_33021(_identifier);
+    return null; -- unreachable
+end;
+$$;
+
 -- Helper function to invalidate cache for all users with a specific perm_set assigned
 -- Uses soft invalidation (UPDATE expiration_date) instead of DELETE for better performance:
 -- - UPDATE is ~5-10x faster than DELETE (no index rebalancing)

@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `internal.resolve_cross_tenant_access()` — helper function that encapsulates the 3-branch cross-tenant permission check pattern (`_target_tenant_id` specified → admin-only with `read_all_*`; tenant 1 → `read_all_*` + see all; else → regular permission + own tenant). Replaces ~15 lines of boilerplate per function across 22 call sites in 7 files.
+- `internal.resolve_user(_identifier text)` — resolves a user by bigint, uuid, or code to `user_id`. Raises error 33020 if not found.
+- `internal.resolve_tenant(_identifier text)` — resolves a tenant by integer, uuid, or code to `tenant_id`. Raises error 34003 if not found.
+- `internal.resolve_group(_identifier text, _tenant_id integer)` — resolves a group by integer or code (scoped to tenant) to `user_group_id`. Raises error 33021 if not found.
+- Error functions: `error.raise_33020` (user not resolved), `error.raise_33021` (group not resolved), `error.raise_34003` (tenant not resolved).
 
 ### Changed
 

@@ -4861,13 +4861,13 @@
     "object_name": "raise_33018",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
-    "last_update_line": 582,
+    "last_update_line": 615,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "016_functions_error.sql",
-        "line": 582,
+        "line": 615,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -4878,13 +4878,47 @@
     "object_name": "raise_33019",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
-    "last_update_line": 593,
+    "last_update_line": 626,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "016_functions_error.sql",
-        "line": 593,
+        "line": 626,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_33020",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 578,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 578,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_33021",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 589,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 589,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -4919,6 +4953,23 @@
       {
         "file": "016_functions_error.sql",
         "line": 493,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_34003",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 600,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 600,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -5286,567 +5337,6 @@
     "object_name": "raise_52101",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
-    "last_update_line": 611,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 611,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52102",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 612,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 612,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52103",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 613,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 613,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52104",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 614,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 614,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52105",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 615,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 615,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52106",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 616,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 616,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52107",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 617,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 617,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52108",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 618,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 618,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52109",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 619,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 619,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52110",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 620,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 620,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52111",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 621,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 621,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52112",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 622,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 622,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52113",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 658,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 658,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52114",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 659,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 659,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52115",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 665,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 665,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52116",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 666,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 666,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52171",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 625,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 625,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52172",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 626,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 626,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52173",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 627,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 627,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52174",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 628,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 628,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52175",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 629,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 629,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52176",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 630,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 630,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52177",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 631,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 631,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52178",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 632,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 632,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52179",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 633,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 633,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52180",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 649,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 649,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52181",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 650,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 650,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52271",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 636,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 636,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52272",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 637,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 637,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52273",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 638,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 638,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52274",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 639,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 639,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52275",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 640,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 640,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52276",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
-    "last_update_line": 643,
-    "last_update_source": "migration",
-    "total_updates": 1,
-    "all_updates": [
-      {
-        "file": "016_functions_error.sql",
-        "line": 643,
-        "operation": "CREATE_OR_REPLACE",
-        "source": "migration"
-      }
-    ]
-  },
-  {
-    "schema": "error",
-    "object_name": "raise_52277",
-    "object_type": "function",
-    "last_update_file": "016_functions_error.sql",
     "last_update_line": 644,
     "last_update_source": "migration",
     "total_updates": 1,
@@ -5861,7 +5351,7 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52278",
+    "object_name": "raise_52102",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 645,
@@ -5878,7 +5368,7 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52279",
+    "object_name": "raise_52103",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 646,
@@ -5895,7 +5385,75 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52282",
+    "object_name": "raise_52104",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 647,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 647,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52105",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 648,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 648,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52106",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 649,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 649,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52107",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 650,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 650,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52108",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 651,
@@ -5912,7 +5470,7 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52283",
+    "object_name": "raise_52109",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 652,
@@ -5929,7 +5487,41 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52301",
+    "object_name": "raise_52110",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 653,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 653,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52111",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 654,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 654,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52112",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 655,
@@ -5946,7 +5538,143 @@
   },
   {
     "schema": "error",
-    "object_name": "raise_52401",
+    "object_name": "raise_52113",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 691,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 691,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52114",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 692,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 692,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52115",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 698,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 698,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52116",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 699,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 699,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52171",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 658,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 658,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52172",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 659,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 659,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52173",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 660,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 660,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52174",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 661,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 661,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52175",
     "object_type": "function",
     "last_update_file": "016_functions_error.sql",
     "last_update_line": 662,
@@ -5956,6 +5684,329 @@
       {
         "file": "016_functions_error.sql",
         "line": 662,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52176",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 663,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 663,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52177",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 664,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 664,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52178",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 665,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 665,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52179",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 666,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 666,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52180",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 682,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 682,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52181",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 683,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 683,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52271",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 669,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 669,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52272",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 670,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 670,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52273",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 671,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 671,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52274",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 672,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 672,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52275",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 673,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 673,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52276",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 676,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 676,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52277",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 677,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 677,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52278",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 678,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 678,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52279",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 679,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 679,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52282",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 684,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 684,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52283",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 685,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 685,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52301",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 688,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 688,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "error",
+    "object_name": "raise_52401",
+    "object_type": "function",
+    "last_update_file": "016_functions_error.sql",
+    "last_update_line": 695,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "016_functions_error.sql",
+        "line": 695,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -6340,6 +6391,57 @@
   },
   {
     "schema": "internal",
+    "object_name": "resolve_group",
+    "object_type": "function",
+    "last_update_file": "019_functions_unsecure.sql",
+    "last_update_line": 181,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "019_functions_unsecure.sql",
+        "line": 181,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "internal",
+    "object_name": "resolve_tenant",
+    "object_type": "function",
+    "last_update_file": "019_functions_unsecure.sql",
+    "last_update_line": 131,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "019_functions_unsecure.sql",
+        "line": 131,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "internal",
+    "object_name": "resolve_user",
+    "object_type": "function",
+    "last_update_file": "019_functions_unsecure.sql",
+    "last_update_line": 82,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "019_functions_unsecure.sql",
+        "line": 82,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "internal",
     "object_name": "throw_no_permission",
     "object_type": "function",
     "last_update_file": "022_functions_auth_permission.sql",
@@ -6527,19 +6629,19 @@
     "object_name": "__temp_users_groups_permissions",
     "object_type": "table",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1879,
+    "last_update_line": 2024,
     "last_update_source": "migration",
     "total_updates": 2,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1878,
+        "line": 2023,
         "operation": "DROP",
         "source": "migration"
       },
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1879,
+        "line": 2024,
         "operation": "CREATE",
         "source": "migration"
       }
@@ -7588,19 +7690,19 @@
     "object_name": "tmp_default_groups",
     "object_type": "table",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1462,
+    "last_update_line": 1607,
     "last_update_source": "migration",
     "total_updates": 2,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1431,
+        "line": 1576,
         "operation": "DROP",
         "source": "migration"
       },
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1462,
+        "line": 1607,
         "operation": "DROP",
         "source": "migration"
       }
@@ -8886,13 +8988,13 @@
     "object_name": "assign_permission",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 613,
+    "last_update_line": 758,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 613,
+        "line": 758,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -8903,13 +9005,13 @@
     "object_name": "assign_permission_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 812,
+    "last_update_line": 957,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 812,
+        "line": 957,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -8920,13 +9022,13 @@
     "object_name": "assign_user_default_groups",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1417,
+    "last_update_line": 1562,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1417,
+        "line": 1562,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -8937,13 +9039,13 @@
     "object_name": "blacklist_user",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2533,
+    "last_update_line": 2678,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2533,
+        "line": 2678,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -8954,13 +9056,13 @@
     "object_name": "blacklist_user_identities",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2569,
+    "last_update_line": 2714,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2569,
+        "line": 2714,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9005,13 +9107,13 @@
     "object_name": "check_user_blacklist",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2511,
+    "last_update_line": 2656,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2511,
+        "line": 2656,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9039,13 +9141,13 @@
     "object_name": "clear_user_group_id_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2470,
+    "last_update_line": 2615,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2470,
+        "line": 2615,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9073,13 +9175,13 @@
     "object_name": "compute_short_code",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 867,
+    "last_update_line": 1012,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 867,
+        "line": 1012,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9090,13 +9192,13 @@
     "object_name": "copy_perm_set",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2098,
+    "last_update_line": 2243,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2098,
+        "line": 2243,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9107,13 +9209,13 @@
     "object_name": "create_api_user",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1466,
+    "last_update_line": 1611,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1466,
+        "line": 1611,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9175,13 +9277,13 @@
     "object_name": "create_perm_set",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1061,
+    "last_update_line": 1206,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1061,
+        "line": 1206,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9192,13 +9294,13 @@
     "object_name": "create_perm_set_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1105,
+    "last_update_line": 1250,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1105,
+        "line": 1250,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9209,13 +9311,13 @@
     "object_name": "create_perm_set_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1187,
+    "last_update_line": 1332,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1187,
+        "line": 1332,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9226,13 +9328,13 @@
     "object_name": "create_permission",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 939,
+    "last_update_line": 1084,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 939,
+        "line": 1084,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9243,13 +9345,13 @@
     "object_name": "create_permission_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1013,
+    "last_update_line": 1158,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1013,
+        "line": 1158,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9260,13 +9362,13 @@
     "object_name": "create_primary_tenant",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 319,
+    "last_update_line": 464,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 319,
+        "line": 464,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9277,13 +9379,13 @@
     "object_name": "create_service_user_info",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1331,
+    "last_update_line": 1476,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1331,
+        "line": 1476,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9294,13 +9396,13 @@
     "object_name": "create_user_event",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 373,
+    "last_update_line": 518,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 373,
+        "line": 518,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9311,13 +9413,13 @@
     "object_name": "create_user_group",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 454,
+    "last_update_line": 599,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 454,
+        "line": 599,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9328,13 +9430,13 @@
     "object_name": "create_user_group_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 485,
+    "last_update_line": 630,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 485,
+        "line": 630,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9345,13 +9447,13 @@
     "object_name": "create_user_group_member",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1520,
+    "last_update_line": 1665,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1520,
+        "line": 1665,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9362,13 +9464,13 @@
     "object_name": "create_user_group_member_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 496,
+    "last_update_line": 641,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 496,
+        "line": 641,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9379,13 +9481,13 @@
     "object_name": "create_user_identity",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1623,
+    "last_update_line": 1768,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1623,
+        "line": 1768,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9396,13 +9498,13 @@
     "object_name": "create_user_info",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1285,
+    "last_update_line": 1430,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1285,
+        "line": 1430,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9413,13 +9515,13 @@
     "object_name": "create_user_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 329,
+    "last_update_line": 474,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 329,
+        "line": 474,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9447,13 +9549,13 @@
     "object_name": "delete_perm_set_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1231,
+    "last_update_line": 1376,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1231,
+        "line": 1376,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9464,13 +9566,13 @@
     "object_name": "delete_tenant",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1663,
+    "last_update_line": 1808,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1663,
+        "line": 1808,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9481,13 +9583,13 @@
     "object_name": "delete_user_by_id",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 352,
+    "last_update_line": 497,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 352,
+        "line": 497,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9498,13 +9600,13 @@
     "object_name": "delete_user_by_username_as_system",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 341,
+    "last_update_line": 486,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 341,
+        "line": 486,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9515,13 +9617,13 @@
     "object_name": "ensure_audit_partitions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2199,
+    "last_update_line": 2344,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2199,
+        "line": 2344,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9583,13 +9685,13 @@
     "object_name": "expire_tokens",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 428,
+    "last_update_line": 573,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 428,
+        "line": 573,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9617,13 +9719,13 @@
     "object_name": "get_all_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1022,
+    "last_update_line": 1167,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1022,
+        "line": 1167,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9634,13 +9736,13 @@
     "object_name": "get_assigned_group_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 580,
+    "last_update_line": 725,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 580,
+        "line": 725,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9651,13 +9753,13 @@
     "object_name": "get_cached_group_ids",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2381,
+    "last_update_line": 2526,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2381,
+        "line": 2526,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9668,13 +9770,13 @@
     "object_name": "get_effective_group_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 543,
+    "last_update_line": 688,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 543,
+        "line": 688,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9719,13 +9821,13 @@
     "object_name": "get_perm_sets",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1035,
+    "last_update_line": 1180,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1035,
+        "line": 1180,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9736,13 +9838,13 @@
     "object_name": "get_user_assigned_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2158,
+    "last_update_line": 2303,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2158,
+        "line": 2303,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9753,13 +9855,13 @@
     "object_name": "get_user_group_by_id",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 521,
+    "last_update_line": 666,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 521,
+        "line": 666,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9770,13 +9872,13 @@
     "object_name": "get_user_group_members",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1577,
+    "last_update_line": 1722,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1577,
+        "line": 1722,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9787,13 +9889,13 @@
     "object_name": "invalidate_group_members_group_id_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2490,
+    "last_update_line": 2635,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2490,
+        "line": 2635,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9821,13 +9923,13 @@
     "object_name": "invalidate_perm_set_users_permission_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 84,
+    "last_update_line": 229,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 84,
+        "line": 229,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9838,13 +9940,13 @@
     "object_name": "invalidate_permission_users_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 135,
+    "last_update_line": 280,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 135,
+        "line": 280,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9855,13 +9957,13 @@
     "object_name": "invalidate_user_group_id_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2448,
+    "last_update_line": 2593,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2448,
+        "line": 2593,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9872,13 +9974,13 @@
     "object_name": "invalidate_users_permission_cache",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 119,
+    "last_update_line": 264,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 119,
+        "line": 264,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9906,13 +10008,13 @@
     "object_name": "notify_journal_event",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 214,
+    "last_update_line": 359,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 214,
+        "line": 359,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9923,13 +10025,13 @@
     "object_name": "notify_permission_change",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 182,
+    "last_update_line": 327,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 182,
+        "line": 327,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9940,13 +10042,13 @@
     "object_name": "notify_user_event",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 256,
+    "last_update_line": 401,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 256,
+        "line": 401,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9974,13 +10076,13 @@
     "object_name": "purge_journal",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2250,
+    "last_update_line": 2395,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2250,
+        "line": 2395,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -9991,13 +10093,13 @@
     "object_name": "purge_user_events",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2310,
+    "last_update_line": 2455,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2310,
+        "line": 2455,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10008,13 +10110,13 @@
     "object_name": "recalculate_user_groups",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1691,
+    "last_update_line": 1836,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1691,
+        "line": 1836,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10025,13 +10127,13 @@
     "object_name": "recalculate_user_permissions",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1818,
+    "last_update_line": 1963,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1818,
+        "line": 1963,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10093,13 +10195,13 @@
     "object_name": "set_permission_as_assignable",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 764,
+    "last_update_line": 909,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 764,
+        "line": 909,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10110,13 +10212,13 @@
     "object_name": "unassign_permission",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 719,
+    "last_update_line": 864,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 719,
+        "line": 864,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10144,13 +10246,13 @@
     "object_name": "update_last_used_provider",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1276,
+    "last_update_line": 1421,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1276,
+        "line": 1421,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10161,13 +10263,13 @@
     "object_name": "update_perm_set",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1143,
+    "last_update_line": 1288,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1143,
+        "line": 1288,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10178,13 +10280,13 @@
     "object_name": "update_permission_full_code",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 849,
+    "last_update_line": 994,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 849,
+        "line": 994,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10195,13 +10297,13 @@
     "object_name": "update_permission_full_title",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 825,
+    "last_update_line": 970,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 825,
+        "line": 970,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10212,13 +10314,13 @@
     "object_name": "update_permission_short_code",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 928,
+    "last_update_line": 1073,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 928,
+        "line": 1073,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10246,13 +10348,13 @@
     "object_name": "update_user_identity_uid_oid",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2014,
+    "last_update_line": 2159,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2014,
+        "line": 2159,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10263,13 +10365,13 @@
     "object_name": "update_user_info_basic_data",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1495,
+    "last_update_line": 1640,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1495,
+        "line": 1640,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10280,13 +10382,13 @@
     "object_name": "update_user_password",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 1391,
+    "last_update_line": 1536,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 1391,
+        "line": 1536,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10365,13 +10467,13 @@
     "object_name": "verify_owner_or_permission",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 300,
+    "last_update_line": 445,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 300,
+        "line": 445,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }
@@ -10382,13 +10484,13 @@
     "object_name": "verify_user_identity",
     "object_type": "function",
     "last_update_file": "019_functions_unsecure.sql",
-    "last_update_line": 2066,
+    "last_update_line": 2211,
     "last_update_source": "migration",
     "total_updates": 1,
     "all_updates": [
       {
         "file": "019_functions_unsecure.sql",
-        "line": 2066,
+        "line": 2211,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }

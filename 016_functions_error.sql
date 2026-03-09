@@ -574,6 +574,39 @@ begin
 end;
 $$;
 
+-- 33020: User not resolved by identifier
+create or replace function error.raise_33020(_identifier text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User (identifier: %) could not be resolved', _identifier
+        using errcode = '33020';
+end;
+$$;
+
+-- 33021: Group not resolved by identifier
+create or replace function error.raise_33021(_identifier text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'User group (identifier: %) could not be resolved', _identifier
+        using errcode = '33021';
+end;
+$$;
+
+-- 34003: Tenant not resolved by identifier
+create or replace function error.raise_34003(_identifier text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Tenant (identifier: %) could not be resolved', _identifier
+        using errcode = '34003';
+end;
+$$;
+
 /*
  * Blacklist Errors (33018-33019)
  */
