@@ -467,10 +467,12 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_tenants(bigint, text, text, integer, integer, integer, integer);
+
 create or replace function auth.search_tenants(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1,
@@ -498,7 +500,7 @@ begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'tenants.read_all_tenants', 'tenants.read_tenants', _tenant_id, _target_tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);

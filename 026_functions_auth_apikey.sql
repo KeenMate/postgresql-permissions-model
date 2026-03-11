@@ -107,7 +107,17 @@ begin
 end;
 $$;
 
-create or replace function auth.search_api_keys(_user_id bigint, _correlation_id text, _search_text text, _page integer DEFAULT 1, _page_size integer DEFAULT 10, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
+drop function if exists auth.search_api_keys(bigint, text, text, integer, integer, integer, integer);
+
+create or replace function auth.search_api_keys(
+    _user_id bigint,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
+    _page integer default 1,
+    _page_size integer default 10,
+    _tenant_id integer default 1,
+    _target_tenant_id integer default null
+)
     returns TABLE(__created_by text, __created_at timestamp with time zone, __updated_by text, __updated_at timestamp with time zone, __api_key_id integer, __tenant_id integer, __title text, __description text, __api_key text, __expire_at timestamp with time zone, __notification_email text, __total_items bigint)
     stable
     rows 100
@@ -121,35 +131,35 @@ begin
 	__effective_tenant_id := internal.resolve_cross_tenant_access(
 		_user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
-	__search_text := helpers.normalize_text(_search_text);
+	__search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
 
-	_page := case when _page is null then 1 else _page end;
-	_page_size := case when _page_size is null then 10 else least(_page_size, 100) end;
+	_page := coalesce(_page, 1);
+	_page_size := least(coalesce(_page_size, 10), 100);
 
 	return query
-		with filtered_rows
-					 as (select ak.api_key_id
-										, count(*) over () as total_items
-							 from auth.api_key ak
-							 where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
-								 and (helpers.is_empty_string(__search_text) or lower(ak.title) like '%' || __search_text || '%')
-							 order by ak.title, ak.api_key
-							 offset ((_page - 1) * _page_size) limit _page_size)
+		with filtered_rows as (
+		    select ak.api_key_id
+		         , count(*) over () as total_items
+		    from auth.api_key ak
+		    where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
+		      and (helpers.is_empty_string(__search_text) or lower(ak.title) like '%' || __search_text || '%')
+		    order by ak.title, ak.api_key
+		    offset ((_page - 1) * _page_size) limit _page_size
+		)
 		select ak.created_by
-				 , ak.created_at
-				 , ak.updated_by
-				 , ak.updated_at
-				 , ak.api_key_id
-				 , ak.tenant_id
-				 , ak.title
-				 , ak.description
-				 , ak.api_key
-				 , ak.expire_at
-				 , ak.notification_email
-				 , total_items
+		     , ak.created_at
+		     , ak.updated_by
+		     , ak.updated_at
+		     , ak.api_key_id
+		     , ak.tenant_id
+		     , ak.title
+		     , ak.description
+		     , ak.api_key
+		     , ak.expire_at
+		     , ak.notification_email
+		     , fr.total_items
 		from filtered_rows fr
-					 inner join auth.api_key ak on fr.
-																					 api_key_id = ak.api_key_id;
+		inner join auth.api_key ak on fr.api_key_id = ak.api_key_id;
 end;
 $$;
 
@@ -808,14 +818,15 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_outbound_api_keys(bigint, text, text, text, integer, integer, integer, integer);
+
 create or replace function auth.search_outbound_api_keys(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text DEFAULT NULL,
-    _service_code text DEFAULT NULL,
-    _page integer DEFAULT 1,
-    _page_size integer DEFAULT 10,
-    _tenant_id integer DEFAULT 1,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
+    _page integer default 1,
+    _page_size integer default 10,
+    _tenant_id integer default 1,
     _target_tenant_id integer default null
 )
     returns TABLE(
@@ -839,12 +850,14 @@ as
 $$
 declare
     __search_text text;
+    __service_code text;
     __effective_tenant_id int;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'api_keys.search_all', 'api_keys.search', _tenant_id, _target_tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+    __service_code := _search_criteria ->> 'service_code';
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 10), 100);
@@ -855,7 +868,7 @@ begin
             from auth.api_key ak
             where (__effective_tenant_id is null or ak.tenant_id = __effective_tenant_id)
               and ak.key_type = 'outbound'
-              and (_service_code is null or ak.service_code = lower(_service_code))
+              and (__service_code is null or ak.service_code = lower(__service_code))
               and (helpers.is_empty_string(__search_text)
                    or lower(ak.title) like '%' || __search_text || '%'
                    or lower(ak.service_code) like '%' || __search_text || '%')

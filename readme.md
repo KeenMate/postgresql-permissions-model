@@ -24,7 +24,7 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **User blacklist** for blocking re-creation of deleted/banned users (username + provider identity)
 - **Permission caching** for performance with automatic invalidation
 - **Real-time notifications** via PostgreSQL LISTEN/NOTIFY for permission changes
-- **Built-in search/paging** for users, groups, tenants, permissions, and permission sets
+- **Built-in search/paging** with unified `_search_criteria jsonb` parameter across all search functions
 
 ## Quick Start
 

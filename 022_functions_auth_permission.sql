@@ -347,15 +347,21 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_permissions(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1)
-    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text)
+drop function if exists auth.get_user_permissions(bigint, text, bigint, integer);
+create or replace function auth.get_user_permissions(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
+    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
     language plpgsql
 as
 $$
+declare
+	__effective_tenant_id int;
 begin
 	if _user_id <> _target_user_id then
-		perform auth.has_permission(_user_id, _correlation_id, 'users.get_permissions', _tenant_id);
+		__effective_tenant_id := internal.resolve_cross_tenant_access(
+			_user_id, _correlation_id, 'users.get_all_permissions', 'users.get_permissions', _tenant_id, _target_tenant_id);
+	else
+		__effective_tenant_id := _tenant_id;
 	end if;
 
 	return query
@@ -371,6 +377,9 @@ begin
 			end
 				 , p.full_code::text
 				 , p.title
+				 , t.tenant_id
+				 , t.code
+				 , t.title
 		from auth.permission_assignment pa
 					 left join auth.user_group ug on pa.user_group_id = ug.user_group_id
 					 left join auth.user_group_member ugm on ug.user_group_id = ugm.user_group_id
@@ -380,8 +389,11 @@ begin
 
 					 inner join auth.permission p on p.permission_id = pa.permission_id
 			or p.permission_id = psp.permission_id
-		where pa.user_id = _target_user_id
-			 or ugm.user_id = _target_user_id;
+
+					 inner join auth.tenant t on t.tenant_id = pa.tenant_id
+		where (pa.user_id = _target_user_id
+			 or ugm.user_id = _target_user_id)
+		  and (__effective_tenant_id is null or pa.tenant_id = __effective_tenant_id);
 end;
 $$;
 
@@ -459,6 +471,7 @@ begin
 	perform unsecure.create_permission_as_system('Update user data', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Get data', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Get permissions', 'users', _source := 'core');
+	perform unsecure.create_permission_as_system('Get all permissions', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Read users', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Read all users', 'users', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete system user info', 'users', _source := 'core');
@@ -558,7 +571,7 @@ begin
 			'authentication.get_data', 'authentication.create_auth_event', 'authentication.read_user_events',
 			'authentication.ensure_permissions', 'authentication.get_users_groups_and_permissions',
 			'resources',
-			'users.read_all_users', 'users.read_all_user_group_memberships',
+			'users.read_all_users', 'users.read_all_user_group_memberships', 'users.get_all_permissions',
 			'tenants.get_all_tenants', 'tenants.get_all_users', 'tenants.get_all_groups', 'tenants.read_all_tenants',
 			'authentication.read_all_user_events',
 			'api_keys.search_all',
@@ -619,7 +632,7 @@ begin
 			'permissions.get_perm_sets', 'permissions.read_permissions', 'permissions.read_perm_sets',
 			'tokens.create_token', 'tokens.validate_token', 'tokens.set_as_used',
 			'authentication.read_user_events', 'authentication.create_auth_event',
-			'users.read_all_users', 'users.read_all_user_group_memberships',
+			'users.read_all_users', 'users.read_all_user_group_memberships', 'users.get_all_permissions',
 			'tenants.get_all_tenants', 'tenants.get_all_users', 'tenants.get_all_groups', 'tenants.read_all_tenants',
 			'authentication.read_all_user_events',
 			'api_keys.search_all',
@@ -743,16 +756,15 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_permissions(bigint, text, text, boolean, text, integer, integer, integer, text);
+
 create or replace function auth.search_permissions(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
-    _is_assignable boolean default null,
-    _parent_code text default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
-    _tenant_id integer default 1,
-    _source text default null
+    _tenant_id integer default 1
 )
     returns TABLE(
         __permission_id integer,
@@ -773,17 +785,23 @@ as
 $$
 declare
     __search_text text;
+    __is_assignable boolean;
+    __parent_code text;
+    __source text;
     __parent_path ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'permissions.read_permissions', _tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+    __is_assignable := (_search_criteria ->> 'is_assignable')::boolean;
+    __parent_code := _search_criteria ->> 'parent_code';
+    __source := _search_criteria ->> 'source';
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);
 
-    if helpers.is_not_empty_string(_parent_code) then
-        select node_path from auth.permission where full_code = _parent_code::ltree into __parent_path;
+    if helpers.is_not_empty_string(__parent_code) then
+        select node_path from auth.permission where full_code = __parent_code::ltree into __parent_path;
     end if;
 
     return query
@@ -791,9 +809,9 @@ begin
             select p.permission_id
                  , count(*) over () as total_items
             from auth.permission p
-            where (_is_assignable is null or p.is_assignable = _is_assignable)
+            where (__is_assignable is null or p.is_assignable = __is_assignable)
               and (__parent_path is null or p.node_path <@ __parent_path)
-              and (_source is null or p.source = _source)
+              and (__source is null or p.source = __source)
               and (helpers.is_empty_string(__search_text)
                    or p.nrm_search_data like '%' || __search_text || '%')
             order by p.full_code
@@ -813,16 +831,15 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_perm_sets(bigint, text, text, boolean, boolean, integer, integer, integer, text, integer);
+
 create or replace function auth.search_perm_sets(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
-    _is_assignable boolean default null,
-    _is_system boolean default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1,
-    _source text default null,
     _target_tenant_id integer default null
 )
     returns TABLE(
@@ -843,12 +860,18 @@ as
 $$
 declare
     __search_text text;
+    __is_assignable boolean;
+    __is_system boolean;
+    __source text;
     __effective_tenant_id int;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'permissions.read_all_perm_sets', 'permissions.read_perm_sets', _tenant_id, _target_tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+    __is_assignable := (_search_criteria ->> 'is_assignable')::boolean;
+    __is_system := (_search_criteria ->> 'is_system')::boolean;
+    __source := _search_criteria ->> 'source';
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);
@@ -859,9 +882,9 @@ begin
                  , count(*) over () as total_items
             from auth.perm_set ps
             where (__effective_tenant_id is null or ps.tenant_id = __effective_tenant_id)
-              and (_is_assignable is null or ps.is_assignable = _is_assignable)
-              and (_is_system is null or ps.is_system = _is_system)
-              and (_source is null or ps.source = _source)
+              and (__is_assignable is null or ps.is_assignable = __is_assignable)
+              and (__is_system is null or ps.is_system = __is_system)
+              and (__source is null or ps.source = __source)
               and (helpers.is_empty_string(__search_text)
                    or ps.nrm_search_data like '%' || __search_text || '%')
             order by ps.title

@@ -19,7 +19,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_id)
     INTO __count, __found_user_ids
-    FROM auth.search_users(__user2_id, 'test_ct', _search_text := 'ct_',
+    FROM auth.search_users(__user2_id, 'test_ct', '{"search_text": "ct_"}'::jsonb,
                            _tenant_id := __tenant2_id);
 
     -- Should find user2 (own tenant) but NOT user3 (tenant 3) or admin (tenant 1)
@@ -50,7 +50,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_group_id)
     INTO __count, __found_ids
-    FROM auth.search_user_groups(__user2_id, 'test_ct', _search_text := 'CT ',
+    FROM auth.search_user_groups(__user2_id, 'test_ct', '{"search_text": "CT "}'::jsonb,
                                  _tenant_id := __tenant2_id);
 
     -- Should find tenant 2 group but NOT tenant 1 or 3 groups
@@ -79,7 +79,7 @@ BEGIN
 
     SELECT count(*), array_agg(__tenant_id)
     INTO __count, __found_ids
-    FROM auth.search_tenants(__user2_id, 'test_ct', _search_text := 'Cross-Tenant Test',
+    FROM auth.search_tenants(__user2_id, 'test_ct', '{"search_text": "Cross-Tenant Test"}'::jsonb,
                              _tenant_id := __tenant2_id);
 
     IF __count = 1 AND __tenant2_id = ANY(__found_ids) THEN

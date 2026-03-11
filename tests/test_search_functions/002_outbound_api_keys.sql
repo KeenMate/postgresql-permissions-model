@@ -27,7 +27,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 5: auth.search_outbound_api_keys filters by service_code';
 
-    SELECT count(*) INTO __count FROM auth.search_outbound_api_keys(1, null, _service_code := 'test_service');
+    SELECT count(*) INTO __count FROM auth.search_outbound_api_keys(1, _search_criteria := '{"service_code": "test_service"}'::jsonb);
 
     IF __count >= 1 THEN
         RAISE NOTICE '  PASS: found % outbound key(s) for service_code "test_service"', __count;

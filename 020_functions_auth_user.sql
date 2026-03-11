@@ -860,13 +860,12 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_users(bigint, text, text, text, boolean, boolean, integer, integer, integer, integer);
+
 create or replace function auth.search_users(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
-    _user_type_code text default null,
-    _is_active boolean default null,
-    _is_locked boolean default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1,
@@ -892,12 +891,18 @@ as
 $$
 declare
     __search_text text;
+    __user_type_code text;
+    __is_active boolean;
+    __is_locked boolean;
     __effective_tenant_id int;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'users.read_all_users', 'users.read_users', _tenant_id, _target_tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+    __user_type_code := _search_criteria ->> 'user_type_code';
+    __is_active := (_search_criteria ->> 'is_active')::boolean;
+    __is_locked := (_search_criteria ->> 'is_locked')::boolean;
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);
@@ -907,9 +912,9 @@ begin
             select ui.user_id
                  , count(*) over () as total_items
             from auth.user_info ui
-            where (_user_type_code is null or ui.user_type_code = _user_type_code)
-              and (_is_active is null or ui.is_active = _is_active)
-              and (_is_locked is null or ui.is_locked = _is_locked)
+            where (__user_type_code is null or ui.user_type_code = __user_type_code)
+              and (__is_active is null or ui.is_active = __is_active)
+              and (__is_locked is null or ui.is_locked = __is_locked)
               and (helpers.is_empty_string(__search_text)
                    or ui.nrm_search_data like '%' || __search_text || '%')
               and (__effective_tenant_id is null or exists(select 1 from auth.tenant_user tu where tu.user_id = ui.user_id and tu.tenant_id = __effective_tenant_id))
@@ -1048,11 +1053,12 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_blacklist(bigint, text, text, text, integer, integer, integer);
+
 create or replace function auth.search_blacklist(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
-    _reason text default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1
@@ -1076,10 +1082,12 @@ as
 $$
 declare
     __search_text text;
+    __reason text;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'users.search_blacklist', _tenant_id);
 
-    __search_text := lower(trim(_search_text));
+    __search_text := lower(trim(_search_criteria ->> 'search_text'));
+    __reason := _search_criteria ->> 'reason';
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);
@@ -1089,7 +1097,7 @@ begin
             select bl.blacklist_id
                  , count(*) over () as total_items
             from auth.user_blacklist bl
-            where (_reason is null or bl.reason = _reason)
+            where (__reason is null or bl.reason = __reason)
               and (__search_text is null or __search_text = ''
                    or bl.username like '%' || __search_text || '%'
                    or bl.provider_uid like '%' || __search_text || '%'

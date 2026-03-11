@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.25.0] - 2026-03-10
+
+### Added
+
+- `auth.get_user_assigned_groups` now returns `__tenant_id`, `__tenant_code`, `__tenant_title` columns for multi-tenant admin UI support
+- `auth.search_user_groups` now returns `__tenant_id`, `__tenant_code`, `__tenant_title` columns for multi-tenant admin UI support
+- `auth.get_user_permissions` now returns `__tenant_id`, `__tenant_code`, `__tenant_title` columns and supports cross-tenant queries via `_target_tenant_id` parameter (new permission: `users.get_all_permissions`)
+
+### Changed
+
+- **Unified search function signatures**: All 12 search/audit functions now use a single `_search_criteria jsonb` parameter instead of multiple domain-specific filter parameters. The standard signature is `(_user_id, _correlation_id, _search_criteria, _page, _page_size, _tenant_id, _target_tenant_id)` — 6-7 params regardless of domain complexity. Filter keys are passed as JSON properties (e.g. `'{"search_text": "foo", "is_active": true}'`). Functions refactored:
+  - `auth.search_users` — criteria: `search_text`, `user_type_code`, `is_active`, `is_locked`
+  - `auth.search_blacklist` — criteria: `search_text`, `reason`
+  - `auth.search_user_group_mappings` — criteria: `search_text`, `provider_code`, `mapped_object_id`, `mapped_role`
+  - `auth.search_user_groups` — criteria: `search_text`, `is_active`, `is_external`, `is_system`
+  - `auth.search_permissions` — criteria: `search_text`, `is_assignable`, `parent_code`, `source`
+  - `auth.search_perm_sets` — criteria: `search_text`, `is_assignable`, `is_system`, `source`
+  - `auth.search_tenants` — criteria: `search_text`
+  - `auth.search_api_keys` — criteria: `search_text`
+  - `auth.search_outbound_api_keys` — criteria: `search_text`, `service_code`
+  - `auth.search_user_events` — criteria: `event_type_code`, `target_user_id`, `request_context`, `correlation_id`, `from`, `to`
+  - `auth.get_user_audit_trail` — criteria: `target_user_id`, `from`, `to`
+  - `auth.get_security_events` — criteria: `from`, `to`
+
+### Fixed
+
+- `auth.search_user_events` — `_correlation_id` was used as both an auth tracing parameter and a WHERE filter, causing empty results when the app passed a real correlation_id. The filter is now a separate `correlation_id` key in `_search_criteria`.
+
 ## [2.24.0] - 2026-03-09
 
 ### Added

@@ -35,7 +35,7 @@ BEGIN
     RAISE NOTICE 'TEST 15: auth.search_blacklist with search text filter';
 
     SELECT count(*) INTO __count
-    FROM auth.search_blacklist(__admin_id, __corr_id, _search_text := 'blacklisted-aad-uid');
+    FROM auth.search_blacklist(__admin_id, __corr_id, '{"search_text": "blacklisted-aad-uid"}'::jsonb);
 
     IF __count >= 1 THEN
         RAISE NOTICE '  PASS: Search by provider_uid text found % entries', __count;
@@ -56,7 +56,7 @@ BEGIN
     RAISE NOTICE 'TEST 16: auth.search_blacklist with reason filter';
 
     SELECT count(*) INTO __count
-    FROM auth.search_blacklist(__admin_id, __corr_id, _reason := 'policy_violation');
+    FROM auth.search_blacklist(__admin_id, __corr_id, '{"reason": "policy_violation"}'::jsonb);
 
     IF __count >= 1 THEN
         RAISE NOTICE '  PASS: Search by reason found % entries', __count;
@@ -66,7 +66,7 @@ BEGIN
 
     -- search for reason that has no entries
     SELECT count(*) INTO __count
-    FROM auth.search_blacklist(__admin_id, __corr_id, _reason := 'nonexistent_reason');
+    FROM auth.search_blacklist(__admin_id, __corr_id, '{"reason": "nonexistent_reason"}'::jsonb);
 
     IF __count = 0 THEN
         RAISE NOTICE '  PASS: Search by nonexistent reason returns empty';
@@ -87,7 +87,7 @@ BEGIN
     RAISE NOTICE 'TEST 17: auth.search_blacklist with no matches';
 
     SELECT count(*) INTO __count
-    FROM auth.search_blacklist(__admin_id, __corr_id, _search_text := 'zzz_nonexistent_zzz');
+    FROM auth.search_blacklist(__admin_id, __corr_id, '{"search_text": "zzz_nonexistent_zzz"}'::jsonb);
 
     IF __count = 0 THEN
         RAISE NOTICE '  PASS: No matches returns empty set';

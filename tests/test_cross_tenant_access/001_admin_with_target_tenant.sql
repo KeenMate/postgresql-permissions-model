@@ -20,7 +20,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_id)
     INTO __count, __found_user_ids
-    FROM auth.search_users(__admin_user_id, 'test_ct', _search_text := 'ct_regular_user2',
+    FROM auth.search_users(__admin_user_id, 'test_ct', '{"search_text": "ct_regular_user2"}'::jsonb,
                            _tenant_id := 1, _target_tenant_id := __tenant2_id);
 
     IF __count >= 1 AND __user2_id = ANY(__found_user_ids) THEN
@@ -44,7 +44,7 @@ BEGIN
     RAISE NOTICE 'TEST 2: search_users - admin targeting tenant 2 does NOT see tenant 3 user';
 
     SELECT count(*) INTO __count
-    FROM auth.search_users(__admin_user_id, 'test_ct', _search_text := 'ct_regular_user3',
+    FROM auth.search_users(__admin_user_id, 'test_ct', '{"search_text": "ct_regular_user3"}'::jsonb,
                            _tenant_id := 1, _target_tenant_id := __tenant2_id);
 
     IF __count = 0 THEN
@@ -69,7 +69,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_group_id)
     INTO __count, __found_ids
-    FROM auth.search_user_groups(__admin_user_id, 'test_ct', _search_text := 'CT Tenant2',
+    FROM auth.search_user_groups(__admin_user_id, 'test_ct', '{"search_text": "CT Tenant2"}'::jsonb,
                                  _tenant_id := 1, _target_tenant_id := __tenant2_id);
 
     IF __count >= 1 AND __group_t2_id = ANY(__found_ids) THEN
@@ -92,7 +92,7 @@ BEGIN
     RAISE NOTICE 'TEST 4: search_user_groups - targeting tenant 2 does NOT show tenant 3 groups';
 
     SELECT count(*) INTO __count
-    FROM auth.search_user_groups(__admin_user_id, 'test_ct', _search_text := 'CT Tenant3',
+    FROM auth.search_user_groups(__admin_user_id, 'test_ct', '{"search_text": "CT Tenant3"}'::jsonb,
                                  _tenant_id := 1, _target_tenant_id := __tenant2_id);
 
     IF __count = 0 THEN
@@ -114,7 +114,7 @@ BEGIN
     RAISE NOTICE 'TEST 5: search_tenants - admin with _target_tenant_id sees only that tenant';
 
     SELECT count(*) INTO __count
-    FROM auth.search_tenants(__admin_user_id, 'test_ct', _search_text := 'Cross-Tenant Test Tenant 3',
+    FROM auth.search_tenants(__admin_user_id, 'test_ct', '{"search_text": "Cross-Tenant Test Tenant 3"}'::jsonb,
                              _tenant_id := 1, _target_tenant_id := __tenant3_id);
 
     IF __count = 1 THEN

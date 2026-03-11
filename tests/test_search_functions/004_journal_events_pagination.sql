@@ -27,7 +27,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 13: auth.search_user_events executes without error';
 
-    SELECT count(*) INTO __count FROM auth.search_user_events(1, null);
+    SELECT count(*) INTO __count FROM auth.search_user_events(1);
 
     IF __count >= 0 THEN
         RAISE NOTICE '  PASS: search_user_events returned % results', __count;
@@ -48,7 +48,7 @@ BEGIN
 
     SELECT count(*), max(r.__total_items)
     INTO __returned_count, __total
-    FROM auth.search_permissions(1, null, null, _page_size := 2) r;
+    FROM auth.search_permissions(1, _page_size := 2) r;
 
     IF __returned_count <= 2 AND __total > __returned_count THEN
         RAISE NOTICE '  PASS: page_size=2 returned % rows, total_items=%', __returned_count, __total;

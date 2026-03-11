@@ -20,7 +20,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_id)
     INTO __count, __found_user_ids
-    FROM auth.search_users(__admin_user_id, 'test_ct', _search_text := 'ct_',
+    FROM auth.search_users(__admin_user_id, 'test_ct', '{"search_text": "ct_"}'::jsonb,
                            _tenant_id := 1);
 
     IF __count >= 3 AND __user2_id = ANY(__found_user_ids) AND __user3_id = ANY(__found_user_ids) THEN
@@ -46,7 +46,7 @@ BEGIN
 
     SELECT count(*), array_agg(__user_group_id)
     INTO __count, __found_ids
-    FROM auth.search_user_groups(__admin_user_id, 'test_ct', _search_text := 'CT ',
+    FROM auth.search_user_groups(__admin_user_id, 'test_ct', '{"search_text": "CT "}'::jsonb,
                                  _tenant_id := 1);
 
     IF __count >= 3
@@ -74,7 +74,7 @@ BEGIN
 
     SELECT count(*), array_agg(__tenant_id)
     INTO __count, __found_ids
-    FROM auth.search_tenants(__admin_user_id, 'test_ct', _search_text := 'Cross-Tenant Test',
+    FROM auth.search_tenants(__admin_user_id, 'test_ct', '{"search_text": "Cross-Tenant Test"}'::jsonb,
                              _tenant_id := 1);
 
     IF __count >= 2 AND __tenant2_id = ANY(__found_ids) AND __tenant3_id = ANY(__found_ids) THEN

@@ -9,7 +9,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 1: auth.search_api_keys executes without error';
 
-    SELECT count(*) INTO __count FROM auth.search_api_keys(1, null, null);
+    SELECT count(*) INTO __count FROM auth.search_api_keys(1);
 
     IF __count >= 0 THEN
         RAISE NOTICE '  PASS: search_api_keys returned % results', __count;
@@ -28,8 +28,8 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 2: auth.search_api_keys filters by search text';
 
-    SELECT count(*) INTO __count_all FROM auth.search_api_keys(1, null, null);
-    SELECT count(*) INTO __count_filtered FROM auth.search_api_keys(1, null, 'search test api');
+    SELECT count(*) INTO __count_all FROM auth.search_api_keys(1);
+    SELECT count(*) INTO __count_filtered FROM auth.search_api_keys(1, _search_criteria := '{"search_text": "search test api"}'::jsonb);
 
     IF __count_filtered >= 1 THEN
         RAISE NOTICE '  PASS: search found % result(s) matching "search test api" (% total)', __count_filtered, __count_all;
@@ -47,7 +47,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 3: auth.search_api_keys returns empty for non-matching text';
 
-    SELECT count(*) INTO __count FROM auth.search_api_keys(1, null, 'zzz_nonexistent_xyz_12345');
+    SELECT count(*) INTO __count FROM auth.search_api_keys(1, _search_criteria := '{"search_text": "zzz_nonexistent_xyz_12345"}'::jsonb);
 
     IF __count = 0 THEN
         RAISE NOTICE '  PASS: no results for non-matching text';

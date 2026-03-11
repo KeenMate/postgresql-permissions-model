@@ -339,13 +339,12 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_user_group_mappings(bigint, text, text, text, text, text, integer, integer, integer, integer);
+
 create or replace function auth.search_user_group_mappings(
 	_user_id bigint,
-	_correlation_id text,
-	_provider_code text default null,
-	_mapped_object_id text default null,
-	_mapped_role text default null,
-	_search_text text default null,
+	_correlation_id text default null,
+	_search_criteria jsonb default null,
 	_page integer default 1,
 	_page_size integer default 30,
 	_tenant_id integer default 1,
@@ -370,12 +369,18 @@ as
 $$
 declare
 	__search_text text;
+	__provider_code text;
+	__mapped_object_id text;
+	__mapped_role text;
 	__effective_tenant_id int;
 begin
 	__effective_tenant_id := internal.resolve_cross_tenant_access(
 		_user_id, _correlation_id, 'groups.get_all_mappings', 'groups.get_mapping', _tenant_id, _target_tenant_id);
 
-	__search_text := helpers.normalize_text(_search_text);
+	__search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+	__provider_code := _search_criteria ->> 'provider_code';
+	__mapped_object_id := _search_criteria ->> 'mapped_object_id';
+	__mapped_role := _search_criteria ->> 'mapped_role';
 
 	_page := coalesce(_page, 1);
 	_page_size := least(coalesce(_page_size, 30), 100);
@@ -387,9 +392,9 @@ begin
 			from auth.user_group_mapping ugm
 				inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
 			where (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
-			  and (_provider_code is null or ugm.provider_code = _provider_code)
-			  and (_mapped_object_id is null or ugm.mapped_object_id = _mapped_object_id)
-			  and (_mapped_role is null or ugm.mapped_role = _mapped_role)
+			  and (__provider_code is null or ugm.provider_code = __provider_code)
+			  and (__mapped_object_id is null or ugm.mapped_object_id = __mapped_object_id)
+			  and (__mapped_role is null or ugm.mapped_role = __mapped_role)
 			  and (helpers.is_empty_string(__search_text)
 				   or ugm.mapped_object_id ilike '%' || __search_text || '%'
 				   or ugm.mapped_object_name ilike '%' || __search_text || '%'
@@ -724,8 +729,9 @@ begin
 end;
 $$;
 
+drop function if exists auth.get_user_assigned_groups(bigint, text, bigint, integer, integer);
 create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
-    returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer)
+    returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
     language plpgsql
 as
@@ -743,9 +749,11 @@ begin
 	end if;
 
 	return query
-		select ugm.member_id, ugm.user_group_id, ug.code, ug.title, ugm.member_type_code, ugm.mapping_id
+		select ugm.member_id, ugm.user_group_id, ug.code, ug.title, ugm.member_type_code, ugm.mapping_id,
+		       t.tenant_id, t.code, t.title
 		from auth.user_group_member ugm
 					 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
+					 inner join auth.tenant t on t.tenant_id = ug.tenant_id
 		where ugm.user_id = _target_user_id
 		  and (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
 		order by ug.title;
@@ -1022,13 +1030,13 @@ begin
 end;
 $$;
 
+drop function if exists auth.search_user_groups(bigint, text, text, boolean, boolean, boolean, integer, integer, integer, integer);
+
+drop function if exists auth.search_user_groups(bigint, text, jsonb, integer, integer, integer, integer);
 create or replace function auth.search_user_groups(
     _user_id bigint,
-    _correlation_id text,
-    _search_text text default null,
-    _is_active boolean default null,
-    _is_external boolean default null,
-    _is_system boolean default null,
+    _correlation_id text default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 30,
     _tenant_id integer default 1,
@@ -1044,7 +1052,10 @@ create or replace function auth.search_user_groups(
         __is_active boolean,
         __is_default boolean,
         __member_count bigint,
-        __total_items bigint
+        __total_items bigint,
+        __tenant_id integer,
+        __tenant_code text,
+        __tenant_title text
     )
     stable
     rows 100
@@ -1054,12 +1065,18 @@ as
 $$
 declare
     __search_text text;
+    __is_active boolean;
+    __is_external boolean;
+    __is_system boolean;
     __effective_tenant_id int;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'groups.get_all_groups', 'groups.get_group', _tenant_id, _target_tenant_id);
 
-    __search_text := helpers.normalize_text(_search_text);
+    __search_text := helpers.normalize_text(_search_criteria ->> 'search_text');
+    __is_active := (_search_criteria ->> 'is_active')::boolean;
+    __is_external := (_search_criteria ->> 'is_external')::boolean;
+    __is_system := (_search_criteria ->> 'is_system')::boolean;
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 30), 100);
@@ -1070,9 +1087,9 @@ begin
                  , count(*) over () as total_items
             from auth.user_group ug
             where (__effective_tenant_id is null or ug.tenant_id = __effective_tenant_id)
-              and (_is_active is null or ug.is_active = _is_active)
-              and (_is_external is null or ug.is_external = _is_external)
-              and (_is_system is null or ug.is_system = _is_system)
+              and (__is_active is null or ug.is_active = __is_active)
+              and (__is_external is null or ug.is_external = __is_external)
+              and (__is_system is null or ug.is_system = __is_system)
               and (helpers.is_empty_string(__search_text)
                    or ug.nrm_search_data like '%' || __search_text || '%')
             order by ug.title
@@ -1094,8 +1111,12 @@ begin
              , ug.is_default
              , coalesce(mc.member_count, 0)
              , fg.total_items
+             , t.tenant_id
+             , t.code
+             , t.title
         from filtered_groups fg
                  inner join auth.user_group ug on fg.user_group_id = ug.user_group_id
+                 inner join auth.tenant t on t.tenant_id = ug.tenant_id
                  left join member_counts mc on ug.user_group_id = mc.user_group_id;
 end;
 $$;

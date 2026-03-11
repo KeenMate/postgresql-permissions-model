@@ -31,18 +31,12 @@ $$;
  * Paginated search of user events with optional filters.
  * Requires 'authentication.read_user_events' permission.
  */
--- drop old overload (had no _filter_correlation_id parameter)
-drop function if exists auth.search_user_events(bigint, text, text, bigint, jsonb, timestamptz, timestamptz, integer, integer, integer, integer);
+drop function if exists auth.search_user_events(bigint, text, text, bigint, jsonb, text, timestamptz, timestamptz, integer, integer, integer, integer);
 
 create or replace function auth.search_user_events(
     _user_id bigint,
     _correlation_id text default null,
-    _event_type_code text default null,
-    _target_user_id bigint default null,
-    _request_context_criteria jsonb default null,
-    _filter_correlation_id text default null,
-    _from timestamptz default null,
-    _to timestamptz default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 10,
     _tenant_id integer default 1,
@@ -69,9 +63,25 @@ as
 $$
 declare
     __effective_tenant_id int;
+    __event_type_code text;
+    __target_user_id bigint;
+    __request_context_criteria jsonb;
+    __filter_correlation_id text;
+    __from timestamptz;
+    __to timestamptz;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
+
+    __event_type_code := _search_criteria ->> 'event_type_code';
+    __target_user_id := (_search_criteria ->> 'target_user_id')::bigint;
+    __request_context_criteria := (_search_criteria -> 'request_context')::jsonb;
+    __filter_correlation_id := _search_criteria ->> 'correlation_id';
+    __from := coalesce((_search_criteria ->> 'from')::timestamptz, now() - interval '100 years');
+    __to := coalesce((_search_criteria ->> 'to')::timestamptz, now() + interval '100 years');
+
+    _page := coalesce(_page, 1);
+    _page_size := least(coalesce(_page_size, 10), 100);
 
     return query
         with filtered_rows as (
@@ -79,12 +89,11 @@ begin
                  , ue.created_at as event_created_at
                  , count(1) over () as total_items
             from auth.user_event ue
-            where (_event_type_code is null or ue.event_type_code = _event_type_code)
-              and (_target_user_id is null or ue.target_user_id = _target_user_id)
-              and (_request_context_criteria is null or ue.request_context @> _request_context_criteria)
-              and (_filter_correlation_id is null or ue.correlation_id = _filter_correlation_id)
-              and ue.created_at between coalesce(_from, now() - interval '100 years')
-                                    and coalesce(_to, now() + interval '100 years')
+            where (__event_type_code is null or ue.event_type_code = __event_type_code)
+              and (__target_user_id is null or ue.target_user_id = __target_user_id)
+              and (__request_context_criteria is null or ue.request_context @> __request_context_criteria)
+              and (__filter_correlation_id is null or ue.correlation_id = __filter_correlation_id)
+              and ue.created_at between __from and __to
             order by ue.created_at desc
             offset ((_page - 1) * _page_size) limit _page_size
         )
@@ -115,12 +124,12 @@ $$;
  * Returns a unified, paginated timeline of all audit activity related to a user.
  * Requires 'authentication.read_user_events' permission.
  */
+drop function if exists auth.get_user_audit_trail(bigint, text, bigint, timestamptz, timestamptz, integer, integer, integer, integer);
+
 create or replace function auth.get_user_audit_trail(
     _user_id bigint,
     _correlation_id text default null,
-    _target_user_id bigint default null,
-    _from timestamptz default null,
-    _to timestamptz default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 20,
     _tenant_id integer default 1,
@@ -145,13 +154,15 @@ $$
 declare
     __from timestamptz;
     __to timestamptz;
+    __target_user_id bigint;
     __effective_tenant_id int;
 begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
 
-    __from := coalesce(_from, now() - interval '100 years');
-    __to := coalesce(_to, now() + interval '100 years');
+    __target_user_id := (_search_criteria ->> 'target_user_id')::bigint;
+    __from := coalesce((_search_criteria ->> 'from')::timestamptz, now() - interval '100 years');
+    __to := coalesce((_search_criteria ->> 'to')::timestamptz, now() + interval '100 years');
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 20), 100);
@@ -175,7 +186,7 @@ begin
                  , j.created_by
             from public.journal j
             left join const.event_code ec on ec.event_id = j.event_id
-            where j.keys @> jsonb_build_object('user', _target_user_id)
+            where j.keys @> jsonb_build_object('user', __target_user_id)
               and (__effective_tenant_id is null or j.tenant_id = __effective_tenant_id)
               and j.created_at between __from and __to
 
@@ -193,7 +204,7 @@ begin
                  , ue.created_at
                  , ue.created_by
             from auth.user_event ue
-            where ue.target_user_id = _target_user_id
+            where ue.target_user_id = __target_user_id
               and ue.created_at between __from and __to
         ),
         counted as (
@@ -226,11 +237,12 @@ $$;
  * disables, and permission denials. Paginated.
  * Requires 'authentication.read_user_events' permission.
  */
+drop function if exists auth.get_security_events(bigint, text, timestamptz, timestamptz, integer, integer, integer, integer);
+
 create or replace function auth.get_security_events(
     _user_id bigint,
     _correlation_id text default null,
-    _from timestamptz default null,
-    _to timestamptz default null,
+    _search_criteria jsonb default null,
     _page integer default 1,
     _page_size integer default 20,
     _tenant_id integer default 1,
@@ -260,8 +272,8 @@ begin
     __effective_tenant_id := internal.resolve_cross_tenant_access(
         _user_id, _correlation_id, 'authentication.read_all_user_events', 'authentication.read_user_events', _tenant_id, _target_tenant_id);
 
-    __from := coalesce(_from, now() - interval '100 years');
-    __to := coalesce(_to, now() + interval '100 years');
+    __from := coalesce((_search_criteria ->> 'from')::timestamptz, now() - interval '100 years');
+    __to := coalesce((_search_criteria ->> 'to')::timestamptz, now() + interval '100 years');
 
     _page := coalesce(_page, 1);
     _page_size := least(coalesce(_page_size, 20), 100);

@@ -54,7 +54,7 @@ BEGIN
     -- Search with correlation_id filter (using _filter_correlation_id parameter)
     SELECT sue.__total_items, sue.__correlation_id
     INTO __result_count, __result_corr_id
-    FROM auth.search_user_events(__user_id, _filter_correlation_id := __corr_id) sue
+    FROM auth.search_user_events(__user_id, _search_criteria := jsonb_build_object('correlation_id', __corr_id)) sue
     LIMIT 1;
 
     IF __result_count >= 1 AND __result_corr_id = __corr_id THEN
