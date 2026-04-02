@@ -12,7 +12,7 @@ BEGIN
     RAISE NOTICE 'Ensure Functions - COMPLETED SUCCESSFULLY';
     RAISE NOTICE '=================================================================';
     RAISE NOTICE '';
-    RAISE NOTICE 'All 45 tests passed:';
+    RAISE NOTICE 'All 56 tests passed:';
     RAISE NOTICE '  ensure_permissions:';
     RAISE NOTICE '    1. Create hierarchy (root + children)';
     RAISE NOTICE '    2. Idempotent (no duplicates on re-call)';
@@ -66,5 +66,18 @@ BEGIN
     RAISE NOTICE '    43. Removes unlisted same-group mappings';
     RAISE NOTICE '    44. Scoped by (group, provider)';
     RAISE NOTICE '    45. Role-based mappings';
+    RAISE NOTICE '  ensure_invitation_templates:';
+    RAISE NOTICE '    46. Create new templates with actions';
+    RAISE NOTICE '    47. Actions created correctly';
+    RAISE NOTICE '    48. Idempotent (no duplicates on re-call)';
+    RAISE NOTICE '    49. Mix of existing and new';
+    RAISE NOTICE '    50. Template without actions';
+    RAISE NOTICE '    51. Source stored on template';
+    RAISE NOTICE '  ensure_invitation_templates final_state:';
+    RAISE NOTICE '    52. Null source raises error';
+    RAISE NOTICE '    53. Default does NOT remove templates';
+    RAISE NOTICE '    54. Removes unlisted same-source templates';
+    RAISE NOTICE '    55. Does NOT remove different source';
+    RAISE NOTICE '    56. Cascades to template actions';
     RAISE NOTICE '';
 END $$;

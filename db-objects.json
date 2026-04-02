@@ -1004,6 +1004,23 @@
   },
   {
     "schema": "auth",
+    "object_name": "ensure_invitation_templates",
+    "object_type": "function",
+    "last_update_file": "042_functions_invitation.sql",
+    "last_update_line": 1534,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "042_functions_invitation.sql",
+        "line": 1534,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "auth",
     "object_name": "ensure_perm_sets",
     "object_type": "function",
     "last_update_file": "022_functions_auth_permission.sql",
@@ -9714,6 +9731,23 @@
       {
         "file": "019_functions_unsecure.sql",
         "line": 2344,
+        "operation": "CREATE_OR_REPLACE",
+        "source": "migration"
+      }
+    ]
+  },
+  {
+    "schema": "unsecure",
+    "object_name": "ensure_invitation_templates",
+    "object_type": "function",
+    "last_update_file": "042_functions_invitation.sql",
+    "last_update_line": 1432,
+    "last_update_source": "migration",
+    "total_updates": 1,
+    "all_updates": [
+      {
+        "file": "042_functions_invitation.sql",
+        "line": 1432,
         "operation": "CREATE_OR_REPLACE",
         "source": "migration"
       }

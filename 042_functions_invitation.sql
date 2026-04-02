@@ -1425,3 +1425,130 @@ begin
     );
 end;
 $$;
+
+-- ===========================================================================
+-- 27. unsecure.ensure_invitation_templates
+-- ===========================================================================
+create or replace function unsecure.ensure_invitation_templates(
+    _created_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _templates       jsonb,
+    _tenant_id       integer default 1,
+    _source          text    default null,
+    _is_final_state  boolean default false
+) returns setof auth.invitation_template
+    language plpgsql
+as
+$$
+declare
+    _item             jsonb;
+    _code             text;
+    _input_codes      text[] := '{}';
+    _tmpl_to_delete   record;
+    ___template_id    integer;
+    ___action         jsonb;
+begin
+    if _is_final_state and _source is null then
+        raise exception '_source is required when _is_final_state is true';
+    end if;
+
+    for _item in
+        select value from jsonb_array_elements(_templates)
+    loop
+        _code := _item ->> 'code';
+        _input_codes := array_append(_input_codes, _code);
+
+        -- Skip if already exists for this tenant
+        if exists (select 1 from auth.invitation_template where code = _code and tenant_id = _tenant_id) then
+            continue;
+        end if;
+
+        -- Create template
+        insert into auth.invitation_template (created_by, updated_by, tenant_id, code, title, description, default_message, source)
+        values (_created_by, _created_by, _tenant_id, _code,
+                _item ->> 'title', _item ->> 'description', _item ->> 'default_message', _source)
+        returning template_id into ___template_id;
+
+        -- Create actions
+        for ___action in select * from jsonb_array_elements(coalesce(_item -> 'actions', '[]'::jsonb))
+        loop
+            insert into auth.invitation_template_action (
+                created_by, updated_by, template_id, action_type_code, executor_code,
+                phase_code, condition_code, sequence, is_required, payload_template
+            ) values (
+                _created_by, _created_by, ___template_id,
+                ___action ->> 'action_type_code',
+                coalesce(___action ->> 'executor_code',
+                         (select executor_code from const.invitation_action_type where code = ___action ->> 'action_type_code')),
+                coalesce(___action ->> 'phase_code', 'on_accept'),
+                coalesce(___action ->> 'condition_code', 'always'),
+                coalesce((___action ->> 'sequence')::integer, 0),
+                coalesce((___action ->> 'is_required')::boolean, true),
+                coalesce(___action -> 'payload_template', '{}'::jsonb)
+            );
+        end loop;
+
+        perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
+            22010, 'invitation_template', ___template_id,
+            jsonb_build_object('template_code', _code),
+            _tenant_id);
+    end loop;
+
+    -- Final state: remove templates with same source+tenant that are not in the input set
+    if _is_final_state then
+        for _tmpl_to_delete in
+            select it.template_id, it.code
+            from auth.invitation_template it
+            where it.source = _source
+              and it.tenant_id = _tenant_id
+              and it.code != all (_input_codes)
+        loop
+            -- Cascade deletes template_actions
+            delete from auth.invitation_template
+            where template_id = _tmpl_to_delete.template_id;
+
+            perform create_journal_message_for_entity(
+                _created_by, _user_id, _correlation_id,
+                22012, 'invitation_template', _tmpl_to_delete.template_id,
+                jsonb_build_object('template_code', _tmpl_to_delete.code,
+                    'reason', 'final_state_sync', 'source', _source),
+                _tenant_id
+            );
+        end loop;
+    end if;
+
+    -- Return all processed templates (existing + newly created)
+    return query
+        select it.*
+        from auth.invitation_template it
+        where it.tenant_id = _tenant_id
+          and it.code = any (_input_codes)
+        order by it.title;
+end;
+$$;
+
+-- ===========================================================================
+-- 28. auth.ensure_invitation_templates
+-- ===========================================================================
+create or replace function auth.ensure_invitation_templates(
+    _created_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _templates       jsonb,
+    _tenant_id       integer default 1,
+    _source          text    default null,
+    _is_final_state  boolean default false,
+    _request_context jsonb   default null
+) returns setof auth.invitation_template
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates', _tenant_id);
+
+    return query select * from unsecure.ensure_invitation_templates(
+        _created_by, _user_id, _correlation_id, _templates, _tenant_id, _source, _is_final_state
+    );
+end;
+$$;

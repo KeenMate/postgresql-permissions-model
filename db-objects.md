@@ -61,6 +61,7 @@
 | auth | enroll\_mfa | function | 038\_functions\_mfa.sql | 25 | 1 | 038\_functions\_mfa.sql:25 | - |
 | auth | ensure\_access\_flags | function | 035\_functions\_resource\_access.sql | 1469 | 1 | 035\_functions\_resource\_access.sql:1469 | - |
 | auth | ensure\_groups\_and\_permissions | function | 022\_functions\_auth\_permission.sql | 685 | 1 | 022\_functions\_auth\_permission.sql:685 | - |
+| auth | ensure\_invitation\_templates | function | 042\_functions\_invitation.sql | 1534 | 1 | 042\_functions\_invitation.sql:1534 | - |
 | auth | ensure\_perm\_sets | function | 022\_functions\_auth\_permission.sql | 1058 | 1 | 022\_functions\_auth\_permission.sql:1058 | - |
 | auth | ensure\_permissions | function | 022\_functions\_auth\_permission.sql | 928 | 1 | 022\_functions\_auth\_permission.sql:928 | - |
 | auth | ensure\_provider | function | 024\_functions\_auth\_provider.sql | 51 | 1 | 024\_functions\_auth\_provider.sql:51 | - |
@@ -560,6 +561,7 @@
 | unsecure | delete\_user\_by\_id | function | 019\_functions\_unsecure.sql | 497 | 1 | 019\_functions\_unsecure.sql:497 | - |
 | unsecure | delete\_user\_by\_username\_as\_system | function | 019\_functions\_unsecure.sql | 486 | 1 | 019\_functions\_unsecure.sql:486 | - |
 | unsecure | ensure\_audit\_partitions | function | 019\_functions\_unsecure.sql | 2344 | 1 | 019\_functions\_unsecure.sql:2344 | - |
+| unsecure | ensure\_invitation\_templates | function | 042\_functions\_invitation.sql | 1432 | 1 | 042\_functions\_invitation.sql:1432 | - |
 | unsecure | ensure\_resource\_access\_partition | function | 034\_tables\_resource\_access.sql | 178 | 1 | 034\_tables\_resource\_access.sql:178 | - |
 | unsecure | evaluate\_invitation\_condition | function | 042\_functions\_invitation.sql | 393 | 1 | 042\_functions\_invitation.sql:393 | - |
 | unsecure | execute\_database\_action | function | 042\_functions\_invitation.sql | 699 | 1 | 042\_functions\_invitation.sql:699 | - |
@@ -613,6 +615,6 @@
 | unsecure | verify\_user\_identity | function | 019\_functions\_unsecure.sql | 2211 | 1 | 019\_functions\_unsecure.sql:2211 | - |
 
 ## Summary
-- **Total Objects**: 609
-- **By Type**: function: 487, index: 10, schema: 9, table: 65, trigger: 30, view: 8
-- **By Schema**: auth: 225, const: 21, error: 107, helpers: 18, internal: 5, public: 107, stage: 1, triggers: 35, unsecure: 90
+- **Total Objects**: 611
+- **By Type**: function: 489, index: 10, schema: 9, table: 65, trigger: 30, view: 8
+- **By Schema**: auth: 226, const: 21, error: 107, helpers: 18, internal: 5, public: 107, stage: 1, triggers: 35, unsecure: 91
