@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-04-11
+
+### Added
+
+- **Resource roles** — named bundles of access flags scoped to a resource_type, replacing N-row flag grants with a single role assignment that expands to flags at check time
+  - `const.resource_role` + `const.resource_role_flag` tables for role definitions
+  - `auth.resource_role_assignment` (partitioned by root_type) for tenant-scoped role grants
+  - Role CRUD: `create_resource_role`, `ensure_resource_roles`, `update_resource_role`, `delete_resource_role`, `ensure_resource_role_flags`, `get_resource_roles`, `get_resource_role_flags`
+  - Role assignment: `assign_resource_role`, `revoke_resource_role`, `revoke_all_resource_roles`, `get_resource_role_assignments`
+  - Role redefinition takes effect instantly — no cascade needed, roles expand at check time
+  - Denies remain flag-level in `auth.resource_access` (roles are grant-only)
+- **Translation `context` column** — `public.translation` now supports multiple translated values per object (e.g., `context='title'` and `context='description'` for the same entity)
+- **`public.mv_translation`** — materialized view that pre-aggregates translations into one jsonb per object for single-index-probe reads. All read-path functions use the MV; write-path functions refresh it after mutations
+- **Error codes**: 35007 (resource role not found), 35008 (role flag invalid for type), 35009 (role/type mismatch)
+- **Event codes**: 18003-18005 (resource role created/updated/deleted), 18020-18021 (resource role assigned/revoked)
+- Test suite: `test_resource_roles` (8 files covering CRUD, assignment, has_resource_access with roles, deny override, role redefinition, tenant isolation, hierarchy cascade)
+- Example: `999-examples-organiogram.sql` — 30-node organization tree with 5 users and resource roles demo
+
+### Changed
+
+- **Renamed `auth.grant_resource_access` → `auth.assign_resource_access`** for verb consistency with `assign_permission`, `assign_resource_role`, etc.
+- **Updated check functions** to union role-derived access with direct flag grants:
+  - `has_resource_access` — added user role and group role checks in the hierarchy walk
+  - `filter_accessible_resources` — 4-way OR (direct user, user role, direct group, group role)
+  - `get_resource_access_flags` — includes role-sourced flags with source `'role:<code>'`
+  - `get_resource_access_matrix` — priority chain: direct > user_role > group > group_role
+  - `get_resource_grants` — UNIONs role assignments expanded to individual flags
+  - `get_user_accessible_resources` — includes role-derived resources
+- **Removed inline `title`/`description` columns** from all const tables — display text now lives exclusively in `public.translation`:
+  - `const.resource_type` (title, full_title, description)
+  - `const.resource_access_flag` (title)
+  - `const.resource_role` (title, description)
+  - `const.event_category` (title)
+  - `const.event_code` (title, description)
+  - `const.mfa_type` (title)
+  - `const.invitation_executor` (title)
+  - `const.invitation_phase` (title)
+  - `const.invitation_condition` (title, description)
+  - `const.invitation_action_type` (title, description)
+- All affected functions gain `_language_code text default 'en'` parameter
+- `full_title` for resource_type precomputed into translations via `unsecure.update_resource_type_full_title_translations`
+- Read functions use `coalesce(mv.values->>'title', <code>)` — missing translations fall back to the entity code
+- Translation functions updated: `create_translation` (+context), `copy_translations` (context-aware), `get_group_translations` (reads from MV, returns nested jsonb), `search_translations` (+context filter)
+- `get_event_message_template` changed from `language sql` to `language plpgsql` (deferred validation for file ordering)
+- `unsecure.ensure_resource_access_partition` now creates both `resource_access` and `resource_role_assignment` partitions
+
 ## [2.25.0] - 2026-03-10
 
 ### Added

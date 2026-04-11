@@ -14,7 +14,8 @@ This is a standalone PostgreSQL framework that provides complete tenant/user/gro
 - **Identity provider integration**: Works with any provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
 - **Permission sets** for role-based access control
 - **Resource-level ACL** for per-resource access control (grants, denies, group inheritance)
-- **Language & translation** with full-text and accent-insensitive search
+- **Resource roles** — named flag bundles (e.g., "Editor" = read+write+delete) assigned to users/groups on resources, expanding at check time for instant redefinition
+- **Language & translation** with context-aware multi-field support, materialized view for reads, full-text and accent-insensitive search
 - **API key management** with technical user pattern
 - **Comprehensive audit logging** with multi-key journal entries and event categories
 - **App bootstrapping** with idempotent ensure functions and optional `_is_final_state` declarative sync
@@ -151,13 +152,15 @@ The `_source` parameter scopes deletions — each module manages only its own it
 - **`auth.permission`** - Global hierarchical permissions
 - **`auth.perm_set`** - Tenant-specific permission collections
 - **`auth.resource_access`** - Resource-level ACL (list-partitioned by resource_type)
+- **`const.resource_role`** / **`const.resource_role_flag`** - Named flag bundles per resource_type
+- **`auth.resource_role_assignment`** - Role grants on resources (list-partitioned by root_type)
 - **`auth.user_mfa`** - MFA enrollment state, encrypted secrets, hashed recovery codes
 - **`auth.mfa_policy`** - MFA enforcement rules (scope: user > group > tenant > global)
 - **`auth.invitation`** - Invitation lifecycle with phases, conditions, and action orchestration
 - **`auth.invitation_template`** - Reusable invitation templates with action definitions
 - **`auth.user_blacklist`** - Blacklist for deleted/banned user identities
 - **`auth.api_key`** - Service authentication with technical users
-- **`const.language`** / **`public.translation`** - Language registry and translation storage with full-text search
+- **`const.language`** / **`public.translation`** / **`public.mv_translation`** - Language registry, translation storage with context-aware multi-field support, and materialized view for efficient reads
 - **`public.journal`** - Audit logging with multi-key support, request context tracking (range-partitioned by month)
 - **`auth.user_event`** - Security event audit trail with request context tracking (range-partitioned by month)
 
@@ -756,10 +759,16 @@ The system uses structured event/error codes organized by category. Codes are st
 | Code | Event | Description |
 |------|-------|-------------|
 | 18001 | resource_type_created | New resource type was registered |
+| 18002 | resource_type_updated | Resource type was updated |
+| 18003 | resource_role_created | New resource role was registered |
+| 18004 | resource_role_updated | Resource role definition or flags changed |
+| 18005 | resource_role_deleted | Resource role was deleted |
 | 18010 | resource_access_granted | Resource access was granted |
 | 18011 | resource_access_revoked | Resource access was revoked |
 | 18012 | resource_access_denied | Resource access was denied |
 | 18013 | resource_access_bulk_revoked | All resource access was revoked for a resource |
+| 18020 | resource_role_assigned | Resource role assigned to user or group |
+| 18021 | resource_role_revoked | Resource role revoked from user or group |
 
 #### Language Events (20001-20999)
 
@@ -865,6 +874,11 @@ The system uses structured event/error codes organized by category. Codes are st
 | 35002 | error.raise_35002 | Neither user_id nor user_group_id provided |
 | 35003 | error.raise_35003 | Resource type not found or inactive |
 | 35004 | error.raise_35004 | Access flag not found |
+| 35005 | error.raise_35005 | Resource ID missing required key from key_schema |
+| 35006 | error.raise_35006 | Access flag not valid for resource type |
+| 35007 | error.raise_35007 | Resource role not found or inactive |
+| 35008 | error.raise_35008 | Role flag not valid for resource type |
+| 35009 | error.raise_35009 | Role resource_type mismatch at assignment |
 
 #### Language/Translation Errors (37001-37999)
 
