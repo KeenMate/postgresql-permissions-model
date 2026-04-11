@@ -14,8 +14,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
 
     -- Create root type 'project' with key_schema
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
-    VALUES ('project', 'Project', 'Test project root type', 'test', null, 'project'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
+    VALUES ('project', 'test', null, 'project'::ext.ltree,
         '{"project_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -27,8 +27,8 @@ BEGIN
     PERFORM unsecure.ensure_resource_access_partition('project');
 
     -- Create child types with composite key_schema
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
-    VALUES ('project.documents', 'Project Documents', 'Documents sub-type', 'test', 'project', 'project.documents'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
+    VALUES ('project.documents', 'test', 'project', 'project.documents'::ext.ltree,
         '{"project_id": "bigint", "folder_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -36,8 +36,8 @@ BEGIN
         ('project.documents', 'read'), ('project.documents', 'write'), ('project.documents', 'delete'), ('project.documents', 'export')
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
-    VALUES ('project.invoices', 'Project Invoices', 'Invoices sub-type', 'test', 'project', 'project.invoices'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
+    VALUES ('project.invoices', 'test', 'project', 'project.invoices'::ext.ltree,
         '{"project_id": "bigint", "invoice_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -87,7 +87,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read on 'project' (parent) for resource_id {"project_id": 1000}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-2', 'project', '{"project_id": 1000}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-hier-2', 'project', '{"project_id": 1000}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Check child type access — should inherit from parent
@@ -127,7 +127,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
     -- Grant write only on child type for user_3
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-3', 'project.documents',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-hier-3', 'project.documents',
         '{"project_id": 1000, "folder_id": 1}'::jsonb,
         _target_user_id := __user_id_3, _access_flags := array['write']);
 
@@ -210,7 +210,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant write on 'project' to group (user_2 is member of group_id_1)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-hier-5', 'project', '{"project_id": 2000}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-hier-5', 'project', '{"project_id": 2000}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['write']);
 
     -- User 2 (member of editors group) should inherit write on child via group + hierarchy

@@ -15,7 +15,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read to user_2 on document {"id": 500}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-1', 'document', '{"id": 500}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-hra-1', 'document', '{"id": 500}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Check access
@@ -92,7 +92,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read to editors group on document {"id": 600}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-hra-4', 'document', '{"id": 600}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-hra-4', 'document', '{"id": 600}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read']);
 
     -- User_2 is a member of editors group

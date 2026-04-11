@@ -199,7 +199,7 @@ Generated: 2026-03-08
 | `auth.filter_accessible_resources` | **None** (core check function) |
 | `auth.get_resource_access_flags` | **None** (read-only query) |
 | `auth.get_resource_access_matrix` | **None** (read-only query) |
-| `auth.grant_resource_access` | `resources.grant_access` |
+| `auth.assign_resource_access` | `resources.grant_access` |
 | `auth.deny_resource_access` | `resources.deny_access` |
 | `auth.revoke_resource_access` | `resources.revoke_access` |
 | `auth.revoke_all_resource_access` | `resources.revoke_access` |

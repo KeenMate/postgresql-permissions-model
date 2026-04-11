@@ -60,14 +60,17 @@ on conflict do nothing;
 -- ---------------------------------------------------------------------------
 create table if not exists const.invitation_executor
 (
-    code  text not null primary key,
-    title text not null
+    code  text not null primary key
 );
 
-insert into const.invitation_executor (code, title) values
-    ('database', 'Database — executed directly via SQL'),
-    ('backend',  'Backend — executed by application server'),
-    ('external', 'External — executed by external system')
+insert into const.invitation_executor (code) values
+    ('database'), ('backend'), ('external')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'invitation_executor', 'database', 'title', 'Database — executed directly via SQL'),
+    ('system', 'system', 'en', 'invitation_executor', 'backend',  'title', 'Backend — executed by application server'),
+    ('system', 'system', 'en', 'invitation_executor', 'external', 'title', 'External — executed by external system')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -75,15 +78,18 @@ on conflict do nothing;
 -- ---------------------------------------------------------------------------
 create table if not exists const.invitation_phase
 (
-    code  text not null primary key,
-    title text not null
+    code  text not null primary key
 );
 
-insert into const.invitation_phase (code, title) values
-    ('on_create',  'On Create — fires immediately when invitation is created'),
-    ('on_accept',  'On Accept — fires when the recipient accepts'),
-    ('on_reject',  'On Reject — fires when the recipient rejects'),
-    ('on_expired', 'On Expired — fires when the invitation expires')
+insert into const.invitation_phase (code) values
+    ('on_create'), ('on_accept'), ('on_reject'), ('on_expired')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'invitation_phase', 'on_create',  'title', 'On Create — fires immediately when invitation is created'),
+    ('system', 'system', 'en', 'invitation_phase', 'on_accept',  'title', 'On Accept — fires when the recipient accepts'),
+    ('system', 'system', 'en', 'invitation_phase', 'on_reject',  'title', 'On Reject — fires when the recipient rejects'),
+    ('system', 'system', 'en', 'invitation_phase', 'on_expired', 'title', 'On Expired — fires when the invitation expires')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -91,17 +97,25 @@ on conflict do nothing;
 -- ---------------------------------------------------------------------------
 create table if not exists const.invitation_condition
 (
-    code        text not null primary key,
-    title       text not null,
-    description text
+    code text not null primary key
 );
 
-insert into const.invitation_condition (code, title, description) values
-    ('always',                  'Always',                      'Always execute this action'),
-    ('user_not_in_tenant',      'User Not in Tenant',          'Execute only if the target user is not already a member of the invitation tenant'),
-    ('user_not_in_group',       'User Not in Group',           'Execute only if the target user is not already a member of the specified group'),
-    ('user_has_no_perm_set',    'User Has No Permission Set',  'Execute only if the target user does not already have the specified permission set'),
-    ('user_has_no_resource_access','User Has No Resource Access','Execute only if the target user has no access to the specified resource')
+insert into const.invitation_condition (code) values
+    ('always'), ('user_not_in_tenant'), ('user_not_in_group'),
+    ('user_has_no_perm_set'), ('user_has_no_resource_access')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'invitation_condition', 'always',                   'title', 'Always'),
+    ('system', 'system', 'en', 'invitation_condition', 'always',                   'description', 'Always execute this action'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_not_in_tenant',       'title', 'User Not in Tenant'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_not_in_tenant',       'description', 'Execute only if the target user is not already a member of the invitation tenant'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_not_in_group',        'title', 'User Not in Group'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_not_in_group',        'description', 'Execute only if the target user is not already a member of the specified group'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_has_no_perm_set',     'title', 'User Has No Permission Set'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_has_no_perm_set',     'description', 'Execute only if the target user does not already have the specified permission set'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_has_no_resource_access','title', 'User Has No Resource Access'),
+    ('system', 'system', 'en', 'invitation_condition', 'user_has_no_resource_access','description', 'Execute only if the target user has no access to the specified resource')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -123,53 +137,41 @@ on conflict do nothing;
 create table if not exists const.invitation_action_type
 (
     code           text    not null primary key,
-    title          text    not null,
-    description    text,
     executor_code  text    not null references const.invitation_executor(code),
     payload_schema jsonb   not null default '{}'::jsonb,
     is_active      boolean not null default true,
     source         text    default null
 );
 
-insert into const.invitation_action_type (code, title, description, executor_code, payload_schema, source) values
-    ('add_tenant_user', 'Add User to Tenant',
-     'Adds the invited user as a tenant member',
-     'database',
+insert into const.invitation_action_type (code, executor_code, payload_schema, source) values
+    ('add_tenant_user', 'database',
      '{"fields": {
          "tenant_id":      {"type": "integer", "required": true, "source": "invitation.tenant_id"},
          "target_user_id": {"type": "integer", "required": true, "source": "invitation.target_user_id"}
      }}'::jsonb, 'core'),
 
-    ('add_group_member', 'Add User to Group',
-     'Adds the invited user as a group member',
-     'database',
+    ('add_group_member', 'database',
      '{"fields": {
          "user_group_id":  {"type": "integer", "required": true,  "source": null},
          "target_user_id": {"type": "integer", "required": true,  "source": "invitation.target_user_id"},
          "tenant_id":      {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('assign_perm_set', 'Assign Permission Set',
-     'Assigns a permission set to the invited user',
-     'database',
+    ('assign_perm_set', 'database',
      '{"fields": {
          "perm_set_code":  {"type": "string",  "required": true,  "source": null},
          "target_user_id": {"type": "integer", "required": true,  "source": "invitation.target_user_id"},
          "tenant_id":      {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('assign_permission', 'Assign Permission',
-     'Assigns an individual permission to the invited user',
-     'database',
+    ('assign_permission', 'database',
      '{"fields": {
          "permission_code": {"type": "string",  "required": true,  "source": null},
          "target_user_id":  {"type": "integer", "required": true,  "source": "invitation.target_user_id"},
          "tenant_id":       {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('grant_resource_access', 'Grant Resource Access',
-     'Grants resource-level access (ACL) to the invited user',
-     'database',
+    ('assign_resource_access', 'database',
      '{"fields": {
          "resource_type":  {"type": "string",  "required": true,  "source": null},
          "resource_id":    {"type": "object",  "required": true,  "source": null},
@@ -178,9 +180,7 @@ insert into const.invitation_action_type (code, title, description, executor_cod
          "tenant_id":      {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('send_welcome_email', 'Send Welcome Email',
-     'Sends a welcome email to the invited user',
-     'backend',
+    ('send_welcome_email', 'backend',
      '{"fields": {
          "email":           {"type": "string",  "required": true,  "source": "invitation.target_email"},
          "invitation_uuid": {"type": "string",  "required": true,  "source": "invitation.uuid"},
@@ -190,9 +190,7 @@ insert into const.invitation_action_type (code, title, description, executor_cod
          "tenant_id":       {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('notify_inviter', 'Notify Inviter',
-     'Notifies the inviter that the invitation was accepted/rejected',
-     'backend',
+    ('notify_inviter', 'backend',
      '{"fields": {
          "inviter_user_id": {"type": "integer", "required": true,  "source": "invitation.inviter_user_id"},
          "target_email":    {"type": "string",  "required": true,  "source": "invitation.target_email"},
@@ -202,15 +200,33 @@ insert into const.invitation_action_type (code, title, description, executor_cod
          "tenant_id":       {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core'),
 
-    ('provision_external', 'Provision in External System',
-     'Creates or provisions the user in an external system',
-     'external',
+    ('provision_external', 'external',
      '{"fields": {
          "target_email":    {"type": "string",  "required": true,  "source": "invitation.target_email"},
          "target_user_id":  {"type": "integer", "required": false, "source": "invitation.target_user_id"},
          "invitation_uuid": {"type": "string",  "required": true,  "source": "invitation.uuid"},
          "tenant_id":       {"type": "integer", "required": true,  "source": "invitation.tenant_id"}
      }}'::jsonb, 'core')
+on conflict do nothing;
+
+-- Invitation action type translations
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'invitation_action_type', 'add_tenant_user',       'title', 'Add User to Tenant'),
+    ('system', 'system', 'en', 'invitation_action_type', 'add_tenant_user',       'description', 'Adds the invited user as a tenant member'),
+    ('system', 'system', 'en', 'invitation_action_type', 'add_group_member',      'title', 'Add User to Group'),
+    ('system', 'system', 'en', 'invitation_action_type', 'add_group_member',      'description', 'Adds the invited user as a group member'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_perm_set',       'title', 'Assign Permission Set'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_perm_set',       'description', 'Assigns a permission set to the invited user'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_permission',     'title', 'Assign Permission'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_permission',     'description', 'Assigns an individual permission to the invited user'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_resource_access','title', 'Grant Resource Access'),
+    ('system', 'system', 'en', 'invitation_action_type', 'assign_resource_access','description', 'Grants resource-level access (ACL) to the invited user'),
+    ('system', 'system', 'en', 'invitation_action_type', 'send_welcome_email',    'title', 'Send Welcome Email'),
+    ('system', 'system', 'en', 'invitation_action_type', 'send_welcome_email',    'description', 'Sends a welcome email to the invited user'),
+    ('system', 'system', 'en', 'invitation_action_type', 'notify_inviter',        'title', 'Notify Inviter'),
+    ('system', 'system', 'en', 'invitation_action_type', 'notify_inviter',        'description', 'Notifies the inviter that the invitation was accepted/rejected'),
+    ('system', 'system', 'en', 'invitation_action_type', 'provision_external',    'title', 'Provision in External System'),
+    ('system', 'system', 'en', 'invitation_action_type', 'provision_external',    'description', 'Creates or provisions the user in an external system')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -346,32 +362,76 @@ create index if not exists ix_inv_tmpl_action_template on auth.invitation_templa
 -- ---------------------------------------------------------------------------
 -- 11. Event codes and messages
 -- ---------------------------------------------------------------------------
-insert into const.event_category (category_code, title, range_start, range_end, is_error, source) values
-    ('invitation_event', 'Invitation Events', 22001, 22999, false, 'core'),
-    ('invitation_error', 'Invitation Errors', 39001, 39999, true,  'core')
+insert into const.event_category (category_code, range_start, range_end, is_error, source) values
+    ('invitation_event', 22001, 22999, false, 'core'),
+    ('invitation_error', 39001, 39999, true,  'core')
 on conflict do nothing;
 
-insert into const.event_code (event_id, code, category_code, title, description, is_system, source) values
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'event_category', 'invitation_event', 'title', 'Invitation Events'),
+    ('system', 'system', 'en', 'event_category', 'invitation_error', 'title', 'Invitation Errors')
+on conflict do nothing;
+
+insert into const.event_code (event_id, code, category_code, is_system, source) values
     -- Invitation informational events (22001-22999)
-    (22001, 'invitation_created',          'invitation_event', 'Invitation Created',          'New invitation was created', true, 'core'),
-    (22002, 'invitation_accepted',         'invitation_event', 'Invitation Accepted',         'Invitation was accepted by the recipient', true, 'core'),
-    (22003, 'invitation_rejected',         'invitation_event', 'Invitation Rejected',         'Invitation was rejected by the recipient', true, 'core'),
-    (22004, 'invitation_revoked',          'invitation_event', 'Invitation Revoked',          'Invitation was revoked by the inviter', true, 'core'),
-    (22005, 'invitation_expired',          'invitation_event', 'Invitation Expired',          'Invitation expired without response', true, 'core'),
-    (22006, 'invitation_action_completed', 'invitation_event', 'Invitation Action Completed', 'An invitation action was completed', true, 'core'),
-    (22007, 'invitation_action_failed',    'invitation_event', 'Invitation Action Failed',    'An invitation action failed', true, 'core'),
-    (22008, 'invitation_completed',        'invitation_event', 'Invitation Completed',        'All invitation actions were completed', true, 'core'),
-    (22009, 'invitation_failed',           'invitation_event', 'Invitation Failed',           'Invitation processing failed due to a required action failure', true, 'core'),
-    (22010, 'invitation_template_created', 'invitation_event', 'Template Created',            'Invitation template was created', true, 'core'),
-    (22011, 'invitation_template_updated', 'invitation_event', 'Template Updated',            'Invitation template was updated', true, 'core'),
-    (22012, 'invitation_template_deleted', 'invitation_event', 'Template Deleted',            'Invitation template was deleted', true, 'core'),
+    (22001, 'invitation_created',          'invitation_event', true, 'core'),
+    (22002, 'invitation_accepted',         'invitation_event', true, 'core'),
+    (22003, 'invitation_rejected',         'invitation_event', true, 'core'),
+    (22004, 'invitation_revoked',          'invitation_event', true, 'core'),
+    (22005, 'invitation_expired',          'invitation_event', true, 'core'),
+    (22006, 'invitation_action_completed', 'invitation_event', true, 'core'),
+    (22007, 'invitation_action_failed',    'invitation_event', true, 'core'),
+    (22008, 'invitation_completed',        'invitation_event', true, 'core'),
+    (22009, 'invitation_failed',           'invitation_event', true, 'core'),
+    (22010, 'invitation_template_created', 'invitation_event', true, 'core'),
+    (22011, 'invitation_template_updated', 'invitation_event', true, 'core'),
+    (22012, 'invitation_template_deleted', 'invitation_event', true, 'core'),
     -- Invitation errors (39001-39999)
-    (39001, 'err_invitation_not_found',    'invitation_error', 'Invitation Not Found',        'Invitation does not exist', true, 'core'),
-    (39002, 'err_invitation_not_pending',  'invitation_error', 'Invitation Not Pending',      'Invitation is not in pending state', true, 'core'),
-    (39003, 'err_invitation_expired',      'invitation_error', 'Invitation Expired',          'Invitation has expired', true, 'core'),
-    (39004, 'err_invitation_action_not_found','invitation_error','Invitation Action Not Found','Invitation action does not exist', true, 'core'),
-    (39005, 'err_invitation_action_not_pending','invitation_error','Invitation Action Not Pending','Invitation action is not in pending or processing state', true, 'core'),
-    (39006, 'err_invitation_template_not_found','invitation_error','Template Not Found',       'Invitation template does not exist or is inactive', true, 'core')
+    (39001, 'err_invitation_not_found',       'invitation_error', true, 'core'),
+    (39002, 'err_invitation_not_pending',     'invitation_error', true, 'core'),
+    (39003, 'err_invitation_expired',         'invitation_error', true, 'core'),
+    (39004, 'err_invitation_action_not_found',   'invitation_error', true, 'core'),
+    (39005, 'err_invitation_action_not_pending', 'invitation_error', true, 'core'),
+    (39006, 'err_invitation_template_not_found', 'invitation_error', true, 'core')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'event_code', 'invitation_created', 'title', 'Invitation Created'),
+    ('system', 'system', 'en', 'event_code', 'invitation_created', 'description', 'New invitation was created'),
+    ('system', 'system', 'en', 'event_code', 'invitation_accepted', 'title', 'Invitation Accepted'),
+    ('system', 'system', 'en', 'event_code', 'invitation_accepted', 'description', 'Invitation was accepted by the recipient'),
+    ('system', 'system', 'en', 'event_code', 'invitation_rejected', 'title', 'Invitation Rejected'),
+    ('system', 'system', 'en', 'event_code', 'invitation_rejected', 'description', 'Invitation was rejected by the recipient'),
+    ('system', 'system', 'en', 'event_code', 'invitation_revoked', 'title', 'Invitation Revoked'),
+    ('system', 'system', 'en', 'event_code', 'invitation_revoked', 'description', 'Invitation was revoked by the inviter'),
+    ('system', 'system', 'en', 'event_code', 'invitation_expired', 'title', 'Invitation Expired'),
+    ('system', 'system', 'en', 'event_code', 'invitation_expired', 'description', 'Invitation expired without response'),
+    ('system', 'system', 'en', 'event_code', 'invitation_action_completed', 'title', 'Invitation Action Completed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_action_completed', 'description', 'An invitation action was completed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_action_failed', 'title', 'Invitation Action Failed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_action_failed', 'description', 'An invitation action failed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_completed', 'title', 'Invitation Completed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_completed', 'description', 'All invitation actions were completed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_failed', 'title', 'Invitation Failed'),
+    ('system', 'system', 'en', 'event_code', 'invitation_failed', 'description', 'Invitation processing failed due to a required action failure'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_created', 'title', 'Template Created'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_created', 'description', 'Invitation template was created'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_updated', 'title', 'Template Updated'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_updated', 'description', 'Invitation template was updated'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_deleted', 'title', 'Template Deleted'),
+    ('system', 'system', 'en', 'event_code', 'invitation_template_deleted', 'description', 'Invitation template was deleted'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_not_found', 'title', 'Invitation Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_not_found', 'description', 'Invitation does not exist'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_not_pending', 'title', 'Invitation Not Pending'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_not_pending', 'description', 'Invitation is not in pending state'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_expired', 'title', 'Invitation Expired'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_expired', 'description', 'Invitation has expired'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_action_not_found', 'title', 'Invitation Action Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_action_not_found', 'description', 'Invitation action does not exist'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_action_not_pending', 'title', 'Invitation Action Not Pending'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_action_not_pending', 'description', 'Invitation action is not in pending or processing state'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_template_not_found', 'title', 'Template Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_invitation_template_not_found', 'description', 'Invitation template does not exist or is inactive')
 on conflict do nothing;
 
 insert into const.event_message (event_id, language_code, message_template) values

@@ -7,7 +7,7 @@
  * - auth.filter_accessible_resources  — bulk filter (with hierarchy walk-up)
  * - auth.get_resource_access_flags    — effective flags for a user on a resource
  * - auth.get_resource_access_matrix   — full sub-type × flag matrix for UI
- * - auth.grant_resource_access        — grant flags to user/group
+ * - auth.assign_resource_access        — grant flags to user/group
  * - auth.deny_resource_access         — deny flags for a user (overrides group grants)
  * - auth.revoke_resource_access       — revoke specific flags
  * - auth.revoke_all_resource_access   — revoke all flags for a resource
@@ -593,14 +593,14 @@ end;
 $$;
 
 -- ============================================================================
--- Grant: auth.grant_resource_access
+-- Grant: auth.assign_resource_access
 -- ============================================================================
 --
 -- Grant one or more flags to a user or group.
 -- UPSERT: if exists as deny, flips is_deny to false.
 -- resource_id is jsonb — validated against key_schema.
 --
-create or replace function auth.grant_resource_access(
+create or replace function auth.assign_resource_access(
     _created_by     text,
     _user_id        bigint,
     _correlation_id text,
@@ -1100,37 +1100,6 @@ end;
 $$;
 
 -- ============================================================================
--- unsecure.update_resource_type_full_title
--- ============================================================================
--- Updates full_title for the given resource type and all its descendants.
--- Pattern matches unsecure.update_permission_full_title.
---
--- full_title = ancestor titles joined by ' > ', e.g.:
---   'project'            → 'Project'
---   'project.documents'  → 'Project > Project Documents'
---
-create or replace function unsecure.update_resource_type_full_title(_path ext.ltree)
-returns void
-    language sql
-as
-$$
-update const.resource_type rt
-set full_title = (
-    select array_to_string(
-        array(
-            select a.title
-            from const.resource_type a
-            where a.path @> s.path
-            order by a.path
-        ),
-        ' > ')
-    from const.resource_type s
-    where s.code = rt.code
-)
-where rt.path <@ _path;
-$$;
-
--- ============================================================================
 -- Resource type management: auth.create_resource_type
 -- ============================================================================
 --
@@ -1608,32 +1577,5 @@ begin
 end;
 $$;
 
--- ============================================================================
--- Trigger: const.resource_type → full_title
--- ============================================================================
--- Recalculate full_title on insert or when title/parent_code changes.
--- pg_trigger_depth() guard prevents recursion since the called function
--- updates full_title on the same table.
---
--- Placed here (not in 033_triggers) because it depends on both:
---   const.resource_type (034) and unsecure.update_resource_type_full_title (035)
---
-create or replace function triggers.update_resource_type_full_title() returns trigger
-    language plpgsql
-as
-$$
-begin
-    if pg_trigger_depth() > 1 then
-        return new;
-    end if;
-
-    perform unsecure.update_resource_type_full_title(new.path);
-    return new;
-end;
-$$;
-
-create trigger trg_resource_type_full_title
-    after insert or update of title, parent_code, full_title
-    on const.resource_type
-    for each row
-execute function triggers.update_resource_type_full_title();
+-- full_title trigger and unsecure.update_resource_type_full_title removed in 046
+-- (titles now live in public.translation, full_title is computed at query time)

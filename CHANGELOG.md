@@ -610,7 +610,7 @@ Resource-level authorization layered on top of RBAC. While RBAC controls what ac
 | `auth.has_resource_access()` | Check if user has a flag on a resource (deny-overrides algorithm) |
 | `auth.filter_accessible_resources()` | Bulk filter — returns subset of resource IDs user can access |
 | `auth.get_resource_access_flags()` | Returns all effective flags + source (direct/group name) |
-| `auth.grant_resource_access()` | Grant flags to user or group (idempotent upsert) |
+| `auth.assign_resource_access()` | Grant flags to user or group (idempotent upsert) |
 | `auth.deny_resource_access()` | Explicit deny on user (overrides all group grants) |
 | `auth.revoke_resource_access()` | Revoke specific flags or all flags |
 | `auth.revoke_all_resource_access()` | Remove all ACL rows for a resource (cleanup on delete) |

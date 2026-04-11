@@ -17,7 +17,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read to editors group on document {"id": 700}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-1a', 'document', '{"id": 700}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-deny-1a', 'document', '{"id": 700}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read']);
 
     -- Verify user_2 (member of editors) can read
@@ -61,7 +61,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read+write to editors group on document {"id": 710}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-2a', 'document', '{"id": 710}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-deny-2a', 'document', '{"id": 710}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read', 'write']);
 
     -- Deny only read for user_2
@@ -151,7 +151,7 @@ BEGIN
     END IF;
 
     -- Now grant (should flip is_deny to false)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-deny-4c', 'document', '{"id": 720}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-deny-4c', 'document', '{"id": 720}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Verify the row was flipped, not duplicated

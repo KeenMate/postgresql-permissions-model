@@ -160,19 +160,21 @@ create or replace function public.get_event_message_template(
     _language_code text default 'en'
 ) returns text
     stable
-    language sql
+    language plpgsql
 as
 $$
-select coalesce(
-    -- Try requested language
-    (select message_template from const.event_message
-     where event_id = _event_id and language_code = _language_code and is_active = true),
-    -- Fall back to English
-    (select message_template from const.event_message
-     where event_id = _event_id and language_code = 'en' and is_active = true),
-    -- Fall back to event title
-    (select title from const.event_code where event_id = _event_id)
-);
+begin
+    return coalesce(
+        (select message_template from const.event_message
+         where event_id = _event_id and language_code = _language_code and is_active = true),
+        (select message_template from const.event_message
+         where event_id = _event_id and language_code = 'en' and is_active = true),
+        (select t.value from public.translation t
+         where t.data_group = 'event_code'
+           and t.data_object_code = (select code from const.event_code where event_id = _event_id)
+           and t.context = 'title' and t.language_code = 'en')
+    );
+end;
 $$;
 
 -- Core function: Create journal entry with event ID
@@ -702,8 +704,15 @@ create or replace function public.create_event_category(
 as
 $$
 begin
-    insert into const.event_category (category_code, title, range_start, range_end, is_error, source)
-    values (_category_code, _title, _range_start, _range_end, _is_error, _source);
+    insert into const.event_category (category_code, range_start, range_end, is_error, source)
+    values (_category_code, _range_start, _range_end, _is_error, _source);
+
+    -- Store title as translation
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, 'en', 'event_category', _category_code, 'title', _title)
+        on conflict do nothing;
+    end if;
 
     return query
         select *
@@ -749,8 +758,20 @@ begin
     end if;
 
     -- Always insert with is_system = false (system events come from seed only)
-    insert into const.event_code (event_id, code, category_code, title, description, is_read_only, is_system, source)
-    values (_event_id, _code, _category_code, _title, _description, _is_read_only, false, _source);
+    insert into const.event_code (event_id, code, category_code, is_read_only, is_system, source)
+    values (_event_id, _code, _category_code, _is_read_only, false, _source);
+
+    -- Store title + description as translations
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, 'en', 'event_code', _code, 'title', _title)
+        on conflict do nothing;
+    end if;
+    if _description is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, 'en', 'event_code', _code, 'description', _description)
+        on conflict do nothing;
+    end if;
 
     return query
         select *

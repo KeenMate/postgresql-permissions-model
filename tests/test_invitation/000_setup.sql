@@ -45,8 +45,8 @@ BEGIN
     RETURNING tenant_id INTO __tenant_id_2;
 
     -- Register custom action type: send_sms_invite
-    INSERT INTO const.invitation_action_type (code, title, executor_code, payload_schema, source)
-    VALUES ('send_sms_invite', 'Send SMS Invitation', 'backend', '{
+    INSERT INTO const.invitation_action_type (code, executor_code, payload_schema, source)
+    VALUES ('send_sms_invite', 'backend', '{
         "fields": {
             "mobile_phone":    {"type": "string",  "required": true,  "source": "invitation.target_email"},
             "invitation_uuid": {"type": "string",  "required": true,  "source": "invitation.uuid"},

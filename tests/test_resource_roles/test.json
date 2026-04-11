@@ -1,0 +1,6 @@
+{
+  "name": "Resource Roles Test Suite",
+  "description": "Tests for resource roles: CRUD, flag management, role assignment, has_resource_access with roles, deny override, role redefinition, tenant isolation",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

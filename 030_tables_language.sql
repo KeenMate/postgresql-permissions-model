@@ -60,6 +60,7 @@ create table public.translation
     data_group       text                                             not null,
     data_object_code text,
     data_object_id   bigint,
+    context          text,
     value            text                                             not null,
     nrm_search_data   text,
     ts_search_data   tsvector,
@@ -68,11 +69,11 @@ create table public.translation
 );
 
 create unique index uq_translation_code
-    on public.translation (language_code, data_group, data_object_code)
+    on public.translation (language_code, data_group, data_object_code, coalesce(context, ''))
     where data_object_code is not null;
 
 create unique index uq_translation_id
-    on public.translation (language_code, data_group, data_object_id)
+    on public.translation (language_code, data_group, data_object_id, coalesce(context, ''))
     where data_object_id is not null;
 
 create index ix_translation_ts_search
@@ -83,6 +84,54 @@ create index ix_translation_nrm_search
 
 create index ix_translation_group
     on public.translation (data_group, language_code);
+
+-- ============================================================================
+-- Materialized View: pre-aggregated translations (one row per object)
+-- ============================================================================
+-- Read path: single index probe, all contexts as jsonb.
+-- Write path: INSERT/UPDATE the flat translation table, then refresh.
+--
+-- Output: {"title": "Folder", "description": "A folder resource"}
+-- Usage:  mv.values->>'title', mv.values->>'description'
+--
+create materialized view if not exists public.mv_translation as
+select t.language_code,
+       t.tenant_id,
+       t.data_group,
+       t.data_object_code,
+       t.data_object_id,
+       jsonb_object_agg(coalesce(t.context, 'value'), t.value) as values
+from public.translation t
+group by t.language_code, t.tenant_id, t.data_group, t.data_object_code, t.data_object_id;
+
+create unique index if not exists uq_mv_translation_code
+    on public.mv_translation (language_code, data_group, data_object_code)
+    where data_object_code is not null;
+
+create unique index if not exists uq_mv_translation_id
+    on public.mv_translation (language_code, data_group, data_object_id)
+    where data_object_id is not null;
+
+create index if not exists ix_mv_translation_group
+    on public.mv_translation (data_group, language_code);
+
+-- Refresh function (CONCURRENTLY = non-blocking, requires unique index)
+create or replace function unsecure.refresh_translation_cache()
+returns void
+    language plpgsql
+as
+$$
+begin
+    -- CONCURRENTLY requires unique index and at least one prior populate.
+    -- First call after CREATE MATERIALIZED VIEW uses non-concurrent refresh;
+    -- subsequent calls use CONCURRENTLY for non-blocking behavior.
+    begin
+        refresh materialized view concurrently public.mv_translation;
+    exception when others then
+        refresh materialized view public.mv_translation;
+    end;
+end;
+$$;
 
 -- ============================================================================
 -- Trigger Infrastructure
@@ -180,27 +229,47 @@ $$;
 -- Event Categories & Codes
 -- ============================================================================
 
-INSERT INTO const.event_category (category_code, title, range_start, range_end, is_error) VALUES
-    ('language_event',    'Language Events',    20001, 20999, false),
-    ('translation_event', 'Translation Events', 21001, 21999, false),
-    ('language_error',    'Language/Translation Errors', 37001, 37999, true)
+INSERT INTO const.event_category (category_code, range_start, range_end, is_error) VALUES
+    ('language_event',    20001, 20999, false),
+    ('translation_event', 21001, 21999, false),
+    ('language_error',    37001, 37999, true)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO const.event_code (event_id, code, category_code, title, description, is_system) VALUES
-    -- Language events (20001-20999)
-    (20001, 'language_created',      'language_event',    'Language Created',      'New language was created', true),
-    (20002, 'language_updated',      'language_event',    'Language Updated',      'Language was updated', true),
-    (20003, 'language_deleted',      'language_event',    'Language Deleted',      'Language was deleted', true),
+INSERT INTO const.event_code (event_id, code, category_code, is_system) VALUES
+    (20001, 'language_created',      'language_event',    true),
+    (20002, 'language_updated',      'language_event',    true),
+    (20003, 'language_deleted',      'language_event',    true),
+    (21001, 'translation_created',   'translation_event', true),
+    (21002, 'translation_updated',   'translation_event', true),
+    (21003, 'translation_deleted',   'translation_event', true),
+    (21004, 'translations_copied',   'translation_event', true),
+    (37001, 'err_language_not_found',    'language_error', true),
+    (37002, 'err_translation_not_found', 'language_error', true)
+ON CONFLICT DO NOTHING;
 
-    -- Translation events (21001-21999)
-    (21001, 'translation_created',   'translation_event', 'Translation Created',   'New translation was created', true),
-    (21002, 'translation_updated',   'translation_event', 'Translation Updated',   'Translation was updated', true),
-    (21003, 'translation_deleted',   'translation_event', 'Translation Deleted',   'Translation was deleted', true),
-    (21004, 'translations_copied',   'translation_event', 'Translations Copied',   'Translations were copied between languages', true),
-
-    -- Language/Translation errors (37001-37999)
-    (37001, 'err_language_not_found',    'language_error', 'Language Not Found',    'Language does not exist', true),
-    (37002, 'err_translation_not_found', 'language_error', 'Translation Not Found', 'Translation does not exist', true)
+-- Language/translation event translations
+INSERT INTO public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) VALUES
+    ('system', 'system', 'en', 'event_category', 'language_event',    'title', 'Language Events'),
+    ('system', 'system', 'en', 'event_category', 'translation_event', 'title', 'Translation Events'),
+    ('system', 'system', 'en', 'event_category', 'language_error',    'title', 'Language/Translation Errors'),
+    ('system', 'system', 'en', 'event_code', 'language_created',      'title', 'Language Created'),
+    ('system', 'system', 'en', 'event_code', 'language_created',      'description', 'New language was created'),
+    ('system', 'system', 'en', 'event_code', 'language_updated',      'title', 'Language Updated'),
+    ('system', 'system', 'en', 'event_code', 'language_updated',      'description', 'Language was updated'),
+    ('system', 'system', 'en', 'event_code', 'language_deleted',      'title', 'Language Deleted'),
+    ('system', 'system', 'en', 'event_code', 'language_deleted',      'description', 'Language was deleted'),
+    ('system', 'system', 'en', 'event_code', 'translation_created',   'title', 'Translation Created'),
+    ('system', 'system', 'en', 'event_code', 'translation_created',   'description', 'New translation was created'),
+    ('system', 'system', 'en', 'event_code', 'translation_updated',   'title', 'Translation Updated'),
+    ('system', 'system', 'en', 'event_code', 'translation_updated',   'description', 'Translation was updated'),
+    ('system', 'system', 'en', 'event_code', 'translation_deleted',   'title', 'Translation Deleted'),
+    ('system', 'system', 'en', 'event_code', 'translation_deleted',   'description', 'Translation was deleted'),
+    ('system', 'system', 'en', 'event_code', 'translations_copied',   'title', 'Translations Copied'),
+    ('system', 'system', 'en', 'event_code', 'translations_copied',   'description', 'Translations were copied between languages'),
+    ('system', 'system', 'en', 'event_code', 'err_language_not_found',    'title', 'Language Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_language_not_found',    'description', 'Language does not exist'),
+    ('system', 'system', 'en', 'event_code', 'err_translation_not_found', 'title', 'Translation Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_translation_not_found', 'description', 'Translation does not exist')
 ON CONFLICT DO NOTHING;
 
 -- Event message templates

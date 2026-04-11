@@ -745,14 +745,14 @@ begin
                 null, _target_user_id, null, ___perm_code, _tenant_id
             );
 
-        when 'grant_resource_access' then
+        when 'assign_resource_access' then
             ___resource_type := _payload->>'resource_type';
             ___resource_id := _payload->'resource_id';
             ___access_flags := array(select jsonb_array_elements_text(_payload->'access_flags'));
             if ___access_flags is null or array_length(___access_flags, 1) is null then
                 ___access_flags := array['read'];
             end if;
-            perform auth.grant_resource_access(
+            perform auth.assign_resource_access(
                 _updated_by, _user_id, _correlation_id,
                 ___resource_type, ___resource_id,
                 _target_user_id, null, ___access_flags, _tenant_id

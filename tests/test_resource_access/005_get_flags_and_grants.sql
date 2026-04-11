@@ -15,7 +15,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read + write to user_2 on document {"id": 2001}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-flags-1a', 'document', '{"id": 2001}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-flags-1a', 'document', '{"id": 2001}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read', 'write']);
 
     -- Get effective flags
@@ -47,7 +47,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read+write+delete to group on document {"id": 2002}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-flags-2a', 'document', '{"id": 2002}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-flags-2a', 'document', '{"id": 2002}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read', 'write', 'delete']);
 
     -- Deny write for user_2
@@ -84,11 +84,11 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read directly to user_2 on document {"id": 2003}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-flags-3a', 'document', '{"id": 2003}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-flags-3a', 'document', '{"id": 2003}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Grant write to group on document {"id": 2003}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-flags-3b', 'document', '{"id": 2003}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-flags-3b', 'document', '{"id": 2003}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['write']);
 
     -- Check sources

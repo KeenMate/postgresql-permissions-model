@@ -18,7 +18,7 @@ BEGIN
 
     -- Grant read access to user_2 on document {"id": 100}
     SELECT __resource_access_id, __access_flag
-    FROM auth.grant_resource_access('test', __user_id_1, 'test-corr-1', 'document', '{"id": 100}'::jsonb,
+    FROM auth.assign_resource_access('test', __user_id_1, 'test-corr-1', 'document', '{"id": 100}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'])
     INTO __ra_id, __flag;
 
@@ -55,7 +55,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read, write, delete to user_2 on document {"id": 200}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-2', 'document', '{"id": 200}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-2', 'document', '{"id": 200}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read', 'write', 'delete']);
 
     SELECT count(*) FROM auth.resource_access
@@ -83,7 +83,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-3', 'document', '{"id": 300}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-3', 'document', '{"id": 300}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read', 'write']);
 
     SELECT count(*) FROM auth.resource_access
@@ -223,9 +223,9 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read twice
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7a', 'document', '{"id": 400}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-7a', 'document', '{"id": 400}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-7b', 'document', '{"id": 400}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-7b', 'document', '{"id": 400}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     SELECT count(*) FROM auth.resource_access

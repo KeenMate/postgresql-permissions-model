@@ -29,12 +29,13 @@ insert into const.token_state (code) values ('invalid') on conflict do nothing;
 -- ---------------------------------------------------------------------------
 create table if not exists const.mfa_type (
     code      text    primary key,
-    title     text    not null,
     is_active boolean not null default true
 );
 
-insert into const.mfa_type (code, title) values
-    ('totp', 'Time-based One-Time Password')
+insert into const.mfa_type (code) values ('totp') on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'mfa_type', 'totp', 'title', 'Time-based One-Time Password')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -78,28 +79,57 @@ on conflict do nothing;
 -- ---------------------------------------------------------------------------
 -- 6. New event categories & codes
 -- ---------------------------------------------------------------------------
-insert into const.event_category (category_code, title, range_start, range_end, is_error, source) values
-    ('mfa_error', 'MFA Errors', 38001, 38999, true, 'core')
+insert into const.event_category (category_code, range_start, range_end, is_error, source) values
+    ('mfa_error', 38001, 38999, true, 'core')
 on conflict do nothing;
 
-insert into const.event_code (event_id, code, category_code, title, description, is_system, source) values
-    -- Auto-lockout (user_event range)
-    (10083, 'user_auto_locked',           'user_event', 'User Auto-Locked',           'User account was auto-locked after too many failed login attempts', true, 'core'),
-    -- MFA informational events (user_event range)
-    (10090, 'mfa_enrolled',               'user_event', 'MFA Enrolled',               'MFA enrollment was initiated', true, 'core'),
-    (10091, 'mfa_enrollment_confirmed',   'user_event', 'MFA Enrollment Confirmed',   'MFA enrollment was confirmed with a valid code', true, 'core'),
-    (10092, 'mfa_challenge_created',      'user_event', 'MFA Challenge Created',      'MFA challenge token was created', true, 'core'),
-    (10093, 'mfa_challenge_passed',       'user_event', 'MFA Challenge Passed',       'MFA challenge was successfully verified', true, 'core'),
-    (10094, 'mfa_recovery_used',          'user_event', 'MFA Recovery Code Used',     'MFA recovery code was used to pass challenge', true, 'core'),
-    (10098, 'mfa_disabled',              'user_event', 'MFA Disabled',               'MFA was disabled for a user', true, 'core'),
-    (10099, 'mfa_challenge_failed',      'user_event', 'MFA Challenge Failed',       'MFA challenge verification failed (wrong code)', true, 'core'),
-    -- MFA errors (38001-38999)
-    (38001, 'err_mfa_already_enrolled',   'mfa_error', 'MFA Already Enrolled',       'MFA is already enrolled and confirmed for this type', true, 'core'),
-    (38002, 'err_mfa_not_enrolled',       'mfa_error', 'MFA Not Enrolled',           'MFA is not enrolled for this type', true, 'core'),
-    (38003, 'err_mfa_not_confirmed',      'mfa_error', 'MFA Not Confirmed',          'MFA enrollment has not been confirmed yet', true, 'core'),
-    (38004, 'err_mfa_invalid_code',       'mfa_error', 'MFA Invalid Code',           'The provided MFA code is not valid', true, 'core'),
-    (38005, 'err_mfa_required',           'mfa_error', 'MFA Required',               'MFA verification is required to complete this action', true, 'core'),
-    (38006, 'err_mfa_type_not_found',     'mfa_error', 'MFA Type Not Found',         'The specified MFA type does not exist or is inactive', true, 'core')
+insert into const.event_code (event_id, code, category_code, is_system, source) values
+    (10083, 'user_auto_locked',           'user_event', true, 'core'),
+    (10090, 'mfa_enrolled',               'user_event', true, 'core'),
+    (10091, 'mfa_enrollment_confirmed',   'user_event', true, 'core'),
+    (10092, 'mfa_challenge_created',      'user_event', true, 'core'),
+    (10093, 'mfa_challenge_passed',       'user_event', true, 'core'),
+    (10094, 'mfa_recovery_used',          'user_event', true, 'core'),
+    (10098, 'mfa_disabled',              'user_event', true, 'core'),
+    (10099, 'mfa_challenge_failed',      'user_event', true, 'core'),
+    (38001, 'err_mfa_already_enrolled',   'mfa_error', true, 'core'),
+    (38002, 'err_mfa_not_enrolled',       'mfa_error', true, 'core'),
+    (38003, 'err_mfa_not_confirmed',      'mfa_error', true, 'core'),
+    (38004, 'err_mfa_invalid_code',       'mfa_error', true, 'core'),
+    (38005, 'err_mfa_required',           'mfa_error', true, 'core'),
+    (38006, 'err_mfa_type_not_found',     'mfa_error', true, 'core')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'event_category', 'mfa_error', 'title', 'MFA Errors'),
+    ('system', 'system', 'en', 'event_code', 'user_auto_locked',         'title', 'User Auto-Locked'),
+    ('system', 'system', 'en', 'event_code', 'user_auto_locked',         'description', 'User account was auto-locked after too many failed login attempts'),
+    ('system', 'system', 'en', 'event_code', 'mfa_enrolled',             'title', 'MFA Enrolled'),
+    ('system', 'system', 'en', 'event_code', 'mfa_enrolled',             'description', 'MFA enrollment was initiated'),
+    ('system', 'system', 'en', 'event_code', 'mfa_enrollment_confirmed', 'title', 'MFA Enrollment Confirmed'),
+    ('system', 'system', 'en', 'event_code', 'mfa_enrollment_confirmed', 'description', 'MFA enrollment was confirmed with a valid code'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_created',    'title', 'MFA Challenge Created'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_created',    'description', 'MFA challenge token was created'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_passed',     'title', 'MFA Challenge Passed'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_passed',     'description', 'MFA challenge was successfully verified'),
+    ('system', 'system', 'en', 'event_code', 'mfa_recovery_used',        'title', 'MFA Recovery Code Used'),
+    ('system', 'system', 'en', 'event_code', 'mfa_recovery_used',        'description', 'MFA recovery code was used to pass challenge'),
+    ('system', 'system', 'en', 'event_code', 'mfa_disabled',             'title', 'MFA Disabled'),
+    ('system', 'system', 'en', 'event_code', 'mfa_disabled',             'description', 'MFA was disabled for a user'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_failed',     'title', 'MFA Challenge Failed'),
+    ('system', 'system', 'en', 'event_code', 'mfa_challenge_failed',     'description', 'MFA challenge verification failed (wrong code)'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_already_enrolled', 'title', 'MFA Already Enrolled'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_already_enrolled', 'description', 'MFA is already enrolled and confirmed for this type'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_not_enrolled',     'title', 'MFA Not Enrolled'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_not_enrolled',     'description', 'MFA is not enrolled for this type'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_not_confirmed',    'title', 'MFA Not Confirmed'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_not_confirmed',    'description', 'MFA enrollment has not been confirmed yet'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_invalid_code',     'title', 'MFA Invalid Code'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_invalid_code',     'description', 'The provided MFA code is not valid'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_required',         'title', 'MFA Required'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_required',         'description', 'MFA verification is required to complete this action'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_type_not_found',   'title', 'MFA Type Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_type_not_found',   'description', 'The specified MFA type does not exist or is inactive')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------

@@ -18,7 +18,7 @@ BEGIN
     -- 'folder' allows: read, write, delete, share
     -- 'approve' is NOT in folder's flag list → should raise 35006
     BEGIN
-        PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-1', 'folder',
+        PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-1', 'folder',
             '{"id": 500}'::jsonb,
             _target_user_id := __user_id_2, _access_flags := array['approve']);
     EXCEPTION WHEN OTHERS THEN
@@ -84,7 +84,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- 'document' allows: read, write, delete, share, export
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-3', 'document',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-3', 'document',
         '{"id": 600}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read', 'export']);
 
@@ -124,7 +124,7 @@ BEGIN
 
     -- 'folder' allows read, write, delete, share — NOT approve
     BEGIN
-        PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-4', 'folder',
+        PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-4', 'folder',
             '{"id": 700}'::jsonb,
             _target_user_id := __user_id_2, _access_flags := array['read', 'approve']);
     EXCEPTION WHEN OTHERS THEN
@@ -169,15 +169,15 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Create a resource type with NO per-type flag mappings
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
-    VALUES ('ptf_untyped', 'PTF Untyped', 'Type with no flag mappings', 'test', null,
+    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
+    VALUES ('ptf_untyped', 'test', null,
         'ptf_untyped'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
     PERFORM unsecure.ensure_resource_access_partition('ptf_untyped');
 
     -- Should be able to grant ANY flag (including approve, export, etc.)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-5', 'ptf_untyped',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-5', 'ptf_untyped',
         '{"id": 800}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read', 'approve', 'export']);
 
@@ -337,7 +337,7 @@ BEGIN
     -- 'project.invoices' allows: read, write, approve
     -- Granting 'share' on project.invoices should fail (share is valid for project, not invoices)
     BEGIN
-        PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-9', 'project.invoices',
+        PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-9', 'project.invoices',
             '{"project_id": 9000, "invoice_id": 1}'::jsonb,
             _target_user_id := __user_id_2, _access_flags := array['share']);
     EXCEPTION WHEN OTHERS THEN
@@ -404,7 +404,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
     -- 'project.invoices' allows 'approve' — a flag NOT on the parent 'project'
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-11', 'project.invoices',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-11', 'project.invoices',
         '{"project_id": 9000, "invoice_id": 1}'::jsonb,
         _target_user_id := __user_id_3, _access_flags := array['approve']);
 
@@ -582,8 +582,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Create a test type with flags
-    INSERT INTO const.resource_type (code, title, description, source, parent_code, path, key_schema)
-    VALUES ('ptf_clearable', 'PTF Clearable', 'Type for clear test', 'test', null,
+    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
+    VALUES ('ptf_clearable', 'test', null,
         'ptf_clearable'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -613,7 +613,7 @@ BEGIN
     END IF;
 
     -- Verify all flags are now accepted (backward compat mode)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-ptf-16', 'ptf_clearable',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-ptf-16', 'ptf_clearable',
         '{"id": 900}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['approve', 'export']);
 

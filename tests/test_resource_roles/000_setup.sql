@@ -4,7 +4,7 @@ DO $$
 BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '=================================================================';
-    RAISE NOTICE 'Resource Access (ACL) Test Suite - Starting';
+    RAISE NOTICE 'Resource Roles Test Suite - Starting';
     RAISE NOTICE '=================================================================';
     RAISE NOTICE '';
 END $$;
@@ -21,84 +21,99 @@ DECLARE
     __group_id_2 integer;
     __tenant_id_2 integer;
 BEGIN
-    RAISE NOTICE 'SETUP: Creating test users, groups, tenants, and resource types...';
+    RAISE NOTICE 'SETUP: Creating test users, groups, tenants, resource types, and roles...';
 
-    -- Create test users (system user_id=1 already exists)
+    -- Create test users
     INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
-    VALUES ('test', 'test', 'RA Test User 1', 'ra_test_user_1', 'ra_test_user_1@test.com', 'ra_test_user_1@test.com', 'ra_test_user_1@test.com', true)
+    VALUES ('test', 'test', 'RR Test User 1', 'rr_test_user_1', 'rr_test_user_1@test.com', 'rr_test_user_1@test.com', 'rr_test_user_1@test.com', true)
     RETURNING user_id INTO __user_id_1;
 
     INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
-    VALUES ('test', 'test', 'RA Test User 2', 'ra_test_user_2', 'ra_test_user_2@test.com', 'ra_test_user_2@test.com', 'ra_test_user_2@test.com', true)
+    VALUES ('test', 'test', 'RR Test User 2', 'rr_test_user_2', 'rr_test_user_2@test.com', 'rr_test_user_2@test.com', 'rr_test_user_2@test.com', true)
     RETURNING user_id INTO __user_id_2;
 
     INSERT INTO auth.user_info (created_by, updated_by, display_name, code, username, original_username, email, can_login)
-    VALUES ('test', 'test', 'RA Test User 3', 'ra_test_user_3', 'ra_test_user_3@test.com', 'ra_test_user_3@test.com', 'ra_test_user_3@test.com', true)
+    VALUES ('test', 'test', 'RR Test User 3', 'rr_test_user_3', 'rr_test_user_3@test.com', 'rr_test_user_3@test.com', 'rr_test_user_3@test.com', true)
     RETURNING user_id INTO __user_id_3;
 
-    -- Create test groups
+    -- Create test groups (simulating Entra groups)
     INSERT INTO auth.user_group (created_by, updated_by, tenant_id, title, code, is_active, is_assignable)
-    VALUES ('test', 'test', 1, 'RA Test Group Editors', 'ra_test_group_editors', true, true)
+    VALUES ('test', 'test', 1, 'RR Test Entra Editors', 'rr_test_entra_editors', true, true)
     RETURNING user_group_id INTO __group_id_1;
 
     INSERT INTO auth.user_group (created_by, updated_by, tenant_id, title, code, is_active, is_assignable)
-    VALUES ('test', 'test', 1, 'RA Test Group Viewers', 'ra_test_group_viewers', true, true)
+    VALUES ('test', 'test', 1, 'RR Test Entra Viewers', 'rr_test_entra_viewers', true, true)
     RETURNING user_group_id INTO __group_id_2;
 
-    -- Add user 2 to editors group, user 3 to viewers group
+    -- Add user 2 to editors, user 3 to viewers
     INSERT INTO auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
     VALUES ('test', __group_id_1, __user_id_2, 'manual');
 
     INSERT INTO auth.user_group_member (created_by, user_group_id, user_id, member_type_code)
     VALUES ('test', __group_id_2, __user_id_3, 'manual');
 
-    -- Create second tenant for isolation tests
+    -- Second tenant for isolation tests
     INSERT INTO auth.tenant (created_by, updated_by, title, code)
-    VALUES ('test', 'test', 'RA Test Tenant 2', 'ra_test_tenant_2')
+    VALUES ('test', 'test', 'RR Test Tenant 2', 'rr_test_tenant_2')
     RETURNING tenant_id INTO __tenant_id_2;
 
-    -- Add user 1 to tenant 2
     INSERT INTO auth.tenant_user (created_by, tenant_id, user_id)
     VALUES ('test', __tenant_id_2, __user_id_1);
 
-    -- Create resource types (with ltree path for hierarchy support)
-    -- key_schema defines the expected jsonb structure for resource_id
+    -- Resource types (reuse existing if present, or create)
     INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('document', 'test', null, 'document'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    VALUES ('asset', 'test_roles', null, 'asset'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
     INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('folder', 'test', null, 'folder'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    VALUES ('asset.file', 'test_roles', 'asset', 'asset.file'::ext.ltree, '{"id": "bigint", "file_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
-    -- Register per-type access flags
-    -- 'document' allows: read, write, delete, share, export
+    -- Per-type flags for 'asset'
     INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
-        ('document', 'read'), ('document', 'write'), ('document', 'delete'),
-        ('document', 'share'), ('document', 'export')
+        ('asset', 'read'), ('asset', 'write'), ('asset', 'delete'), ('asset', 'export'), ('asset', 'share')
     ON CONFLICT DO NOTHING;
 
-    -- 'folder' allows: read, write, delete, share
+    -- Per-type flags for 'asset.file'
     INSERT INTO const.resource_type_flag (resource_type_code, access_flag_code) VALUES
-        ('folder', 'read'), ('folder', 'write'), ('folder', 'delete'), ('folder', 'share')
+        ('asset.file', 'read'), ('asset.file', 'write'), ('asset.file', 'delete'), ('asset.file', 'export')
     ON CONFLICT DO NOTHING;
 
-    -- Create partitions for test resource types
-    PERFORM unsecure.ensure_resource_access_partition('document');
-    PERFORM unsecure.ensure_resource_access_partition('folder');
+    -- Create partitions
+    PERFORM unsecure.ensure_resource_access_partition('asset');
 
-    -- Grant resource permissions to test user 1 (acting user for most tests)
-    -- We need to give user 1 the resources permissions via the system admin perm set
-    -- or directly assign individual permissions
+    -- Grant system admin to user 1 (acting user)
     PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin');
 
-    -- Store test data IDs in temp table for later tests
-    CREATE TEMP TABLE IF NOT EXISTS _ra_test_data (
+    -- Create resource roles
+    INSERT INTO const.resource_role (code, resource_type, source)
+    VALUES ('asset_reader', 'asset', 'test_roles');
+
+    INSERT INTO const.resource_role_flag (resource_role_code, access_flag_code) VALUES
+        ('asset_reader', 'read');
+
+    INSERT INTO const.resource_role (code, resource_type, source)
+    VALUES ('asset_editor', 'asset', 'test_roles');
+
+    INSERT INTO const.resource_role_flag (resource_role_code, access_flag_code) VALUES
+        ('asset_editor', 'read'),
+        ('asset_editor', 'write'),
+        ('asset_editor', 'delete'),
+        ('asset_editor', 'export');
+
+    INSERT INTO const.resource_role (code, resource_type, source)
+    VALUES ('asset_file_viewer', 'asset.file', 'test_roles');
+
+    INSERT INTO const.resource_role_flag (resource_role_code, access_flag_code) VALUES
+        ('asset_file_viewer', 'read');
+
+    -- Store test data IDs
+    CREATE TEMP TABLE IF NOT EXISTS _rr_test_data (
         key text PRIMARY KEY,
         val bigint
     );
-    DELETE FROM _ra_test_data;
-    INSERT INTO _ra_test_data VALUES
+    DELETE FROM _rr_test_data;
+    INSERT INTO _rr_test_data VALUES
         ('user_id_1', __user_id_1),
         ('user_id_2', __user_id_2),
         ('user_id_3', __user_id_3),
@@ -108,6 +123,7 @@ BEGIN
 
     RAISE NOTICE 'SETUP: Created users (%, %, %), groups (%, %), tenant_2 (%)',
         __user_id_1, __user_id_2, __user_id_3, __group_id_1, __group_id_2, __tenant_id_2;
+    RAISE NOTICE 'SETUP: Created roles: asset_reader, asset_editor, asset_file_viewer';
     RAISE NOTICE 'SETUP: Done';
     RAISE NOTICE '';
 END $$;

@@ -91,7 +91,6 @@ create table const.user_type
 create table const.event_category
 (
     category_code text    not null primary key,
-    title         text    not null,
     range_start   integer not null,
     range_end     integer not null,
     is_error      boolean not null default false,
@@ -103,8 +102,6 @@ create table const.event_code
     event_id      integer not null primary key,
     code          text    not null unique,
     category_code text    not null references const.event_category(category_code),
-    title         text    not null,
-    description   text,
     is_read_only  boolean not null default false,
     is_system     boolean not null default false,
     source        text    default null

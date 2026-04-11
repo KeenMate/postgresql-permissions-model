@@ -15,11 +15,11 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Grant read on documents 1001, 1002, 1003 (skip 1004, 1005)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-filter-1a', 'document', '{"id": 1001}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-filter-1a', 'document', '{"id": 1001}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-filter-1b', 'document', '{"id": 1002}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-filter-1b', 'document', '{"id": 1002}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-filter-1c', 'document', '{"id": 1003}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-filter-1c', 'document', '{"id": 1003}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     -- Filter: ask for 1001-1005, should only get 1001, 1002, 1003
@@ -85,7 +85,7 @@ BEGIN
     SELECT val::integer FROM _ra_test_data WHERE key = 'group_id_1' INTO __group_id_1;
 
     -- Grant read on document {"id": 1004} to editors group (user_2 is a member)
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-filter-3a', 'document', '{"id": 1004}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-filter-3a', 'document', '{"id": 1004}'::jsonb,
         _user_group_id := __group_id_1, _access_flags := array['read']);
 
     -- Filter: should now include 1001, 1003 (direct) + 1004 (group), but not 1002 (denied)

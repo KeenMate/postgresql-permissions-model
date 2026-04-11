@@ -17,7 +17,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'tenant_id_2' INTO __tenant_id_2;
 
     -- Grant read to user_2 on document {"id": 3001} in tenant 1
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-1a', 'document', '{"id": 3001}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-iso-1a', 'document', '{"id": 3001}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := 1);
 
     -- Verify access in tenant 1
@@ -57,7 +57,7 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'tenant_id_2' INTO __tenant_id_2;
 
     -- Grant on different docs in different tenants
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2a', 'document', '{"id": 3010}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-iso-2a', 'document', '{"id": 3010}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := 1);
 
     -- Create system_admin perm set in tenant 2 (only exists in tenant 1 by default)
@@ -67,7 +67,7 @@ BEGIN
     -- Give user_id_1 the system admin perms in tenant 2
     PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', _tenant_id := __tenant_id_2);
 
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-iso-2b', 'document', '{"id": 3011}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-iso-2b', 'document', '{"id": 3011}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read'], _tenant_id := __tenant_id_2::integer);
 
     -- Filter in tenant 1

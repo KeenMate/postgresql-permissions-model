@@ -34,9 +34,6 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
 create table const.resource_type
 (
     code        text    not null primary key,
-    title       text    not null,
-    full_title  text,
-    description text,
     is_active   boolean not null default true,
     source      text    default null,
     parent_code text    references const.resource_type(code),
@@ -52,18 +49,20 @@ create index ix_resource_type_path on const.resource_type using gist (path);
 create table const.resource_access_flag
 (
     code   text not null primary key,
-    title  text not null,
     source text default null
 );
 
-insert into const.resource_access_flag (code, title, source) values
-    ('read',    'Read',    'core'),
-    ('write',   'Write',   'core'),
-    ('delete',  'Delete',  'core'),
-    ('share',   'Share',   'core'),
-    ('approve', 'Approve', 'core'),
-    ('export',  'Export',  'core')
+insert into const.resource_access_flag (code, source) values
+    ('read',    'core'),
+    ('write',   'core'),
+    ('delete',  'core'),
+    ('share',   'core'),
+    ('approve', 'core'),
+    ('export',  'core')
 on conflict do nothing;
+
+-- Core flag translations are seeded in 046_drop_inline_titles.sql
+-- (the context column on public.translation is added in 045)
 
 /*
  * const.resource_type_flag — Per-type access flag mapping

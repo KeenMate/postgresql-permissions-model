@@ -103,11 +103,11 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_3' INTO __user_id_3;
 
     -- Give user_3 read on parent project for resource {"project_id": 3000}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-matrix-4a', 'project', '{"project_id": 3000}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-matrix-4a', 'project', '{"project_id": 3000}'::jsonb,
         _target_user_id := __user_id_3, _access_flags := array['read']);
 
     -- Give user_3 write on project.documents only for resource {"project_id": 3000, "folder_id": 1}
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-matrix-4b', 'project.documents',
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-matrix-4b', 'project.documents',
         '{"project_id": 3000, "folder_id": 1}'::jsonb,
         _target_user_id := __user_id_3, _access_flags := array['write']);
 

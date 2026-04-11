@@ -90,7 +90,7 @@ When `auth.has_resource_access()` is called, checks happen in this order:
 
 ## Group Access
 
-1. **Grant:** Call `auth.grant_resource_access()` with `_user_group_id` to grant flags to a group
+1. **Grant:** Call `auth.assign_resource_access()` with `_user_group_id` to grant flags to a group
 2. **Membership resolution:** Access check joins `resource_access` → `user_group_member` → `user_group` (must be `is_active=true`)
 3. **Effective flags:** `auth.get_resource_access_flags()` returns group grants with source = group title
 4. All group types (internal, external, hybrid) work equally with resource access
@@ -170,12 +170,12 @@ Source values: `system` (system user), `owner` (tenant owner), `direct` (user-le
 
 ### Granting Access
 
-#### `auth.grant_resource_access`
+#### `auth.assign_resource_access`
 
 Grant flags to a user or group. Idempotent — re-granting is a no-op, granting over a deny flips it to a grant.
 
 ```sql
-auth.grant_resource_access(
+auth.assign_resource_access(
     _created_by     text,
     _user_id        bigint,          -- caller (must have resources.grant_access)
     _correlation_id text,
@@ -190,11 +190,11 @@ auth.grant_resource_access(
 
 ```sql
 -- Grant to user
-perform auth.grant_resource_access('app', _admin_id, _corr_id, 'folder', _folder_id,
+perform auth.assign_resource_access('app', _admin_id, _corr_id, 'folder', _folder_id,
     _target_user_id := _user_id, _access_flags := array['read','write']);
 
 -- Grant to group
-perform auth.grant_resource_access('app', _admin_id, _corr_id, 'folder', _folder_id,
+perform auth.assign_resource_access('app', _admin_id, _corr_id, 'folder', _folder_id,
     _user_group_id := _group_id, _access_flags := array['read','write']);
 ```
 
@@ -325,7 +325,7 @@ insert into const.resource_type (code, title) values ('report', 'Reports');
 perform unsecure.ensure_resource_access_partition('report');
 
 -- 3. Grant/check access on 'report' resources
-perform auth.grant_resource_access('app', _admin_id, _corr_id, 'report', _report_id,
+perform auth.assign_resource_access('app', _admin_id, _corr_id, 'report', _report_id,
     _target_user_id := _user_id, _access_flags := array['read','write']);
 ```
 
@@ -383,7 +383,7 @@ Functions in the `auth` schema require these RBAC permissions:
 
 | Permission | Required by |
 |------------|-------------|
-| `resources.grant_access` | `auth.grant_resource_access()` |
+| `resources.grant_access` | `auth.assign_resource_access()` |
 | `resources.deny_access` | `auth.deny_resource_access()` |
 | `resources.revoke_access` | `auth.revoke_resource_access()`, `auth.revoke_all_resource_access()` |
 | `resources.get_grants` | `auth.get_resource_grants()`, `auth.get_user_accessible_resources()` |
@@ -405,7 +405,7 @@ Functions in the `auth` schema require these RBAC permissions:
 | Code | Event | Function |
 |------|-------|----------|
 | 18001 | resource_type_created | `auth.create_resource_type()` |
-| 18010 | resource_access_granted | `auth.grant_resource_access()` |
+| 18010 | resource_access_granted | `auth.assign_resource_access()` |
 | 18011 | resource_access_revoked | `auth.revoke_resource_access()` |
 | 18012 | resource_access_denied | `auth.deny_resource_access()` |
 | 18013 | resource_access_bulk_revoked | `auth.revoke_all_resource_access()` |

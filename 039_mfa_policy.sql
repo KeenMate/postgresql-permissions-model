@@ -45,12 +45,23 @@ create unique index if not exists uq_mfa_policy_scope
 -- ---------------------------------------------------------------------------
 -- 2. New event codes
 -- ---------------------------------------------------------------------------
-insert into const.event_code (event_id, code, category_code, title, description, is_system, source) values
-    (10095, 'mfa_policy_created',  'user_event', 'MFA Policy Created',      'MFA policy rule was created', true, 'core'),
-    (10096, 'mfa_policy_deleted',  'user_event', 'MFA Policy Deleted',      'MFA policy rule was deleted', true, 'core'),
-    (10097, 'mfa_recovery_reset',  'user_event', 'MFA Recovery Codes Reset', 'MFA recovery codes were regenerated', true, 'core'),
+insert into const.event_code (event_id, code, category_code, is_system, source) values
+    (10095, 'mfa_policy_created',  'user_event', true, 'core'),
+    (10096, 'mfa_policy_deleted',  'user_event', true, 'core'),
+    (10097, 'mfa_recovery_reset',  'user_event', true, 'core'),
     -- Error event code
-    (38007, 'err_mfa_policy_not_found', 'mfa_error', 'MFA Policy Not Found', 'The specified MFA policy does not exist', true, 'core')
+    (38007, 'err_mfa_policy_not_found', 'mfa_error', true, 'core')
+on conflict do nothing;
+
+insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value) values
+    ('system', 'system', 'en', 'event_code', 'mfa_policy_created', 'title', 'MFA Policy Created'),
+    ('system', 'system', 'en', 'event_code', 'mfa_policy_created', 'description', 'MFA policy rule was created'),
+    ('system', 'system', 'en', 'event_code', 'mfa_policy_deleted', 'title', 'MFA Policy Deleted'),
+    ('system', 'system', 'en', 'event_code', 'mfa_policy_deleted', 'description', 'MFA policy rule was deleted'),
+    ('system', 'system', 'en', 'event_code', 'mfa_recovery_reset', 'title', 'MFA Recovery Codes Reset'),
+    ('system', 'system', 'en', 'event_code', 'mfa_recovery_reset', 'description', 'MFA recovery codes were regenerated'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_policy_not_found', 'title', 'MFA Policy Not Found'),
+    ('system', 'system', 'en', 'event_code', 'err_mfa_policy_not_found', 'description', 'The specified MFA policy does not exist')
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------

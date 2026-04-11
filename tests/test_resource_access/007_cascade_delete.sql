@@ -20,7 +20,7 @@ BEGIN
     RETURNING user_id INTO __temp_user_id;
 
     -- Grant access
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-cascade-1a', 'document', '{"id": 4001}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-cascade-1a', 'document', '{"id": 4001}'::jsonb,
         _target_user_id := __temp_user_id, _access_flags := array['read', 'write']);
 
     SELECT count(*) FROM auth.resource_access WHERE user_id = __temp_user_id INTO __count_before;
@@ -57,7 +57,7 @@ BEGIN
     RETURNING user_group_id INTO __temp_group_id;
 
     -- Grant access to the group
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-cascade-2a', 'document', '{"id": 4002}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-cascade-2a', 'document', '{"id": 4002}'::jsonb,
         _user_group_id := __temp_group_id, _access_flags := array['read', 'write', 'share']);
 
     SELECT count(*) FROM auth.resource_access WHERE user_group_id = __temp_group_id INTO __count_before;
@@ -105,7 +105,7 @@ BEGIN
     PERFORM unsecure.assign_permission_as_system(null::integer, __user_id_1, 'system_admin', _tenant_id := __temp_tenant_id);
 
     -- Grant access in temp tenant
-    PERFORM auth.grant_resource_access('test', __user_id_1, 'test-corr-cascade-3a', 'document', '{"id": 4003}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __user_id_1, 'test-corr-cascade-3a', 'document', '{"id": 4003}'::jsonb,
         _target_user_id := __temp_user_id, _access_flags := array['read'], _tenant_id := __temp_tenant_id);
 
     SELECT count(*) FROM auth.resource_access WHERE tenant_id = __temp_tenant_id INTO __count_before;
@@ -157,7 +157,7 @@ BEGIN
     PERFORM unsecure.assign_permission_as_system(null::integer, __temp_granter_id, 'system_admin');
 
     -- Grant with temp granter as the acting user
-    PERFORM auth.grant_resource_access('test', __temp_granter_id, 'test-corr-cascade-4a', 'document', '{"id": 4004}'::jsonb,
+    PERFORM auth.assign_resource_access('test', __temp_granter_id, 'test-corr-cascade-4a', 'document', '{"id": 4004}'::jsonb,
         _target_user_id := __user_id_2, _access_flags := array['read']);
 
     SELECT granted_by FROM auth.resource_access
