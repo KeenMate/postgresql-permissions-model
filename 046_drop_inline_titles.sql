@@ -490,7 +490,7 @@ begin
 
     return query
         select rt.code,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
@@ -570,7 +570,7 @@ begin
 
     return query
         select rt.code,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
@@ -697,7 +697,7 @@ begin
 
     return query
         select rt.code,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
@@ -734,7 +734,7 @@ $$
 begin
     return query
     select rt.code,
-           mv.values->>'title',
+           coalesce(mv.values->>'title', rt.code),
            mv.values->>'full_title',
            mv.values->>'description',
            rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
@@ -802,7 +802,7 @@ begin
 
     return query
     select f.code,
-           (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_access_flag' and mv.data_object_code = f.code and mv.language_code = _language_code),
+           coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_access_flag' and mv.data_object_code = f.code and mv.language_code = _language_code), f.code),
            f.source
     from const.resource_access_flag f
     where f.code in (select value->>'code' from jsonb_array_elements(_flags))
@@ -822,7 +822,7 @@ $$
 begin
     return query
     select f.code,
-           mv.values->>'title',
+           coalesce(mv.values->>'title', f.code),
            f.source
     from const.resource_access_flag f
     left join public.mv_translation mv
@@ -901,7 +901,7 @@ begin
 
     return query
         select r.code, r.resource_type,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
                r.is_active, r.source,
                (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
@@ -1031,7 +1031,7 @@ begin
 
     return query
         select r.code, r.resource_type,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
                r.is_active, r.source,
                (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
@@ -1097,7 +1097,7 @@ begin
 
     return query
         select r.code, r.resource_type,
-               (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
                r.is_active, r.source,
                (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
@@ -1133,7 +1133,7 @@ $$
 begin
     return query
     select r.code, r.resource_type,
-           mv.values->>'title',
+           coalesce(mv.values->>'title', r.code),
            mv.values->>'description',
            r.is_active, r.source,
            (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
@@ -1189,7 +1189,7 @@ begin
         rra.user_group_id,
         ug.title,
         rra.role_code,
-        mv_role.values->>'title',
+        coalesce(mv_role.values->>'title', rra.role_code),
         (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
          from const.resource_role_flag rrf where rrf.resource_role_code = rra.role_code),
         rra.granted_by,
