@@ -927,8 +927,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.search_users(bigint, text, text, text, boolean, boolean, integer, integer, integer, integer);
-
 create or replace function auth.search_users(
     _user_id bigint,
     _correlation_id text default null,
@@ -1119,8 +1117,6 @@ begin
         select __item.blacklist_id, __item.username, __item.provider_code;
 end;
 $$;
-
-drop function if exists auth.search_blacklist(bigint, text, text, text, integer, integer, integer);
 
 create or replace function auth.search_blacklist(
     _user_id bigint,

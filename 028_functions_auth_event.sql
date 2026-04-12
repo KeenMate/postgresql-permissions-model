@@ -31,8 +31,6 @@ $$;
  * Paginated search of user events with optional filters.
  * Requires 'authentication.read_user_events' permission.
  */
-drop function if exists auth.search_user_events(bigint, text, text, bigint, jsonb, text, timestamptz, timestamptz, integer, integer, integer, integer);
-
 create or replace function auth.search_user_events(
     _user_id bigint,
     _correlation_id text default null,
@@ -124,8 +122,6 @@ $$;
  * Returns a unified, paginated timeline of all audit activity related to a user.
  * Requires 'authentication.read_user_events' permission.
  */
-drop function if exists auth.get_user_audit_trail(bigint, text, bigint, timestamptz, timestamptz, integer, integer, integer, integer);
-
 create or replace function auth.get_user_audit_trail(
     _user_id bigint,
     _correlation_id text default null,
@@ -237,8 +233,6 @@ $$;
  * disables, and permission denials. Paginated.
  * Requires 'authentication.read_user_events' permission.
  */
-drop function if exists auth.get_security_events(bigint, text, timestamptz, timestamptz, integer, integer, integer, integer);
-
 create or replace function auth.get_security_events(
     _user_id bigint,
     _correlation_id text default null,

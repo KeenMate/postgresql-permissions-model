@@ -347,7 +347,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.get_user_permissions(bigint, text, bigint, integer);
 create or replace function auth.get_user_permissions(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
@@ -757,8 +756,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.search_permissions(bigint, text, text, boolean, text, integer, integer, integer, text);
-
 create or replace function auth.search_permissions(
     _user_id bigint,
     _correlation_id text default null,
@@ -831,8 +828,6 @@ begin
                  inner join auth.permission p on fp.permission_id = p.permission_id;
 end;
 $$;
-
-drop function if exists auth.search_perm_sets(bigint, text, text, boolean, boolean, integer, integer, integer, text, integer);
 
 create or replace function auth.search_perm_sets(
     _user_id bigint,

@@ -467,8 +467,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.search_tenants(bigint, text, text, integer, integer, integer, integer);
-
 create or replace function auth.search_tenants(
     _user_id bigint,
     _correlation_id text default null,

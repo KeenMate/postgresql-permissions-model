@@ -339,8 +339,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.search_user_group_mappings(bigint, text, text, text, text, text, integer, integer, integer, integer);
-
 create or replace function auth.search_user_group_mappings(
 	_user_id bigint,
 	_correlation_id text default null,
@@ -729,7 +727,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.get_user_assigned_groups(bigint, text, bigint, integer, integer);
 create or replace function auth.get_user_assigned_groups(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
     returns TABLE(__user_group_member_id bigint, __user_group_id integer, __user_group_code text, __user_group_title text, __user_group_member_type_code text, __user_group_mapping_id integer, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
@@ -1030,9 +1027,6 @@ begin
 end;
 $$;
 
-drop function if exists auth.search_user_groups(bigint, text, text, boolean, boolean, boolean, integer, integer, integer, integer);
-
-drop function if exists auth.search_user_groups(bigint, text, jsonb, integer, integer, integer, integer);
 create or replace function auth.search_user_groups(
     _user_id bigint,
     _correlation_id text default null,
