@@ -708,7 +708,7 @@ begin
 		union
 --         Get permissions that are directly assigned
 		select distinct sp.full_code::text
-									, sp.title
+									, (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = sp.code and mv.language_code = 'en')
 									, null
 									, null
 									, null::integer
@@ -731,7 +731,7 @@ begin
 
 	return query
 		with permission_ids as (select distinct coalesce(pa.permission_id, psp.permission_id) as permission_id
-																					, ps.title                                      as perm_set_title
+																					, (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en') as perm_set_title
 																					, pa.perm_set_id
 																					, ps.code
 																					, pa.assignment_id
@@ -739,8 +739,9 @@ begin
 																	 left join auth.perm_set ps on ps.perm_set_id = pa.perm_set_id
 																	 left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
 														where user_group_id = _user_group_id)
-		select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
-																				p.permission_id)) as permissions
+		select jsonb_agg(jsonb_build_object('code', p.full_code, 'title',
+				(select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'),
+				'id', p.permission_id)) as permissions
 				 , pids.perm_set_title
 				 , pids.perm_set_id
 				 , pids.code                                      as perm_set_code
@@ -967,46 +968,73 @@ end;
 
 $$;
 
-create or replace function unsecure.update_permission_full_title(_perm_path ext.ltree) returns SETOF auth.permission
-    rows 1
-    language sql
+create or replace function unsecure.update_permission_full_title(
+    _perm_path      ext.ltree,
+    _language_code  text default 'en',
+    _created_by     text default 'system'
+) returns void
+    language plpgsql
 as
 $$
-update auth.permission p
-set full_title =
-			-- 			case
--- 				when _perm_path = '1'::ext.ltree then 'System'
--- 				else
-			(select array_to_string(
-											ARRAY(select p_n2.title
-														from auth.permission as p_n2
-														where p_n2.node_path @> p_n.node_path
-															and p_n2.permission_id <> 1
-														order by p_n2.node_path),
-											' > ')
-			 from auth.permission as p_n
-			 where p_n.permission_id = p.permission_id)
--- 				end
-where p.node_path <@ _perm_path
-returning *;
+declare
+    _perm       record;
+    _full_title text;
+begin
+    for _perm in
+        select p.permission_id, p.code, p.node_path
+        from auth.permission p
+        where p.node_path <@ _perm_path
+        order by p.node_path
+    loop
+        -- Build breadcrumb from ancestor title translations
+        select array_to_string(
+            array(
+                select coalesce(t.value, a.code)
+                from auth.permission a
+                left join public.translation t
+                    on t.data_group = 'permission' and t.data_object_code = a.code
+                    and t.context = 'title' and t.language_code = _language_code
+                where a.node_path @> _perm.node_path
+                    and a.permission_id <> 1
+                order by a.node_path
+            ), ' > ')
+        into _full_title;
+
+        -- Upsert full_title translation
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'permission', _perm.code, 'full_title', _full_title)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end loop;
+
+    -- Refresh MV so reads see updated full_titles
+    perform unsecure.refresh_translation_cache();
+end;
 $$;
 
-create or replace function unsecure.update_permission_full_code(_perm_path ext.ltree) returns SETOF auth.permission
+create or replace function unsecure.update_permission_full_code(_perm_path ext.ltree) returns setof auth.permission
     rows 1
-    language sql
+    language plpgsql
 as
 $$
-update auth.permission p
-set full_code = (select ext.text2ltree(array_to_string(
-				ARRAY(select coalesce(p_n2.code, helpers.get_code(p_n2.title, '_'))
-							from auth.permission as p_n2
-							where p_n2.node_path @> p_n.node_path
-							order by p_n2.node_path),
-				'.'))
-								 from auth.permission as p_n
-								 where p_n.permission_id = p.permission_id)
-where p.node_path <@ _perm_path
-returning *;
+begin
+    return query
+    update auth.permission p
+    set full_code = (select ext.text2ltree(array_to_string(
+                    array(select coalesce(p_n2.code, helpers.get_code(
+                                        (select t.value from public.translation t
+                                         where t.data_group = 'permission' and t.data_object_code = p_n2.code
+                                             and t.context = 'title' and t.language_code = 'en'), '_'))
+                                from auth.permission as p_n2
+                                where p_n2.node_path @> p_n.node_path
+                                order by p_n2.node_path),
+                    '.'))
+                                     from auth.permission as p_n
+                                     where p_n.permission_id = p.permission_id)
+    where p.node_path <@ _perm_path
+    returning *;
+end;
 $$;
 
 create or replace function unsecure.compute_short_code(_permission_id integer) returns text
@@ -1094,10 +1122,17 @@ declare
 	__full_code   ext.ltree;
 begin
 
-	insert into auth.permission(created_by, updated_by, title, is_assignable, code, source)
-	values (_created_by, _created_by, _title, _is_assignable, helpers.get_code(_title, '_'), _source)
+	insert into auth.permission(created_by, updated_by, is_assignable, code, source)
+	values (_created_by, _created_by, _is_assignable, helpers.get_code(_title, '_'), _source)
 	returning permission_id
 		into __last_id;
+
+	-- Store title as translation
+	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+	values (_created_by, _created_by, 'en', 'permission', helpers.get_code(_title, '_'), 'title', _title)
+	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		where data_object_code is not null
+	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
 	if helpers.is_empty_string(_parent_full_code) then
 		begin
@@ -1170,8 +1205,10 @@ create or replace function unsecure.get_all_permissions(_requested_by text, _use
 as
 $$
 begin
-	return query select permission_id, is_assignable, title, code, full_code::text, has_children, short_code, source
-							 from auth.permission
+	return query select permission_id, is_assignable,
+						(select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'),
+						code, full_code::text, has_children, short_code, source
+							 from auth.permission p
 							 order by full_code;
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 end;
@@ -1185,18 +1222,19 @@ $$
 begin
 	return query
 		select ps.perm_set_id
-				 , ps.title
+				 , (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en')
 				 , ps.code
 				 , ps.is_system
 				 , ps.is_assignable
-				 , jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
-																				p.permission_id))
+				 , jsonb_agg(jsonb_build_object('code', p.full_code, 'title',
+						(select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'),
+						'id', p.permission_id))
 				 , ps.source
 		from auth.perm_set ps
 					 inner join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
 					 inner join auth.permission p on p.permission_id = psp.permission_id
 		where (_tenant_id is null or ps.tenant_id = _tenant_id)
-		group by ps.perm_set_id, ps.title, ps.code, ps.is_system, ps.is_assignable, ps.source;
+		group by ps.perm_set_id, ps.code, ps.is_system, ps.is_assignable, ps.source;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)
 
@@ -1220,11 +1258,20 @@ begin
 		perform error.raise_52178();
 	end if;
 
-	-- noinspection SqlInsertValues
-	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system, is_assignable, source)
-	values (_created_by, _created_by, _tenant_id, _title, _is_system, _is_assignable, _source)
+	insert into auth.perm_set(created_by, updated_by, tenant_id, code, is_system, is_assignable, source)
+	values (_created_by, _created_by, _tenant_id, helpers.get_code(_title, '_'), _is_system, _is_assignable, _source)
 	returning perm_set_id
 		into __last_id;
+
+	-- Store title as translation
+	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+	values (_created_by, _created_by, 'en', 'perm_set',
+		(select code from auth.perm_set where perm_set_id = __last_id), 'title', _title)
+	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		where data_object_code is not null
+	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+	perform unsecure.refresh_translation_cache();
 
 	insert into auth.perm_set_perm(created_by, perm_set_id, permission_id)
 	select _created_by, __last_id, p.permission_id
@@ -1259,10 +1306,20 @@ begin
 	-- This allows system perm sets (e.g., system_admin) to include non-assignable
 	-- permissions like 'resources' that should not be assignable via normal UI/API.
 
-	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system, is_assignable, source)
-	values ('system', 'system', _tenant_id, _title, _is_system, _is_assignable, _source)
+	insert into auth.perm_set(created_by, updated_by, tenant_id, code, is_system, is_assignable, source)
+	values ('system', 'system', _tenant_id, helpers.get_code(_title, '_'), _is_system, _is_assignable, _source)
 	returning perm_set_id
 		into __last_id;
+
+	-- Store title as translation
+	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+	values ('system', 'system', 'en', 'perm_set',
+		(select code from auth.perm_set where perm_set_id = __last_id), 'title', _title)
+	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		where data_object_code is not null
+	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+	perform unsecure.refresh_translation_cache();
 
 	insert into auth.perm_set_perm(created_by, perm_set_id, permission_id)
 	select 'system', __last_id, p.permission_id
@@ -1305,11 +1362,22 @@ begin
 	update perm_set
 	set updated_at    = now()
 		, updated_by    = _updated_by
-		, title         = _title
 		, is_assignable = _is_assignable
 	where perm_set_id = _perm_set_id
 	returning perm_set_id
 		into __last_id;
+
+	-- Store title as translation when provided
+	if _title is not null then
+		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+		values (_updated_by, _updated_by, 'en', 'perm_set',
+			(select code from auth.perm_set where perm_set_id = _perm_set_id), 'title', _title)
+		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+			where data_object_code is not null
+		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+		perform unsecure.refresh_translation_cache();
+	end if;
 
 	-- If assignability changed, invalidate cache for all affected users
 	if __old_is_assignable is distinct from _is_assignable then
@@ -2249,6 +2317,7 @@ declare
 	__source_perm_set    auth.perm_set;
 	__source_tenant_code text;
 	__target_tenant_code text;
+	__effective_title    text;
 begin
 
 	select t.code
@@ -2272,13 +2341,27 @@ begin
 		perform error.raise_52282(_source_perm_set_code);
 	end if;
 
-	insert into auth.perm_set(created_by, updated_by, tenant_id, title, is_system,
+	-- Resolve effective title: use _new_title if provided, otherwise look up source title from translation
+	__effective_title := coalesce(_new_title,
+		(select mv.values->>'title' from public.mv_translation mv
+		 where mv.data_group = 'perm_set' and mv.data_object_code = __source_perm_set.code and mv.language_code = 'en'));
+
+	insert into auth.perm_set(created_by, updated_by, tenant_id, is_system,
 														is_assignable, code, source)
-	values ( _created_by, _created_by, _target_tenant_id, coalesce(_new_title, __source_perm_set.title)
+	values ( _created_by, _created_by, _target_tenant_id
 				 , __source_perm_set.is_system, __source_perm_set.is_assignable, helpers.get_code(_new_title)
 				 , __source_perm_set.source)
 	returning *
 		into __created_perm_set;
+
+	-- Store title as translation for the new perm_set
+	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+	values (_created_by, _created_by, 'en', 'perm_set', __created_perm_set.code, 'title', __effective_title)
+	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		where data_object_code is not null
+	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+	perform unsecure.refresh_translation_cache();
 
 -- copy assigned permissions
 
@@ -2313,10 +2396,11 @@ begin
         where (ugm.user_id = _target_user_id
             or pa.user_id = _target_user_id)
           and tenant_id = _tenant_id)
-                 select jsonb_agg(jsonb_build_object('code', p.full_code, 'title', p.title, 'id',
-                                                     p.permission_id))
+                 select jsonb_agg(jsonb_build_object('code', p.full_code, 'title',
+                        (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'),
+                        'id', p.permission_id))
                                 as permissions
-                      , ps.title
+                      , (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en')
                       , ps.perm_set_id
                       , ps.code as perm_set_code
                       , a.assignment_id
@@ -2326,8 +2410,8 @@ begin
                           left join auth.perm_set_perm psp on ps.perm_set_id = psp.perm_set_id
                           left join auth.permission p
                                     on (coalesce(a.permission_id, psp.permission_id) = p.permission_id)
-                 group by ps.title, ps.perm_set_id, a.assignment_id, a.user_group_id
-                 order by ps.title nulls last;
+                 group by ps.perm_set_id, ps.code, a.assignment_id, a.user_group_id
+                 order by (select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en') nulls last;
 
 
     -- Read operation - journal message omitted (use journal level 'all' to log reads)

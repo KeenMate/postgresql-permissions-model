@@ -420,21 +420,7 @@ UPDATE auth.user_info SET is_system = true, can_login = false WHERE user_id IN (
 -- Reset sequence to 1000 to reserve space for system users
 ALTER SEQUENCE auth.user_info_user_id_seq RESTART WITH 1000;
 
--- Seed permissions, providers, groups, and perm sets
-SELECT auth.seed_permission_data();
+-- Permissions, providers, groups, and perm set seeding moved to 047_seed_permissions.sql
+-- (requires public.translation which is created in 030)
 
--- Assign service permission sets to service accounts
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 2, 'svc_registrator_permissions');
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 3, 'svc_authenticator_permissions');
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 4, 'svc_token_permissions');
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 5, 'svc_api_gateway_permissions');
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 6, 'svc_group_syncer_permissions');
-SELECT * FROM unsecure.assign_permission_as_system(null::integer, 800, 'svc_data_processor_permissions');
-
--- Reset sequences to 1000 to reserve space for system tenants and groups
-ALTER SEQUENCE auth.tenant_tenant_id_seq RESTART WITH 1000;
-ALTER SEQUENCE auth.user_group_user_group_id_seq RESTART WITH 1000;
-
--- Backfill short_code for all permissions (in case any were created without it)
-UPDATE auth.permission SET short_code = unsecure.compute_short_code(permission_id)
-WHERE short_code IS NULL;
+-- Sequence resets and permission backfill moved to 047_seed_permissions.sql

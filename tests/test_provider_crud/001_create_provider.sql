@@ -7,7 +7,6 @@ DO $$
 DECLARE
     __provider_id int;
     __db_code text;
-    __db_name text;
     __db_active boolean;
 BEGIN
     RAISE NOTICE 'TEST 1: create_provider returns valid provider_id';
@@ -20,15 +19,15 @@ BEGIN
         RAISE EXCEPTION '  FAIL: create_provider returned NULL provider_id';
     END IF;
 
-    SELECT code, name, is_active
+    SELECT code, is_active
     FROM auth.provider
     WHERE provider_id = __provider_id
-    INTO __db_code, __db_name, __db_active;
+    INTO __db_code, __db_active;
 
-    IF __db_code = 'prov_test_1' AND __db_name = 'Provider Test 1' AND __db_active = true THEN
-        RAISE NOTICE '  PASS: provider created (id=%, code=%, name=%, active=%)', __provider_id, __db_code, __db_name, __db_active;
+    IF __db_code = 'prov_test_1' AND __db_active = true THEN
+        RAISE NOTICE '  PASS: provider created (id=%, code=%, active=%)', __provider_id, __db_code, __db_active;
     ELSE
-        RAISE EXCEPTION '  FAIL: provider data mismatch (code=%, name=%, active=%)', __db_code, __db_name, __db_active;
+        RAISE EXCEPTION '  FAIL: provider data mismatch (code=%, active=%)', __db_code, __db_active;
     END IF;
 END $$;
 

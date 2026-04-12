@@ -367,7 +367,7 @@ begin
 	return query
 		select pa.assignment_id
 				 , ps.code  as perm_set_code
-				 , ps.title as perm_set_title
+				 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en'), ps.code) as perm_set_title
 				 , ugm.member_id
 				 , ug.title
 				 , case
@@ -376,7 +376,7 @@ begin
 						 else 'assignment'
 			end
 				 , p.full_code::text
-				 , p.title
+				 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'), p.code) as permission_title
 				 , t.tenant_id
 				 , t.code
 				 , t.title
@@ -570,13 +570,14 @@ begin
 			'tokens.create_token', 'tokens.validate_token', 'tokens.set_as_used',
 			'authentication.get_data', 'authentication.create_auth_event', 'authentication.read_user_events',
 			'authentication.ensure_permissions', 'authentication.get_users_groups_and_permissions',
-			'resources',
+			'resources', 'invitations', 'mfa',
 			'users.read_all_users', 'users.read_all_user_group_memberships', 'users.get_all_permissions',
 			'tenants.get_all_tenants', 'tenants.get_all_users', 'tenants.get_all_groups', 'tenants.read_all_tenants',
 			'authentication.read_all_user_events',
 			'api_keys.search_all',
 			'permissions.get_all_perm_sets', 'permissions.read_all_perm_sets',
-			'groups.get_all_groups', 'groups.get_all_mappings'],
+			'groups.get_all_groups', 'groups.get_all_mappings',
+			'invitations.get_all_invitations'],
 		_source := 'core');
 	perform unsecure.create_perm_set_as_system('Tenant creator', true, _is_assignable := true,
 		_permissions := array ['tenants.create_tenant', 'journal.read_journal', 'journal.get_payload'],
@@ -818,7 +819,7 @@ begin
             offset ((_page - 1) * _page_size) limit _page_size
         )
         select p.permission_id
-             , p.title
+             , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'), p.code)
              , p.code
              , p.full_code::text
              , p.short_code
@@ -887,7 +888,7 @@ begin
               and (__source is null or ps.source = __source)
               and (helpers.is_empty_string(__search_text)
                    or ps.nrm_search_data like '%' || __search_text || '%')
-            order by ps.title
+            order by ps.code
             offset ((_page - 1) * _page_size) limit _page_size
         ),
         permission_counts as (
@@ -897,7 +898,7 @@ begin
             group by psp.perm_set_id
         )
         select ps.perm_set_id
-             , ps.title
+             , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en'), ps.code)
              , ps.code
              , ps.is_system
              , ps.is_assignable
@@ -911,15 +912,20 @@ end;
 $$;
 
 create or replace function public.get_permissions_map()
-    returns TABLE(__permission_id integer, __full_code text, __short_code text, __title text, __source text)
+    returns table(__permission_id integer, __full_code text, __short_code text, __title text, __source text)
     stable
-    language sql
+    language plpgsql
 as
 $$
-    select permission_id, full_code::text, short_code, title, source
-    from auth.permission
+begin
+    return query
+    select permission_id, full_code::text, short_code,
+           coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.code and mv.language_code = 'en'), p.code),
+           source
+    from auth.permission p
     where is_assignable = true
     order by full_code;
+end;
 $$;
 
 
@@ -987,12 +993,22 @@ begin
             continue;
         end if;
 
-        -- Delegate to unsecure.create_permission (handles node_path, full_code, full_title, short_code)
+        -- Delegate to unsecure.create_permission (handles node_path, full_code, short_code)
         perform unsecure.create_permission(
             _created_by, _user_id, _correlation_id,
             _title, _parent_code,
             _is_assignable, _short_code, _item_source
         );
+
+        -- Store title as translation
+        if helpers.is_not_empty_string(_title) then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, 'en', 'permission', _full_code, 'title', _title)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+            perform unsecure.refresh_translation_cache();
+        end if;
     end loop;
 
     -- Final state: remove permissions with same source that are not in the input set
@@ -1148,6 +1164,16 @@ begin
                 _permissions, _tenant_id, _item_source
             );
         end if;
+
+        -- Store title as translation
+        if helpers.is_not_empty_string(_title) then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, 'en', 'perm_set', _code, 'title', _title)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+            perform unsecure.refresh_translation_cache();
+        end if;
     end loop;
 
     -- Final state: remove perm sets with same source+tenant that are not in the input set
@@ -1193,7 +1219,7 @@ begin
             select helpers.get_code(item ->> 'title', '_')
             from jsonb_array_elements(_perm_sets) as item
         )
-        order by ps.title;
+        order by ps.code;
 end;
 $$;
 

@@ -23,8 +23,8 @@ BEGIN
     PERFORM set_config('test_bl.correlation_id', 'test_blacklist', false);
 
     -- Create a test provider for OAuth blacklist tests
-    INSERT INTO auth.provider (created_by, updated_by, code, name, is_active, allows_group_mapping)
-    VALUES ('test_bl', 'test_bl', 'test_bl_aad', 'Test Blacklist AAD', true, true)
+    INSERT INTO auth.provider (created_by, updated_by, code, is_active, allows_group_mapping)
+    VALUES ('test_bl', 'test_bl', 'test_bl_aad', true, true)
     ON CONFLICT DO NOTHING;
 
     -- Create a test user to act as admin for permission-checked operations

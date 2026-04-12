@@ -116,8 +116,7 @@ create or replace function triggers.calculate_permission_search_values(_permissi
 as
 $$
 begin
-	return concat_ws(' ', helpers.normalize_text(_permission.title)
-		, helpers.normalize_text(_permission.code)
+	return concat_ws(' ', helpers.normalize_text(_permission.code)
 		, helpers.normalize_text(_permission.full_code::text)
 		, helpers.normalize_text(_permission.source)
 		);
@@ -142,8 +141,7 @@ create or replace function triggers.calculate_perm_set_search_values(_perm_set a
 as
 $$
 begin
-	return concat_ws(' ', helpers.normalize_text(_perm_set.title)
-		, helpers.normalize_text(_perm_set.code)
+	return concat_ws(' ', helpers.normalize_text(_perm_set.code)
 		, helpers.normalize_text(_perm_set.source)
 		);
 end;
@@ -216,11 +214,7 @@ create trigger trg_auth_calculate_permission
 	for each row
 execute function triggers.calculate_permission();
 
-create trigger trg_auth_perm_set_code
-	before insert
-	on auth.perm_set
-	for each row
-execute function helpers.trg_generate_code_from_title();
+-- trg_auth_perm_set_code removed: title column dropped, code is always provided by the function layer
 
 create trigger trg_auth_calculate_perm_set
 	before insert or update

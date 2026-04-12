@@ -178,8 +178,8 @@ BEGIN
     FROM auth.permission WHERE full_code = 'fs_test_root.fs_doomed_perm'::ltree;
 
     -- Create a perm set and link the doomed permission to it
-    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, title, code, source)
-    VALUES ('test_ef', 'test_ef', 1, 'FS Doom Set', 'fs_doom_set', 'fs_test_ref')
+    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, code, source)
+    VALUES ('test_ef', 'test_ef', 1, 'fs_doom_set', 'fs_test_ref')
     RETURNING perm_set_id INTO __perm_set_id;
 
     INSERT INTO auth.perm_set_perm (created_by, perm_set_id, permission_id)

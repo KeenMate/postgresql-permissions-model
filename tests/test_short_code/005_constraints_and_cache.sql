@@ -9,8 +9,8 @@ BEGIN
 
     BEGIN
         -- Try to insert a permission with a duplicate custom short_code
-        INSERT INTO auth.permission (created_by, updated_by, title, code, full_code, node_path, is_assignable, short_code)
-        VALUES ('test', 'test', 'Dup Short Code', 'dup_sc', 'dup_sc'::ltree, '998'::ltree, true, 'CUSTOM_01');
+        INSERT INTO auth.permission (created_by, updated_by, code, full_code, node_path, is_assignable, short_code)
+        VALUES ('test', 'test', 'dup_sc', 'dup_sc'::ltree, '998'::ltree, true, 'CUSTOM_01');
 
         RAISE EXCEPTION '  FAIL: Expected unique violation was not thrown';
     EXCEPTION

@@ -20,7 +20,6 @@ create table auth.provider
         primary key,
     code        text                 not null
         unique,
-    name        text                 not null,
     is_active   boolean default true not null,
     allows_group_mapping boolean default false not null,
     allows_group_sync    boolean default false not null,
@@ -210,12 +209,10 @@ create table auth.permission
     permission_id   integer generated always as identity
         primary key,
     is_assignable   boolean default true  not null,
-    title           text                  not null,
     code            text,
     full_code       ltree,
     node_path       ltree,
     has_children    boolean default false not null,
-    full_title      text,
     nrm_search_data text,
     short_code      text,
     source          text default null,
@@ -236,7 +233,6 @@ create table auth.perm_set
     tenant_id       integer
         references auth.tenant
             on delete cascade,
-    title           text                  not null,
     code            text                  not null,
     is_system       boolean default false not null,
     is_assignable   boolean default true  not null,

@@ -254,10 +254,10 @@ begin
 				 , pa.tenant_id
 				 , pa.perm_set_id
 				 , ps.code
-				 , ps.title
+				 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en'), ps.code)
 				 , p.full_code::text
-				 , p.full_title
-				 , p.title
+				 , coalesce((select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.full_code::text and mv.language_code = 'en'), p.full_code::text)
+				 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.full_code::text and mv.language_code = 'en'), p.code)
 		from auth.permission_assignment pa
 					 left join auth.perm_set ps on pa.perm_set_id = ps.perm_set_id
 					 left join auth.permission p on pa.permission_id = p.permission_id
@@ -323,7 +323,13 @@ begin
 	end if;
 
 	return query
-		select pa.assignment_id, pa.perm_set_id, ps.code, ps.title, p.full_code::text, p.full_title, p.title
+		select pa.assignment_id
+			 , pa.perm_set_id
+			 , ps.code
+			 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ps.code and mv.language_code = 'en'), ps.code)
+			 , p.full_code::text
+			 , coalesce((select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.full_code::text and mv.language_code = 'en'), p.full_code::text)
+			 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = p.full_code::text and mv.language_code = 'en'), p.code)
 		from auth.permission_assignment pa
 					 inner join auth.perm_set ps on pa.perm_set_id = ps.perm_set_id
 					 inner join auth.permission p on pa.permission_id = p.permission_id

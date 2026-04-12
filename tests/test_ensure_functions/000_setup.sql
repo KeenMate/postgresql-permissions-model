@@ -13,8 +13,8 @@ BEGIN
     PERFORM set_config('test_ef.correlation_id', 'test_ensure_functions', false);
 
     -- Create a test provider that allows group mapping (needed for mapping tests)
-    INSERT INTO auth.provider (created_by, updated_by, code, name, is_active, allows_group_mapping)
-    VALUES ('test_ef', 'test_ef', 'test_ef_prov', 'Test EF Provider', true, true)
+    INSERT INTO auth.provider (created_by, updated_by, code, is_active, allows_group_mapping)
+    VALUES ('test_ef', 'test_ef', 'test_ef_prov', true, true)
     ON CONFLICT DO NOTHING;
 
     RAISE NOTICE 'SETUP: Using system user_id=1, correlation_id=test_ensure_functions, provider=test_ef_prov';

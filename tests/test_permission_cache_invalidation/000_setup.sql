@@ -31,15 +31,15 @@ BEGIN
     ON CONFLICT DO NOTHING;
 
     -- Create test permission
-    INSERT INTO auth.permission (created_by, updated_by, title, code, full_code, node_path, is_assignable)
-    VALUES ('test', 'test', 'Cache Test Permission', 'cache_test_perm', 'cache_test_perm'::ltree, '999'::ltree, true)
+    INSERT INTO auth.permission (created_by, updated_by, code, full_code, node_path, is_assignable)
+    VALUES ('test', 'test', 'cache_test_perm', 'cache_test_perm'::ltree, '999'::ltree, true)
     ON CONFLICT DO NOTHING;
 
     SELECT permission_id INTO __test_permission_id FROM auth.permission WHERE code = 'cache_test_perm';
 
     -- Create test perm_set
-    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, title, code, is_assignable)
-    VALUES ('test', 'test', 1, 'Cache Test Perm Set', 'cache_test_perm_set', true)
+    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, code, is_assignable)
+    VALUES ('test', 'test', 1, 'cache_test_perm_set', true)
     ON CONFLICT DO NOTHING;
 
     SELECT perm_set_id INTO __test_perm_set_id FROM auth.perm_set WHERE code = 'cache_test_perm_set' AND tenant_id = 1;

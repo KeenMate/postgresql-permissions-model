@@ -89,10 +89,21 @@ begin
 	perform
 		auth.has_permission(_user_id, _correlation_id, 'providers.create_provider', _tenant_id);
 
-	insert into auth.provider (created_by, updated_by, code, name, is_active, allows_group_mapping, allows_group_sync)
-	values (_created_by, _created_by, _provider_code, _provider_name, _is_active, _allows_group_mapping, _allows_group_sync)
+	insert into auth.provider (created_by, updated_by, code, is_active, allows_group_mapping, allows_group_sync)
+	values (_created_by, _created_by, _provider_code, _is_active, _allows_group_mapping, _allows_group_sync)
 	returning provider_id
 		into __last_id;
+
+	-- Store provider name as translation
+	if _provider_name is not null then
+		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+		values (_created_by, _created_by, 'en', 'provider', _provider_code, 'title', _provider_name)
+		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+			where data_object_code is not null
+		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+		perform unsecure.refresh_translation_cache();
+	end if;
 
 	return query
 		select __last_id;
@@ -122,10 +133,21 @@ begin
 	return query
 		update auth.provider
 			set updated_at = now(),
-				updated_by = _updated_by, code = _provider_code, name = _provider_name, is_active = _is_active,
+				updated_by = _updated_by, code = _provider_code, is_active = _is_active,
 				allows_group_mapping = _allows_group_mapping, allows_group_sync = _allows_group_sync
 			where provider_id = _provider_id
 			returning provider_id;
+
+	-- Upsert provider name as translation
+	if _provider_name is not null then
+		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+		values (_updated_by, _updated_by, 'en', 'provider', _provider_code, 'title', _provider_name)
+		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+			where data_object_code is not null
+		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+		perform unsecure.refresh_translation_cache();
+	end if;
 
 	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 16002  -- provider_updated
@@ -266,7 +288,7 @@ begin
 	return query
 		select p.provider_id
 			 , p.code
-			 , p.name
+			 , coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'provider' and mv.data_object_code = p.code and mv.language_code = 'en'), p.code)
 			 , p.is_active
 			 , p.allows_group_mapping
 			 , p.allows_group_sync
@@ -274,7 +296,9 @@ begin
 		where (_is_active is null or p.is_active = _is_active)
 		  and (_allows_group_mapping is null or p.allows_group_mapping = _allows_group_mapping)
 		  and (_allows_group_sync is null or p.allows_group_sync = _allows_group_sync)
-		  and (_search is null or p.name ilike '%' || _search || '%' or p.code ilike '%' || _search || '%')
+		  and (_search is null
+		       or coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'provider' and mv.data_object_code = p.code and mv.language_code = 'en'), p.code) ilike '%' || _search || '%'
+		       or p.code ilike '%' || _search || '%')
 		order by p.code;
 
 	-- Read operation - journal message omitted (use journal level 'all' to log reads)

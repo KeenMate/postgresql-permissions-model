@@ -99,14 +99,14 @@ BEGIN
     -- -----------------------------------------------------------------------
     -- Create test permission sets in each tenant (for get_perm_sets tests)
     -- -----------------------------------------------------------------------
-    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, title, code, is_assignable, is_system)
-    VALUES ('test_ct', 'test_ct', 1, 'CT Perm Set T1', 'ct_perm_set_t1', true, false);
+    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, code, is_assignable, is_system)
+    VALUES ('test_ct', 'test_ct', 1, 'ct_perm_set_t1', true, false);
 
-    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, title, code, is_assignable, is_system)
-    VALUES ('test_ct', 'test_ct', __tenant2_id, 'CT Perm Set T2', 'ct_perm_set_t2', true, false);
+    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, code, is_assignable, is_system)
+    VALUES ('test_ct', 'test_ct', __tenant2_id, 'ct_perm_set_t2', true, false);
 
-    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, title, code, is_assignable, is_system)
-    VALUES ('test_ct', 'test_ct', __tenant3_id, 'CT Perm Set T3', 'ct_perm_set_t3', true, false);
+    INSERT INTO auth.perm_set (created_by, updated_by, tenant_id, code, is_assignable, is_system)
+    VALUES ('test_ct', 'test_ct', __tenant3_id, 'ct_perm_set_t3', true, false);
 
     -- Add at least one permission to each perm set (get_perm_sets uses INNER JOIN on perm_set_perm)
     INSERT INTO auth.perm_set_perm (created_by, perm_set_id, permission_id)
