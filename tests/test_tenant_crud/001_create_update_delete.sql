@@ -239,24 +239,10 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 9: delete_tenant removes a fresh tenant';
 
-    -- Create a fresh tenant for delete test
-    DECLARE __fresh_uuid uuid; __fresh_tid integer;
+    -- Create a fresh tenant and delete it (delete_tenant handles cleanup)
+    DECLARE __fresh_uuid uuid;
     BEGIN
-        SELECT ct.__uuid, ct.__tenant_id FROM auth.create_tenant('tenant_test', 1, 'tenant-test-del-setup', 'Deletable Tenant', 'del_tenant') ct INTO __fresh_uuid, __fresh_tid;
-
-        -- Manual cleanup of auto-created resources that lack ON DELETE CASCADE
-        DELETE FROM auth.owner WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.resource_role_assignment WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.resource_access WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.user_permission_cache WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.user_group_id_cache WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.permission_assignment WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.perm_set WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.tenant_user WHERE tenant_id = __fresh_tid;
-        DELETE FROM auth.user_group WHERE tenant_id = __fresh_tid;
-        DELETE FROM public.journal WHERE tenant_id = __fresh_tid;
-        DELETE FROM public.translation WHERE tenant_id = __fresh_tid;
-        DELETE FROM const.language WHERE tenant_id = __fresh_tid;
+        SELECT ct.__uuid FROM auth.create_tenant('tenant_test', 1, 'tenant-test-del-setup', 'Deletable Tenant', 'del_tenant') ct INTO __fresh_uuid;
 
         SELECT dt.__tenant_id
         FROM auth.delete_tenant('tenant_test', 1, 'tenant-test-del', __fresh_uuid) dt

@@ -10,20 +10,6 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
--- Fix FK: user_group.tenant_id needs ON DELETE CASCADE for delete_tenant
-do $$
-begin
-    if exists (
-        select 1 from information_schema.table_constraints
-        where constraint_name = 'user_group_tenant_id_fkey'
-          and table_schema = 'auth' and table_name = 'user_group'
-    ) then
-        alter table auth.user_group drop constraint user_group_tenant_id_fkey;
-        alter table auth.user_group add constraint user_group_tenant_id_fkey
-            foreign key (tenant_id) references auth.tenant(tenant_id) on delete cascade;
-    end if;
-end $$;
-
 -- Seed permissions, providers, groups, and perm sets
 select auth.seed_permission_data();
 

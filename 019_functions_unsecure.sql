@@ -1874,16 +1874,64 @@ end;
 $$;
 
 create or replace function unsecure.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_id integer)
-    returns TABLE(__tenant_id integer, __uuid uuid, __code text)
+    returns table(__tenant_id integer, __uuid uuid, __code text)
     language plpgsql
 as
 $$
 declare
     __last_item auth.tenant;
 begin
+    -- Explicit cleanup in dependency order (no reliance on CASCADE)
 
-    delete
-    from auth.tenant
+    -- Caches (ephemeral, safe to delete)
+    delete from auth.user_permission_cache where tenant_id = _tenant_id;
+    delete from auth.user_group_id_cache where tenant_id = _tenant_id;
+
+    -- Resource ACL
+    delete from auth.resource_role_assignment where tenant_id = _tenant_id;
+    delete from auth.resource_access where tenant_id = _tenant_id;
+
+    -- Ownership
+    delete from auth.owner where tenant_id = _tenant_id;
+
+    -- Permission assignments (before perm_sets and groups)
+    delete from auth.permission_assignment where tenant_id = _tenant_id;
+
+    -- Perm set permissions (before perm_sets)
+    delete from auth.perm_set_perm where perm_set_id in (
+        select perm_set_id from auth.perm_set where tenant_id = _tenant_id
+    );
+    delete from auth.perm_set where tenant_id = _tenant_id;
+
+    -- Group members and mappings (before groups)
+    delete from auth.user_group_member where user_group_id in (
+        select user_group_id from auth.user_group where tenant_id = _tenant_id
+    );
+    delete from auth.user_group_mapping where user_group_id in (
+        select user_group_id from auth.user_group where tenant_id = _tenant_id
+    );
+    delete from auth.user_group where tenant_id = _tenant_id;
+
+    -- Tenant users
+    delete from auth.tenant_user where tenant_id = _tenant_id;
+
+    -- Invitations (if any)
+    delete from auth.invitation_action where invitation_id in (
+        select invitation_id from auth.invitation where tenant_id = _tenant_id
+    );
+    delete from auth.invitation where tenant_id = _tenant_id;
+
+    -- MFA policies
+    delete from auth.mfa_policy where tenant_id = _tenant_id;
+
+    -- User tenant preferences
+    delete from auth.user_tenant_preference where tenant_id = _tenant_id;
+
+    -- Detach journal references (preserve audit history)
+    update public.journal set tenant_id = null where tenant_id = _tenant_id;
+
+    -- Delete the tenant
+    delete from auth.tenant
     where tenant_id = _tenant_id
     returning * into __last_item;
 
@@ -1892,7 +1940,6 @@ begin
             , 'tenant', __last_item.tenant_id
             , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
             , 1);
-
 
     return query
         select __last_item.tenant_id
