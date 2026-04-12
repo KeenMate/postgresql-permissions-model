@@ -1,0 +1,6 @@
+{
+  "name": "Token CRUD",
+  "description": "Token management functions: create, validate, set as used, set as failed, expiration handling",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

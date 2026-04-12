@@ -1,0 +1,6 @@
+{
+  "name": "Ownership",
+  "description": "Ownership management: assign/remove tenant and group owners, is_owner checks, get_tenant_owners, get_group_owners",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

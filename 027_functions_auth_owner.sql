@@ -11,12 +11,12 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 create or replace function auth.has_owner(_user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
-    immutable
+    stable
     language plpgsql
 as
 $$
 begin
-	if exists(select from auth.owner where tenant_id = _tenant_id and user_group_id = _user_group_id) then
+	if exists(select from auth.owner where tenant_id = _tenant_id and user_group_id is not distinct from _user_group_id) then
 		return true;
 	end if;
 
@@ -25,7 +25,7 @@ end;
 $$;
 
 create or replace function auth.is_owner(_user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _tenant_id integer DEFAULT 1) returns boolean
-    immutable
+    stable
     language plpgsql
 as
 $$
@@ -79,7 +79,7 @@ begin
 	from auth.owner
 	where user_id = _target_user_id
 		and tenant_id = _tenant_id
-		and user_group_id = _user_group_id;
+		and user_group_id is not distinct from _user_group_id;
 
 	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 11011  -- tenant_user_removed

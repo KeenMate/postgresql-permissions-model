@@ -1,0 +1,6 @@
+{
+  "name": "Group CRUD",
+  "description": "Group create/update/delete, members, mapping deletion, effective and assigned group permissions",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

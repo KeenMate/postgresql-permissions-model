@@ -271,7 +271,8 @@ create table auth.user_group
     user_group_id                integer generated always as identity
         primary key,
     tenant_id                    integer
-        references auth.tenant,
+        references auth.tenant
+            on delete cascade,
     title                        text                  not null,
     code                         text                  not null,
     is_system                    boolean default false not null,

@@ -1,0 +1,6 @@
+{
+  "name": "Tenant CRUD",
+  "description": "Tenant management functions: create, update, delete, search, users, groups, ownership",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

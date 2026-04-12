@@ -1,0 +1,6 @@
+{
+  "name": "API Keys",
+  "description": "API key management: create, update, delete, validate, search, assign/unassign permissions",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}
