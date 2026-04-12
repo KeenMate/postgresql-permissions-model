@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.0.0] - 2026-04-11
+## [3.0.0] - 2026-04-12
 
 ### Added
 
@@ -20,7 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`public.mv_translation`** — materialized view that pre-aggregates translations into one jsonb per object for single-index-probe reads. All read-path functions use the MV; write-path functions refresh it after mutations
 - **Error codes**: 35007 (resource role not found), 35008 (role flag invalid for type), 35009 (role/type mismatch)
 - **Event codes**: 18003-18005 (resource role created/updated/deleted), 18020-18021 (resource role assigned/revoked)
+- **`auth.user_data` jsonb columns** — three new columns for extensible per-user configuration:
+  - `settings jsonb` — app-level config (locale, timezone, notifications)
+  - `preferences jsonb` — UI/UX preferences (theme, sidebar, default view)
+  - `custom_data jsonb` — app-specific fields (employee_number, department)
+- **`auth.update_user_data`** — partial-merge update function. Each jsonb param is shallow-merged (`||`) with existing value; null values remove keys via `jsonb_strip_nulls`. Self-update is free, cross-user requires `users.update_user_data` permission. Auto-creates the `user_data` row on first update.
 - Test suite: `test_resource_roles` (8 files covering CRUD, assignment, has_resource_access with roles, deny override, role redefinition, tenant isolation, hierarchy cascade)
+- Test suite: `test_user_data` (13 tests covering auto-create, name coalesce, jsonb merge/remove, column independence, self-update, permission checks)
 - Example: `999-examples-organiogram.sql` — 30-node organization tree with 5 users and resource roles demo
 
 ### Changed
@@ -50,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Translation functions updated: `create_translation` (+context), `copy_translations` (context-aware), `get_group_translations` (reads from MV, returns nested jsonb), `search_translations` (+context filter)
 - `get_event_message_template` changed from `language sql` to `language plpgsql` (deferred validation for file ordering)
 - `unsecure.ensure_resource_access_partition` now creates both `resource_access` and `resource_role_assignment` partitions
+
+### Fixed
+
+- `auth.get_user_data` — missing `return query` and unqualified table reference (`user_data` → `auth.user_data`). Function was silently returning no rows.
 
 ## [2.25.0] - 2026-03-10
 

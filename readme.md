@@ -146,7 +146,7 @@ The `_source` parameter scopes deletions — each module manages only its own it
 ### Core Components
 - **`auth.user_info`** - Core user data
 - **`auth.user_identity`** - Multiple identity provider support per user
-- **`auth.user_data`** - Extensible custom user fields
+- **`auth.user_data`** - Profile fields + three jsonb columns (`settings`, `preferences`, `custom_data`) with partial merge via `auth.update_user_data`
 - **`auth.tenant`** - Multi-tenancy management
 - **`auth.user_group`** - Three group types (internal/external/hybrid)
 - **`auth.permission`** - Global hierarchical permissions
