@@ -389,25 +389,7 @@ end;
 $$;
 
 -- ============================================================================
--- 5. Drop old function signatures to avoid ambiguous overloads
--- ============================================================================
--- resource type functions (from 035)
-drop function if exists auth.create_resource_type(text, bigint, text, text, text, text, text, integer, text, jsonb, text[]);
-drop function if exists auth.update_resource_type(text, bigint, text, text, text, text, boolean, text, integer);
-drop function if exists auth.ensure_resource_types(text, bigint, text, jsonb, text, integer);
-drop function if exists auth.get_resource_types(text, text, boolean);
--- access flag functions (from 035)
-drop function if exists auth.ensure_access_flags(text, bigint, text, jsonb, text, integer);
-drop function if exists auth.get_access_flags(text);
--- resource role functions (from 044)
-drop function if exists auth.create_resource_role(text, bigint, text, text, text, text, text, text[], text, integer);
-drop function if exists auth.ensure_resource_roles(text, bigint, text, jsonb, text, boolean, integer);
-drop function if exists auth.update_resource_role(text, bigint, text, text, text, text, boolean, text, integer);
-drop function if exists auth.get_resource_roles(text, text, boolean);
-drop function if exists auth.get_resource_role_assignments(bigint, text, text, jsonb, integer);
-
--- ============================================================================
--- 5. Replaced functions — resource type management
+-- 3. Functions — resource type management
 -- ============================================================================
 
 -- auth.create_resource_type
