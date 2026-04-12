@@ -26,8 +26,8 @@ BEGIN
     DELETE FROM const.resource_type_flag WHERE resource_type_code IN (SELECT code FROM const.resource_type WHERE source = 'test');
     -- Delete test access flags
     DELETE FROM const.resource_access_flag WHERE source = 'test';
-    -- Delete child types before parent types (FK constraint)
-    DELETE FROM const.resource_type WHERE parent_code IS NOT NULL AND source = 'test';
+    -- Delete child types before parent types (by path depth)
+    DELETE FROM const.resource_type WHERE source = 'test' AND nlevel(path) > 1;
     DELETE FROM const.resource_type WHERE source = 'test';
 
     -- Drop temp table

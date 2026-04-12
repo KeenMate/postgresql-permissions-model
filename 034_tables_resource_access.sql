@@ -18,10 +18,10 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
 /*
  * const.resource_type — Registry of valid resource types (hierarchical)
  *
- * Supports parent/child relationships for type inheritance:
- *   'project'              → root type (parent_code = null, path = 'project')
- *   'project.documents'    → child type (parent_code = 'project', path = 'project.documents')
- *   'project.invoices'     → child type (parent_code = 'project', path = 'project.invoices')
+ * Supports parent/child relationships for type inheritance via ltree path:
+ *   'project'              → root type (path = 'project')
+ *   'project.documents'    → child type (path = 'project.documents')
+ *   'project.invoices'     → child type (path = 'project.invoices')
  *
  * A grant on 'project' cascades to all 'project.*' sub-types at check time.
  *
@@ -36,7 +36,6 @@ create table const.resource_type
     code        text    not null primary key,
     is_active   boolean not null default true,
     source      text    default null,
-    parent_code text    references const.resource_type(code),
     path        ext.ltree not null,
     key_schema  jsonb   not null default '{}'::jsonb
 );

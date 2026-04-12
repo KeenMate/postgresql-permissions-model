@@ -169,8 +169,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Create a resource type with NO per-type flag mappings
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('ptf_untyped', 'test', null,
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('ptf_untyped', 'test',
         'ptf_untyped'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -582,8 +582,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_2' INTO __user_id_2;
 
     -- Create a test type with flags
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('ptf_clearable', 'test', null,
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('ptf_clearable', 'test',
         'ptf_clearable'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 

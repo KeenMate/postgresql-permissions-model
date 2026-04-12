@@ -14,8 +14,8 @@ BEGIN
     SELECT val FROM _ra_test_data WHERE key = 'user_id_1' INTO __user_id_1;
 
     -- Create root type 'project' with key_schema
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('project', 'test', null, 'project'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('project', 'test', 'project'::ext.ltree,
         '{"project_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -27,8 +27,8 @@ BEGIN
     PERFORM unsecure.ensure_resource_access_partition('project');
 
     -- Create child types with composite key_schema
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('project.documents', 'test', 'project', 'project.documents'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('project.documents', 'test', 'project.documents'::ext.ltree,
         '{"project_id": "bigint", "folder_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
@@ -36,8 +36,8 @@ BEGIN
         ('project.documents', 'read'), ('project.documents', 'write'), ('project.documents', 'delete'), ('project.documents', 'export')
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('project.invoices', 'test', 'project', 'project.invoices'::ext.ltree,
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('project.invoices', 'test', 'project.invoices'::ext.ltree,
         '{"project_id": "bigint", "invoice_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 

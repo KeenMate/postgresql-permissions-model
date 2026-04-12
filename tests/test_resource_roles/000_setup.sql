@@ -61,12 +61,12 @@ BEGIN
     VALUES ('test', __tenant_id_2, __user_id_1);
 
     -- Resource types (reuse existing if present, or create)
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('asset', 'test_roles', null, 'asset'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('asset', 'test_roles', 'asset'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('asset.file', 'test_roles', 'asset', 'asset.file'::ext.ltree, '{"id": "bigint", "file_id": "bigint"}'::jsonb)
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('asset.file', 'test_roles', 'asset.file'::ext.ltree, '{"id": "bigint", "file_id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
     -- Per-type flags for 'asset'

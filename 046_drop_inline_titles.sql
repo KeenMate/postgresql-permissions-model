@@ -417,7 +417,6 @@ create or replace function auth.create_resource_type(
     _correlation_id text,
     _code         text,
     _title        text,
-    _parent_code  text default null,
     _description  text default null,
     _tenant_id    integer default 1,
     _source       text default null,
@@ -431,7 +430,6 @@ create or replace function auth.create_resource_type(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __parent_code  text,
     __path         ext.ltree,
     __key_schema   jsonb,
     __access_flags text[]
@@ -445,22 +443,14 @@ declare
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
-    if _parent_code is not null then
-        if not exists (
-            select 1 from const.resource_type where code = _parent_code and is_active = true
-        ) then
-            perform error.raise_35003(_parent_code);
-        end if;
-    end if;
-
     if _access_flags is not null then
         perform unsecure.validate_access_flags(_access_flags);
     end if;
 
     _path := text2ltree(_code);
 
-    insert into const.resource_type (code, source, parent_code, path, key_schema)
-    values (_code, _source, _parent_code, _path, coalesce(_key_schema, '{}'::jsonb))
+    insert into const.resource_type (code, source, path, key_schema)
+    values (_code, _source, _path, coalesce(_key_schema, '{}'::jsonb))
     on conflict do nothing;
 
     -- Translations for title + description
@@ -493,7 +483,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt where rt.code = _code;
@@ -501,7 +491,7 @@ begin
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18001, 'resource_type', 0
         , jsonb_build_object('resource_type', _code, 'title', _title,
-            'parent_code', _parent_code, 'key_schema', _key_schema, 'access_flags', _access_flags)
+            'key_schema', _key_schema, 'access_flags', _access_flags)
         , _tenant_id);
 end;
 $$;
@@ -525,7 +515,6 @@ create or replace function auth.update_resource_type(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __parent_code  text,
     __path         ext.ltree,
     __key_schema   jsonb,
     __access_flags text[]
@@ -573,7 +562,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt where rt.code = _code;
@@ -601,7 +590,6 @@ create or replace function auth.ensure_resource_types(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __parent_code  text,
     __path         ext.ltree,
     __key_schema   jsonb,
     __access_flags text[]
@@ -613,7 +601,6 @@ declare
     _item          jsonb;
     _code          text;
     _title         text;
-    _parent_code   text;
     _description   text;
     _item_source   text;
     _key_schema    jsonb;
@@ -629,7 +616,6 @@ begin
     loop
         _code        := _item->>'code';
         _title       := _item->>'title';
-        _parent_code := _item->>'parent_code';
         _description := _item->>'description';
         _item_source := coalesce(_item->>'source', _source);
         _key_schema  := coalesce(_item->'key_schema', '{}'::jsonb);
@@ -644,18 +630,12 @@ begin
         end if;
 
         if not exists (select 1 from const.resource_type where code = _code) then
-            if _parent_code is not null then
-                if not exists (select 1 from const.resource_type where code = _parent_code and is_active = true) then
-                    perform error.raise_35003(_parent_code);
-                end if;
-            end if;
-
             if _access_flags is not null then
                 perform unsecure.validate_access_flags(_access_flags);
             end if;
 
-            insert into const.resource_type (code, source, parent_code, path, key_schema)
-            values (_code, _item_source, _parent_code, _path, _key_schema)
+            insert into const.resource_type (code, source, path, key_schema)
+            values (_code, _item_source, _path, _key_schema)
             on conflict do nothing;
         end if;
 
@@ -691,7 +671,7 @@ begin
         perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
             , 18001, 'resource_type', 0
             , jsonb_build_object('resource_type', _code, 'title', _title,
-                'parent_code', _parent_code, 'key_schema', _key_schema, 'access_flags', _access_flags)
+                'key_schema', _key_schema, 'access_flags', _access_flags)
             , _tenant_id);
     end loop;
 
@@ -700,7 +680,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt
@@ -712,7 +692,6 @@ $$;
 -- auth.get_resource_types
 create or replace function auth.get_resource_types(
     _source        text    default null,
-    _parent_code   text    default null,
     _active_only   boolean default true,
     _language_code text    default 'en'
 ) returns table(
@@ -722,7 +701,6 @@ create or replace function auth.get_resource_types(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __parent_code  text,
     __path         ext.ltree,
     __key_schema   jsonb,
     __access_flags text[]
@@ -737,7 +715,7 @@ begin
            coalesce(mv.values->>'title', rt.code),
            mv.values->>'full_title',
            mv.values->>'description',
-           rt.is_active, rt.source, rt.parent_code, rt.path, rt.key_schema,
+           rt.is_active, rt.source, rt.path, rt.key_schema,
            (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
             from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
     from const.resource_type rt
@@ -746,7 +724,6 @@ begin
         and mv.language_code = _language_code
     where (_active_only = false or rt.is_active = true)
       and (_source is null or rt.source = _source)
-      and (_parent_code is null or rt.parent_code = _parent_code)
     order by rt.path;
 end;
 $$;

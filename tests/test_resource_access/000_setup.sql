@@ -63,12 +63,12 @@ BEGIN
 
     -- Create resource types (with ltree path for hierarchy support)
     -- key_schema defines the expected jsonb structure for resource_id
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('document', 'test', null, 'document'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('document', 'test', 'document'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
-    INSERT INTO const.resource_type (code, source, parent_code, path, key_schema)
-    VALUES ('folder', 'test', null, 'folder'::ext.ltree, '{"id": "bigint"}'::jsonb)
+    INSERT INTO const.resource_type (code, source, path, key_schema)
+    VALUES ('folder', 'test', 'folder'::ext.ltree, '{"id": "bigint"}'::jsonb)
     ON CONFLICT DO NOTHING;
 
     -- Register per-type access flags
