@@ -160,6 +160,9 @@ create table auth.user_data
     first_name      text,
     middle_name     text,
     last_name       text,
+    settings        jsonb   not null default '{}'::jsonb,
+    preferences     jsonb   not null default '{}'::jsonb,
+    custom_data     jsonb   not null default '{}'::jsonb,
     nrm_search_data text,
     constraint user_data_created_by_check
         check (length(created_by) <= 250),

@@ -46,7 +46,7 @@ This system manages the complete lifecycle of authorization entities:
 **User Management:**
 - **Users** (`auth.user_info`) - Core user data
 - **User Identity** (`auth.user_identity`) - Provider-specific identities (Windows GUID, AzureAD UID, etc.)
-- **User Data** (`auth.user_data`) - Extensible custom fields per application needs
+- **User Data** (`auth.user_data`) - Profile fields + three jsonb columns: `settings`, `preferences`, `custom_data` with partial merge support
 - **User Permission Cache** (`auth.user_permission_cache`) - Cached permission calculations for performance
 
 **Groups & Mappings:**
@@ -228,11 +228,15 @@ The user system uses three main tables for flexible multi-provider support and e
 - Multiple identities per user: Windows GUID, AzureAD UID, Google ID, etc.
 - **Last used provider determines permissions** - `provider_groups` and `provider_roles` from most recent login drive permission calculations
 
-**Extensible User Data (`user_data` table)**:
-- `auth.update_user_data()` - Update custom user fields
-- **Flexible schema**: Add any columns needed (e.g., `employee_number`, `has_children`, `is_casual_driver`)
-- **Alternative approach**: Create custom tables and reference `auth.user_info.user_id` as foreign key
-- No fixed structure - adapt to application-specific requirements
+**User Data (`user_data` table)**:
+- `auth.update_user_data()` - Partial-merge update for profile + jsonb columns
+- Three jsonb columns with shallow-merge semantics:
+  - `settings` — app-level user config (locale, timezone, notifications)
+  - `preferences` — UI/UX preferences (theme, sidebar, default view)
+  - `custom_data` — app-specific extensible fields (employee_number, department)
+- Pass only the keys to change; pass `null` value to remove a key
+- Self-update is free (no RBAC), updating others requires `users.update_user_data`
+- Auto-creates the `user_data` row on first update
 
 ### Authorization Functions
 Core permission checking for any PostgreSQL application:
@@ -480,7 +484,7 @@ All tests are organized as suite directories with `test.json` manifests:
 - **SQL Convention**: Always use fully qualified schema names (e.g., `auth.has_permission`, `public.__version`) to prevent search_path related errors
 - **Variable Naming Convention**: Function parameters use `_` prefix (e.g., `_user_id`), return columns use `__` prefix (e.g., `__user_id`). When a local variable would clash with a `__` return column, use `___` (triple underscore) prefix for the local variable (e.g., `___user_id`). This prevents ambiguous column/variable errors in PL/pgSQL blocks that query functions returning `__`-prefixed columns.
 - **Group Mapping Strategy**: Supports internal, external, and hybrid group membership models for flexible integration with any identity provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
-- **Extensible User Data**: `user_data` table can be modified with custom columns OR create separate tables referencing `user_info.user_id`
+- **User Data**: `user_data` table has three jsonb columns (`settings`, `preferences`, `custom_data`) with partial merge via `auth.update_user_data`. Additional custom columns can still be added, or create separate tables referencing `user_info.user_id`
 - Permission caching is implemented - use `unsecure.clear_permission_cache()` when needed
 - **API Keys as Technical Users**: Each API key creates a technical user in `user_info`, allowing uniform permission handling across human and service accounts
 - System includes comprehensive audit logging for all security events

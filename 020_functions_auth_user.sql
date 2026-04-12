@@ -631,6 +631,73 @@ begin
 end;
 $$;
 
+-- ============================================================================
+-- auth.update_user_data — partial jsonb merge for settings/preferences/custom_data
+-- ============================================================================
+-- Each jsonb parameter is shallow-merged with the existing value.
+-- Pass only the keys you want to change. To remove a key, pass it with null
+-- value and the function will strip nulls after merge.
+-- Name columns (first_name, etc.) use coalesce — pass null to leave unchanged.
+--
+create or replace function auth.update_user_data(
+    _updated_by      text,
+    _user_id         bigint,
+    _correlation_id  text,
+    _target_user_id  bigint,
+    _first_name      text    default null,
+    _middle_name     text    default null,
+    _last_name       text    default null,
+    _settings        jsonb   default null,
+    _preferences     jsonb   default null,
+    _custom_data     jsonb   default null,
+    _tenant_id       integer default 1
+) returns setof auth.user_data
+    rows 1
+    language plpgsql
+as
+$$
+begin
+    -- Self-update is free, updating others requires permission
+    if _user_id <> _target_user_id then
+        perform auth.has_permission(_user_id, _correlation_id, 'users.update_user_data', _tenant_id);
+    end if;
+
+    -- Ensure user_data row exists (created on first update)
+    insert into auth.user_data (created_by, updated_by, user_id)
+    values (_updated_by, _updated_by, _target_user_id)
+    on conflict (user_id) do nothing;
+
+    return query
+        update auth.user_data
+        set updated_by  = _updated_by,
+            updated_at  = now(),
+            first_name  = coalesce(_first_name, first_name),
+            middle_name = coalesce(_middle_name, middle_name),
+            last_name   = coalesce(_last_name, last_name),
+            settings    = case when _settings is not null
+                          then jsonb_strip_nulls(coalesce(settings, '{}'::jsonb) || _settings)
+                          else settings end,
+            preferences = case when _preferences is not null
+                          then jsonb_strip_nulls(coalesce(preferences, '{}'::jsonb) || _preferences)
+                          else preferences end,
+            custom_data = case when _custom_data is not null
+                          then jsonb_strip_nulls(coalesce(custom_data, '{}'::jsonb) || _custom_data)
+                          else custom_data end
+        where user_id = _target_user_id
+        returning *;
+
+    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+        , 10002  -- user_updated
+        , 'user', _target_user_id
+        , jsonb_strip_nulls(jsonb_build_object(
+            'first_name', _first_name, 'middle_name', _middle_name, 'last_name', _last_name,
+            'settings_keys', case when _settings is not null then (select array_agg(k) from jsonb_object_keys(_settings) k) end,
+            'preferences_keys', case when _preferences is not null then (select array_agg(k) from jsonb_object_keys(_preferences) k) end,
+            'custom_data_keys', case when _custom_data is not null then (select array_agg(k) from jsonb_object_keys(_custom_data) k) end))
+        , _tenant_id);
+end;
+$$;
+
 create or replace function auth.delete_user_info(_deleted_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer default 1, _blacklist boolean default false)
     returns table(__user_id bigint, __username text)
     rows 1
