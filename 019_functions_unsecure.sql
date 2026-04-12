@@ -695,8 +695,8 @@ begin
 	return query
 --         Get all assigned permissions from permsets
 		select distinct ep.permission_code::text as full_code
-									, ep.permission_title
-									, ep.perm_set_title
+									, coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'permission' and mv.data_object_code = ep.permission_code::text and mv.language_code = 'en'), ep.permission_code::text)
+									, coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'perm_set' and mv.data_object_code = ep.perm_set_code and mv.language_code = 'en'), ep.perm_set_code)
 									, ep.perm_set_code
 									, ep.perm_set_id
 									, pa.assignment_id
@@ -2349,7 +2349,7 @@ begin
 	insert into auth.perm_set(created_by, updated_by, tenant_id, is_system,
 														is_assignable, code, source)
 	values ( _created_by, _created_by, _target_tenant_id
-				 , __source_perm_set.is_system, __source_perm_set.is_assignable, helpers.get_code(_new_title)
+				 , __source_perm_set.is_system, __source_perm_set.is_assignable, helpers.get_code(__effective_title)
 				 , __source_perm_set.source)
 	returning *
 		into __created_perm_set;

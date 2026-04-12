@@ -386,7 +386,7 @@ as
 $$
 begin
     if OLD.is_assignable is distinct from NEW.is_assignable
-        or OLD.title is distinct from NEW.title then
+        or OLD.code is distinct from NEW.code then
         perform unsecure.notify_permission_change(
             'perm_set_updated', NEW.tenant_id, 'perm_set', NEW.perm_set_id,
             jsonb_build_object('is_assignable', NEW.is_assignable));

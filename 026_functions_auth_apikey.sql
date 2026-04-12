@@ -162,7 +162,7 @@ end;
 $$;
 
 create or replace function auth.get_api_key_permissions(_user_id bigint, _correlation_id text, _api_key_id integer, _tenant_id integer)
-    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text)
+    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
     language plpgsql
 as
