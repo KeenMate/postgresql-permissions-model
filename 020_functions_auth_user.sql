@@ -619,13 +619,13 @@ as
 $$
 begin
 
-	if
-		_user_id <> _target_user_id then
+	if _user_id <> _target_user_id then
 		perform auth.has_permission(_user_id, _correlation_id, 'users.get_data', _tenant_id);
 	end if;
 
+	return query
 	select *
-	from user_data
+	from auth.user_data
 	where user_id = _target_user_id;
 
 end;

@@ -1,0 +1,6 @@
+{
+  "name": "User Data Test Suite",
+  "description": "Tests for auth.user_data: CRUD, jsonb partial merge (settings/preferences/custom_data), key removal, self-update, permission checks",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}
