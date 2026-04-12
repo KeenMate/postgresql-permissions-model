@@ -60,8 +60,7 @@ insert into const.resource_access_flag (code, source) values
     ('export',  'core')
 on conflict do nothing;
 
--- Core flag translations are seeded in 046_drop_inline_titles.sql
--- (the context column on public.translation is added in 045)
+-- Core flag translations are seeded in 046_seed_translations.sql
 
 /*
  * const.resource_type_flag — Per-type access flag mapping

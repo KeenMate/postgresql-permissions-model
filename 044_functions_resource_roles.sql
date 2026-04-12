@@ -93,7 +93,7 @@ $$;
 
 -- ============================================================================
 -- 1-3. auth.create_resource_role, ensure_resource_roles, update_resource_role
--- are defined in 046_drop_inline_titles.sql (translations-aware versions).
+-- are defined below (translations-aware versions).
 -- ============================================================================
 
 -- ============================================================================
@@ -210,7 +210,7 @@ begin
 end;
 $$;
 
--- 6. auth.get_resource_roles — defined in 046_drop_inline_titles.sql
+-- 6. auth.get_resource_roles — defined below
 
 -- ============================================================================
 -- 7. auth.get_resource_role_flags
@@ -480,7 +480,7 @@ begin
 end;
 $$;
 
--- 11. auth.get_resource_role_assignments — defined in 046_drop_inline_titles.sql
+-- 11. auth.get_resource_role_assignments — defined below
 
 -- ============================================================================
 -- 12. auth.has_resource_access (REPLACED)
@@ -1316,5 +1316,380 @@ begin
     select * from group_resources
     union all
     select * from group_role_resources;
+end;
+$$;
+-- 6. Replaced functions — resource role management
+-- ============================================================================
+
+-- auth.create_resource_role
+create or replace function auth.create_resource_role(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _code           text,
+    _resource_type  text,
+    _title          text,
+    _description    text    default null,
+    _access_flags   text[]  default null,
+    _source         text    default null,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __code          text,
+    __resource_type text,
+    __title         text,
+    __description   text,
+    __is_active     boolean,
+    __source        text,
+    __access_flags  text[]
+)
+    language plpgsql
+as
+$$
+declare
+    _flag text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+    perform unsecure.validate_resource_type(_resource_type);
+
+    if _access_flags is not null then
+        perform unsecure.validate_access_flags(_access_flags);
+        perform unsecure.validate_role_flags_for_type(_code, _resource_type, _access_flags);
+    end if;
+
+    insert into const.resource_role (code, resource_type, source)
+    values (_code, _resource_type, _source)
+    on conflict do nothing;
+
+    -- Translations
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_role', _code, 'title', _title)
+        on conflict do nothing;
+    end if;
+    if _description is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_role', _code, 'description', _description)
+        on conflict do nothing;
+    end if;
+
+    if _access_flags is not null then
+        foreach _flag in array _access_flags
+        loop
+            insert into const.resource_role_flag (resource_role_code, access_flag_code)
+            values (_code, _flag) on conflict do nothing;
+        end loop;
+    end if;
+
+    perform unsecure.refresh_translation_cache();
+
+    return query
+        select r.code, r.resource_type,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               r.is_active, r.source,
+               (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
+                from const.resource_role_flag rrf where rrf.resource_role_code = r.code)
+        from const.resource_role r where r.code = _code;
+
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+        , 18003, 'resource_role', 0
+        , jsonb_build_object('role_code', _code, 'resource_type', _resource_type,
+            'title', _title, 'access_flags', _access_flags, 'source', _source)
+        , _tenant_id);
+end;
+$$;
+
+-- auth.ensure_resource_roles
+create or replace function auth.ensure_resource_roles(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _roles          jsonb,
+    _source         text    default null,
+    _is_final_state boolean default false,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __code          text,
+    __resource_type text,
+    __title         text,
+    __description   text,
+    __is_active     boolean,
+    __source        text,
+    __access_flags  text[]
+)
+    language plpgsql
+as
+$$
+declare
+    _item          jsonb;
+    _code          text;
+    _res_type      text;
+    _title         text;
+    _desc          text;
+    _item_source   text;
+    _access_flags  text[];
+    _flag          text;
+    _existing_code text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    for _item in select value from jsonb_array_elements(_roles)
+    loop
+        _code       := _item->>'code';
+        _res_type   := _item->>'resource_type';
+        _title      := _item->>'title';
+        _desc       := _item->>'description';
+        _item_source := coalesce(_item->>'source', _source);
+
+        if _item ? 'access_flags' and _item->'access_flags' is not null then
+            select array_agg(f.value::text)
+            from jsonb_array_elements_text(_item->'access_flags') as f(value)
+            into _access_flags;
+        else
+            _access_flags := null;
+        end if;
+
+        perform unsecure.validate_resource_type(_res_type);
+
+        if _access_flags is not null then
+            perform unsecure.validate_access_flags(_access_flags);
+            perform unsecure.validate_role_flags_for_type(_code, _res_type, _access_flags);
+        end if;
+
+        if exists (select 1 from const.resource_role where code = _code) then
+            update const.resource_role
+            set source    = coalesce(_item_source, source),
+                is_active = true
+            where code = _code;
+        else
+            insert into const.resource_role (code, resource_type, source)
+            values (_code, _res_type, _item_source);
+        end if;
+
+        -- Translations (upsert)
+        if _title is not null then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, _language_code, 'resource_role', _code, 'title', _title)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+        end if;
+        if _desc is not null then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, _language_code, 'resource_role', _code, 'description', _desc)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+        end if;
+
+        if _access_flags is not null then
+            delete from const.resource_role_flag
+            where resource_role_code = _code and access_flag_code != all(_access_flags);
+            foreach _flag in array _access_flags
+            loop
+                insert into const.resource_role_flag (resource_role_code, access_flag_code)
+                values (_code, _flag) on conflict do nothing;
+            end loop;
+        end if;
+
+        perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+            , 18003, 'resource_role', 0
+            , jsonb_build_object('role_code', _code, 'resource_type', _res_type,
+                'title', _title, 'access_flags', _access_flags)
+            , _tenant_id);
+    end loop;
+
+    if _is_final_state and _source is not null then
+        for _existing_code in
+            select r.code from const.resource_role r
+            where r.source = _source and r.is_active = true
+              and r.code not in (select value->>'code' from jsonb_array_elements(_roles))
+        loop
+            update const.resource_role set is_active = false where code = _existing_code;
+        end loop;
+    end if;
+
+    perform unsecure.refresh_translation_cache();
+
+    return query
+        select r.code, r.resource_type,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               r.is_active, r.source,
+               (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
+                from const.resource_role_flag rrf where rrf.resource_role_code = r.code)
+        from const.resource_role r
+        where r.code in (select value->>'code' from jsonb_array_elements(_roles))
+        order by r.resource_type, r.code;
+end;
+$$;
+
+-- auth.update_resource_role
+create or replace function auth.update_resource_role(
+    _updated_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _code           text,
+    _title          text    default null,
+    _description    text    default null,
+    _is_active      boolean default null,
+    _source         text    default null,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __code          text,
+    __resource_type text,
+    __title         text,
+    __description   text,
+    __is_active     boolean,
+    __source        text,
+    __access_flags  text[]
+)
+    language plpgsql
+as
+$$
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    if not exists (select 1 from const.resource_role where code = _code) then
+        perform error.raise_35007(_code);
+    end if;
+
+    update const.resource_role
+    set is_active = coalesce(_is_active, is_active),
+        source    = coalesce(_source, source)
+    where code = _code;
+
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_updated_by, _updated_by, _language_code, 'resource_role', _code, 'title', _title)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end if;
+    if _description is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_updated_by, _updated_by, _language_code, 'resource_role', _code, 'description', _description)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end if;
+
+    perform unsecure.refresh_translation_cache();
+
+    return query
+        select r.code, r.resource_type,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code), r.code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_role' and mv.data_object_code = r.code and mv.language_code = _language_code),
+               r.is_active, r.source,
+               (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
+                from const.resource_role_flag rrf where rrf.resource_role_code = r.code)
+        from const.resource_role r where r.code = _code;
+
+    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+        , 18004, 'resource_role', 0
+        , jsonb_build_object('role_code', _code, 'title', _title, 'is_active', _is_active)
+        , _tenant_id);
+end;
+$$;
+
+-- auth.get_resource_roles
+create or replace function auth.get_resource_roles(
+    _source        text    default null,
+    _resource_type text    default null,
+    _active_only   boolean default true,
+    _language_code text    default 'en'
+) returns table(
+    __code          text,
+    __resource_type text,
+    __title         text,
+    __description   text,
+    __is_active     boolean,
+    __source        text,
+    __access_flags  text[]
+)
+    stable
+    language plpgsql
+as
+$$
+begin
+    return query
+    select r.code, r.resource_type,
+           coalesce(mv.values->>'title', r.code),
+           mv.values->>'description',
+           r.is_active, r.source,
+           (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
+            from const.resource_role_flag rrf where rrf.resource_role_code = r.code)
+    from const.resource_role r
+    left join public.mv_translation mv
+        on mv.data_group = 'resource_role' and mv.data_object_code = r.code
+        and mv.language_code = _language_code
+    where (_active_only = false or r.is_active = true)
+      and (_source is null or r.source = _source)
+      and (_resource_type is null or r.resource_type = _resource_type)
+    order by r.resource_type, r.code;
+end;
+$$;
+
+-- auth.get_resource_role_assignments
+create or replace function auth.get_resource_role_assignments(
+    _user_id        bigint,
+    _correlation_id text,
+    _resource_type  text,
+    _resource_id    jsonb,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __resource_role_assignment_id bigint,
+    __user_id            bigint,
+    __user_display_name  text,
+    __user_group_id      integer,
+    __group_title        text,
+    __role_code          text,
+    __role_title         text,
+    __access_flags       text[],
+    __granted_by         bigint,
+    __granted_by_name    text,
+    __created_at         timestamptz
+)
+    stable
+    language plpgsql
+as
+$$
+declare
+    _root_type text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.get_grants', _tenant_id);
+
+    _root_type := split_part(_resource_type, '.', 1);
+
+    return query
+    select
+        rra.resource_role_assignment_id,
+        rra.user_id,
+        ui.display_name,
+        rra.user_group_id,
+        ug.title,
+        rra.role_code,
+        coalesce(mv_role.values->>'title', rra.role_code),
+        (select array_agg(rrf.access_flag_code order by rrf.access_flag_code)
+         from const.resource_role_flag rrf where rrf.resource_role_code = rra.role_code),
+        rra.granted_by,
+        gb.display_name,
+        rra.created_at
+    from auth.resource_role_assignment rra
+    left join auth.user_info ui on ui.user_id = rra.user_id
+    left join auth.user_group ug on ug.user_group_id = rra.user_group_id
+    left join public.mv_translation mv_role
+        on mv_role.data_group = 'resource_role' and mv_role.data_object_code = rra.role_code
+        and mv_role.language_code = _language_code
+    left join auth.user_info gb on gb.user_id = rra.granted_by
+    where rra.root_type = _root_type
+      and rra.resource_type = _resource_type
+      and rra.tenant_id = _tenant_id
+      and rra.resource_id = _resource_id
+    order by rra.role_code, rra.created_at;
 end;
 $$;

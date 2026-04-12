@@ -1100,9 +1100,7 @@ end;
 $$;
 
 -- ============================================================================
--- Resource type CRUD and access flag CRUD are defined in
--- 046_drop_inline_titles.sql (translations-aware versions).
--- ensure_resource_type_flags stays here (no translation dependency).
+-- Resource type CRUD, access flag CRUD, and translations-aware functions
 -- ============================================================================
 
 -- ============================================================================
@@ -1164,3 +1162,459 @@ begin
     order by rtf.access_flag_code;
 end;
 $$;
+-- ============================================================================
+-- 2. Helper: recompute full_title translations for a type and descendants
+-- ============================================================================
+-- Mirrors the old unsecure.update_resource_type_full_title but writes to
+-- public.translation with context='full_title' instead of a column.
+-- Called after any title translation is created/updated.
+--
+create or replace function unsecure.update_resource_type_full_title_translations(
+    _path           ext.ltree,
+    _language_code  text default 'en',
+    _created_by     text default 'system'
+) returns void
+    language plpgsql
+as
+$$
+declare
+    _rt record;
+    _full_title text;
+begin
+    for _rt in
+        select code, path
+        from const.resource_type
+        where path <@ _path
+        order by path
+    loop
+        -- Build breadcrumb from ancestor title translations
+        select array_to_string(
+            array(
+                select coalesce(t.value, a.code)
+                from const.resource_type a
+                left join public.translation t
+                    on t.data_group = 'resource_type' and t.data_object_code = a.code
+                    and t.context = 'title' and t.language_code = _language_code
+                where a.path @> _rt.path
+                order by a.path
+            ), ' > ')
+        into _full_title;
+
+        -- Upsert full_title translation
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_type', _rt.code, 'full_title', _full_title)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end loop;
+
+    -- Refresh MV so reads see updated full_titles
+    perform unsecure.refresh_translation_cache();
+end;
+$$;
+
+-- ============================================================================
+-- 3. Functions — resource type management
+-- ============================================================================
+
+-- auth.create_resource_type
+create or replace function auth.create_resource_type(
+    _created_by   text,
+    _user_id      bigint,
+    _correlation_id text,
+    _code         text,
+    _title        text,
+    _description  text default null,
+    _tenant_id    integer default 1,
+    _source       text default null,
+    _key_schema   jsonb default '{}'::jsonb,
+    _access_flags text[] default null,
+    _language_code text default 'en'
+) returns table(
+    __code         text,
+    __title        text,
+    __full_title   text,
+    __description  text,
+    __is_active    boolean,
+    __source       text,
+    __path         ext.ltree,
+    __key_schema   jsonb,
+    __access_flags text[]
+)
+    language plpgsql
+as
+$$
+declare
+    _path ext.ltree;
+    _flag text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    if _access_flags is not null then
+        perform unsecure.validate_access_flags(_access_flags);
+    end if;
+
+    _path := text2ltree(_code);
+
+    insert into const.resource_type (code, source, path, key_schema)
+    values (_code, _source, _path, coalesce(_key_schema, '{}'::jsonb))
+    on conflict do nothing;
+
+    -- Translations for title + description
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_type', _code, 'title', _title)
+        on conflict do nothing;
+    end if;
+    if _description is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_type', _code, 'description', _description)
+        on conflict do nothing;
+    end if;
+
+    -- Recompute full_title for this type and all descendants
+    perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _created_by);
+
+    if _access_flags is not null then
+        foreach _flag in array _access_flags
+        loop
+            insert into const.resource_type_flag (resource_type_code, access_flag_code)
+            values (_code, _flag) on conflict do nothing;
+        end loop;
+    end if;
+
+    perform unsecure.ensure_resource_access_partition(_code);
+
+    return query
+        select rt.code,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
+               (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               rt.is_active, rt.source, rt.path, rt.key_schema,
+               (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
+                from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+        from const.resource_type rt where rt.code = _code;
+
+    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+        , 18001, 'resource_type', 0
+        , jsonb_build_object('resource_type', _code, 'title', _title,
+            'key_schema', _key_schema, 'access_flags', _access_flags)
+        , _tenant_id);
+end;
+$$;
+
+-- auth.update_resource_type
+create or replace function auth.update_resource_type(
+    _updated_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _code           text,
+    _title          text    default null,
+    _description    text    default null,
+    _is_active      boolean default null,
+    _source         text    default null,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __code         text,
+    __title        text,
+    __full_title   text,
+    __description  text,
+    __is_active    boolean,
+    __source       text,
+    __path         ext.ltree,
+    __key_schema   jsonb,
+    __access_flags text[]
+)
+    language plpgsql
+as
+$$
+declare
+    _path ext.ltree;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    if not exists (select 1 from const.resource_type where code = _code) then
+        perform error.raise_35003(_code);
+    end if;
+
+    select path from const.resource_type where code = _code into _path;
+
+    update const.resource_type
+    set is_active = coalesce(_is_active, is_active),
+        source    = coalesce(_source, source)
+    where code = _code;
+
+    -- Upsert translations
+    if _title is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_updated_by, _updated_by, _language_code, 'resource_type', _code, 'title', _title)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+
+        -- Recompute full_title for this type and all descendants
+        perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _updated_by);
+    end if;
+    if _description is not null then
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_updated_by, _updated_by, _language_code, 'resource_type', _code, 'description', _description)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end if;
+
+    return query
+        select rt.code,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
+               (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               rt.is_active, rt.source, rt.path, rt.key_schema,
+               (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
+                from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+        from const.resource_type rt where rt.code = _code;
+
+    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+        , 18002, 'resource_type', 0
+        , jsonb_build_object('resource_type', _code, 'title', _title, 'is_active', _is_active)
+        , _tenant_id);
+end;
+$$;
+
+-- auth.ensure_resource_types
+create or replace function auth.ensure_resource_types(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _resource_types jsonb,
+    _source         text    default null,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(
+    __code         text,
+    __title        text,
+    __full_title   text,
+    __description  text,
+    __is_active    boolean,
+    __source       text,
+    __path         ext.ltree,
+    __key_schema   jsonb,
+    __access_flags text[]
+)
+    language plpgsql
+as
+$$
+declare
+    _item          jsonb;
+    _code          text;
+    _title         text;
+    _description   text;
+    _item_source   text;
+    _key_schema    jsonb;
+    _access_flags  text[];
+    _flag          text;
+    _path          ext.ltree;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    for _item in
+        select value from jsonb_array_elements(_resource_types)
+        order by nlevel(text2ltree(value->>'code'))
+    loop
+        _code        := _item->>'code';
+        _title       := _item->>'title';
+        _description := _item->>'description';
+        _item_source := coalesce(_item->>'source', _source);
+        _key_schema  := coalesce(_item->'key_schema', '{}'::jsonb);
+        _path        := text2ltree(_code);
+
+        if _item ? 'access_flags' and _item->'access_flags' is not null then
+            select array_agg(f.value::text)
+            from jsonb_array_elements_text(_item->'access_flags') as f(value)
+            into _access_flags;
+        else
+            _access_flags := null;
+        end if;
+
+        if not exists (select 1 from const.resource_type where code = _code) then
+            if _access_flags is not null then
+                perform unsecure.validate_access_flags(_access_flags);
+            end if;
+
+            insert into const.resource_type (code, source, path, key_schema)
+            values (_code, _item_source, _path, _key_schema)
+            on conflict do nothing;
+        end if;
+
+        -- Translations (upsert)
+        if _title is not null then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, _language_code, 'resource_type', _code, 'title', _title)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+        end if;
+        if _description is not null then
+            insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+            values (_created_by, _created_by, _language_code, 'resource_type', _code, 'description', _description)
+            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+                where data_object_code is not null
+            do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+        end if;
+
+        -- Recompute full_title for this type and all descendants
+        perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _created_by);
+
+        if _access_flags is not null then
+            foreach _flag in array _access_flags
+            loop
+                insert into const.resource_type_flag (resource_type_code, access_flag_code)
+                values (_code, _flag) on conflict do nothing;
+            end loop;
+        end if;
+
+        perform unsecure.ensure_resource_access_partition(_code);
+
+        perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+            , 18001, 'resource_type', 0
+            , jsonb_build_object('resource_type', _code, 'title', _title,
+                'key_schema', _key_schema, 'access_flags', _access_flags)
+            , _tenant_id);
+    end loop;
+
+    return query
+        select rt.code,
+               coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
+               (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
+               rt.is_active, rt.source, rt.path, rt.key_schema,
+               (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
+                from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+        from const.resource_type rt
+        where rt.code in (select value->>'code' from jsonb_array_elements(_resource_types))
+        order by rt.path;
+end;
+$$;
+
+-- auth.get_resource_types
+create or replace function auth.get_resource_types(
+    _source        text    default null,
+    _active_only   boolean default true,
+    _language_code text    default 'en'
+) returns table(
+    __code         text,
+    __title        text,
+    __full_title   text,
+    __description  text,
+    __is_active    boolean,
+    __source       text,
+    __path         ext.ltree,
+    __key_schema   jsonb,
+    __access_flags text[]
+)
+    stable
+    language plpgsql
+as
+$$
+begin
+    return query
+    select rt.code,
+           coalesce(mv.values->>'title', rt.code),
+           mv.values->>'full_title',
+           mv.values->>'description',
+           rt.is_active, rt.source, rt.path, rt.key_schema,
+           (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
+            from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
+    from const.resource_type rt
+    left join public.mv_translation mv
+        on mv.data_group = 'resource_type' and mv.data_object_code = rt.code
+        and mv.language_code = _language_code
+    where (_active_only = false or rt.is_active = true)
+      and (_source is null or rt.source = _source)
+    order by rt.path;
+end;
+$$;
+
+-- ============================================================================
+-- 5. Replaced functions — access flag management
+-- ============================================================================
+
+-- auth.ensure_access_flags
+create or replace function auth.ensure_access_flags(
+    _created_by     text,
+    _user_id        bigint,
+    _correlation_id text,
+    _flags          jsonb,
+    _source         text    default null,
+    _tenant_id      integer default 1,
+    _language_code  text    default 'en'
+) returns table(__code text, __title text, __source text)
+    language plpgsql
+as
+$$
+declare
+    _item jsonb;
+    _code text;
+    _title text;
+    _item_source text;
+begin
+    perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
+
+    for _item in select value from jsonb_array_elements(_flags)
+    loop
+        _code        := _item->>'code';
+        _title       := _item->>'title';
+        _item_source := coalesce(_item->>'source', _source);
+
+        if _code is null or _title is null then
+            raise exception 'Access flag requires both "code" and "title" fields'
+                using errcode = '35004';
+        end if;
+
+        insert into const.resource_access_flag (code, source)
+        values (_code, _item_source)
+        on conflict do nothing;
+
+        insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
+        values (_created_by, _created_by, _language_code, 'resource_access_flag', _code, 'title', _title)
+        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            where data_object_code is not null
+        do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
+    end loop;
+
+    perform unsecure.refresh_translation_cache();
+
+    return query
+    select f.code,
+           coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_access_flag' and mv.data_object_code = f.code and mv.language_code = _language_code), f.code),
+           f.source
+    from const.resource_access_flag f
+    where f.code in (select value->>'code' from jsonb_array_elements(_flags))
+    order by f.code;
+end;
+$$;
+
+-- auth.get_access_flags
+create or replace function auth.get_access_flags(
+    _source        text default null,
+    _language_code text default 'en'
+) returns table(__code text, __title text, __source text)
+    stable
+    language plpgsql
+as
+$$
+begin
+    return query
+    select f.code,
+           coalesce(mv.values->>'title', f.code),
+           f.source
+    from const.resource_access_flag f
+    left join public.mv_translation mv
+        on mv.data_group = 'resource_access_flag' and mv.data_object_code = f.code
+        and mv.language_code = _language_code
+    where (_source is null or f.source = _source)
+    order by f.code;
+end;
+$$;
+
+-- ============================================================================
