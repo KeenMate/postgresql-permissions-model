@@ -25,9 +25,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `preferences jsonb` — UI/UX preferences (theme, sidebar, default view)
   - `custom_data jsonb` — app-specific fields (employee_number, department)
 - **`auth.update_user_data`** — partial-merge update function. Each jsonb param is shallow-merged (`||`) with existing value; null values remove keys via `jsonb_strip_nulls`. Self-update is free, cross-user requires `users.update_user_data` permission. Auto-creates the `user_data` row on first update.
-- Test suite: `test_resource_roles` (8 files covering CRUD, assignment, has_resource_access with roles, deny override, role redefinition, tenant isolation, hierarchy cascade)
-- Test suite: `test_user_data` (13 tests covering auto-create, name coalesce, jsonb merge/remove, column independence, self-update, permission checks)
 - Example: `999-examples-organiogram.sql` — 30-node organization tree with 5 users and resource roles demo
+- **665 tests across 35 suites** (81% auth function coverage, up from ~32%). New test suites:
+  - `test_resource_roles` (8 files) — CRUD, assignment, has_resource_access with roles, deny override, role redefinition, tenant isolation, hierarchy cascade
+  - `test_user_data` (13 tests) — auto-create, name coalesce, jsonb merge/remove, column independence, self-update, permission checks
+  - `test_tokens` (15 tests) — create, validate, set_as_used, expiry, error cases
+  - `test_api_keys` (19 tests) — create, update, delete, validate, secret rotation, permission assignment, search
+  - `test_tenant_crud` (22 tests) — create, update, delete, search, get_tenant_users/groups, ownership
+  - `test_permission_crud` (16 tests) — permission CRUD, perm_set CRUD, assign/unassign, copy_perm_set null title regression
+  - `test_group_crud` (9 tests) — group CRUD, member/mapping CRUD, get_effective/assigned_group_permissions
+  - `test_ownership` (15 tests) — tenant + group ownership CRUD, is_owner, has_owner
+  - `test_permission_checks` (14 tests) — has_permission, has_permissions, assign_user_default_groups, delete_user_info, get_users_groups_and_permissions
+  - `test_audit_and_user_ops` (10 tests) — create_user_event, audit trail, security events, password update, preferences, last_selected_tenant
+  - `test_outbound_api_keys` (25 tests) — full CRUD, search, secret rotation
+  - `test_group_types` (20 tests) — set_as_external/hybrid/internal, create_external_user_group, enable/disable/lock/unlock
+  - `test_identity_and_providers` (14 tests) — enable/disable/verify identity, user lookups, provider reads
 
 ### Changed
 
@@ -60,6 +72,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `auth.get_user_data` — missing `return query` and unqualified table reference (`user_data` → `auth.user_data`). Function was silently returning no rows.
+- `unsecure.copy_perm_set` — used nullable `_new_title` instead of coalesced `__effective_title` for code generation, causing NULL code violation
+- `triggers.notify_perm_set` — referenced dropped `OLD.title` column, changed to `OLD.code`
+- `auth.get_api_key_permissions` — RETURNS TABLE had 8 columns but inner query returned 11
+- `unsecure.get_effective_group_permissions` — referenced `ep.permission_title` from view that no longer has that column
+- `unsecure.assign_user_default_groups` — ambiguous `user_group_id` in NOT-IN subquery, added alias qualification
+- `auth.is_owner` / `auth.has_owner` — marked `IMMUTABLE` despite reading from table, changed to `STABLE`
+- `auth.delete_owner` — `user_group_id = _user_group_id` never matches NULL rows, changed to `IS NOT DISTINCT FROM`
+- `unsecure.delete_tenant` — was a bare `DELETE FROM auth.tenant` that failed on FK constraints; rewritten with explicit cleanup of all dependent data
+- `auth.update_user_preferences` — returned `character varying` instead of `text`, causing structure mismatch
+- System user (id=1) was not marked `is_system = true` in seed data
+- Removed hardcoded `aad` provider from seed — apps register their own via `auth.ensure_provider`
 
 ## [2.25.0] - 2026-03-10
 
