@@ -864,7 +864,7 @@ $$;
 
 create or replace function auth.update_user_preferences(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _update_data text,
     _tenant_id integer default 1)
-    returns TABLE(__updated_at timestamp with time zone, __updated_by character varying)
+    returns TABLE(__updated_at timestamp with time zone, __updated_by text)
     rows 1
     language plpgsql
 as

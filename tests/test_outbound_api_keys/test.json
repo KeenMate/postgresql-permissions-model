@@ -1,0 +1,6 @@
+{
+  "name": "Outbound API Keys",
+  "description": "Outbound API key management: create, update, update secret, delete, get by service_code/id, get secret, search with pagination",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

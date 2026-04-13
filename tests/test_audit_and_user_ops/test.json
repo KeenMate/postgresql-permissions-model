@@ -1,0 +1,6 @@
+{
+  "name": "Audit Events & User Self-Service Ops",
+  "description": "Tests for audit event creation/querying (create_user_event, get_user_audit_trail, get_security_events) and user self-service operations (update_user_password, update/get_user_preferences, update_user_last_selected_tenant)",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

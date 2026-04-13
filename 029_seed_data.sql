@@ -415,6 +415,7 @@ SELECT * FROM unsecure.create_service_user_info('initial_script', 1, null, 'svc_
 SELECT * FROM unsecure.create_service_user_info('initial_script', 1, null, 'svc_data_processor', 'Data Processor', null, 799);
 
 -- Mark service accounts as system users that cannot login
+UPDATE auth.user_info SET is_system = true WHERE user_id = 1;
 UPDATE auth.user_info SET is_system = true, can_login = false WHERE user_id IN (2, 3, 4, 5, 6, 800);
 
 -- Reset sequence to 1000 to reserve space for system users

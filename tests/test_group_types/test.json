@@ -1,0 +1,6 @@
+{
+  "name": "Group Types",
+  "description": "Group type switching (internal/external/hybrid), enable/disable, lock/unlock, create_external_user_group",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

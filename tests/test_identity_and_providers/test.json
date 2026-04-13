@@ -1,0 +1,6 @@
+{
+  "name": "Identity and Provider Reads",
+  "description": "User identity management (enable/disable/verify) and provider/user read functions",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}
