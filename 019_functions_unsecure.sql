@@ -1649,7 +1649,7 @@ begin
 	from auth.active_user_groups aug
 	where aug.tenant_id = _tenant_id
 		and aug.is_default
-		and user_group_id not in (select user_group_id
+		and aug.user_group_id not in (select ugm.user_group_id
 															from auth.user_group_member ugm
 																		 inner join auth.user_group ug on ug.user_group_id = ugm.user_group_id
 															where ugm.user_id = _target_user_id
