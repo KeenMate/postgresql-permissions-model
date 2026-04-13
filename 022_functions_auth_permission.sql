@@ -670,10 +670,8 @@ begin
 	perform unsecure.create_user_group_as_system('Full admins', true, true);
 	perform unsecure.assign_permission_as_system(3, null, 'full_admin');
 
-	-- Providers
+	-- Providers (email only — apps register their own via auth.ensure_provider)
 	perform auth.create_provider('initial', 1, null, 'email', 'Email authentication', false);
-	perform auth.create_provider('initial', 1, null, 'aad', 'Azure authentication', false);
-	perform auth.enable_provider('system', 1, null, 'aad');
 	perform auth.enable_provider('system', 1, null, 'email');
 
 	-- Set primary tenant as default

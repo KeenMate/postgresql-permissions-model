@@ -14,6 +14,11 @@ BEGIN
     DELETE FROM auth.user_data WHERE user_id IN (SELECT user_id FROM auth.user_info WHERE username LIKE '%regtest%');
     DELETE FROM auth.user_info WHERE username LIKE '%regtest%';
 
+    -- Ensure aad provider exists for provider registration tests
+    INSERT INTO auth.provider (created_by, updated_by, code, is_active, allows_group_mapping)
+    VALUES ('reg_test', 'reg_test', 'aad', true, false)
+    ON CONFLICT DO NOTHING;
+
     RAISE NOTICE 'SETUP: Done';
     RAISE NOTICE '';
 END $$;
