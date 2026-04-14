@@ -41,7 +41,7 @@ create table auth.tenant
         primary key,
     access_type_code text    default 'authenticated'::text  not null
         references const.tenant_access_type,
-    uuid             uuid    default uuid_generate_v4() not null,
+    uuid             uuid    default ext.uuid_generate_v4() not null,
     title            text                               not null,
     code             text                               not null,
     is_removable     boolean default true               not null,
@@ -77,7 +77,7 @@ create table auth.user_info
             on delete set null,
     code                    text    default auth.get_user_random_code()       not null
         unique,
-    uuid                    uuid    default uuid_generate_v4()                not null
+    uuid                    uuid    default ext.uuid_generate_v4()                not null
         unique,
     can_login               boolean default true                              not null,
     username                text                                              not null
@@ -210,8 +210,8 @@ create table auth.permission
         primary key,
     is_assignable   boolean default true  not null,
     code            text,
-    full_code       ltree,
-    node_path       ltree,
+    full_code       ext.ltree,
+    node_path       ext.ltree,
     has_children    boolean default false not null,
     nrm_search_data text,
     short_code      text,
@@ -521,13 +521,13 @@ create unique index uq_auth_user_info
     on auth.user_info (username);
 
 create index ix_trgm_user_info_search
-    on auth.user_info using gin (nrm_search_data gin_trgm_ops);
+    on auth.user_info using gin (nrm_search_data ext.gin_trgm_ops);
 
 create unique index uq_user_permission_cache
     on auth.user_permission_cache (user_id, tenant_id);
 
 create index ix_trgm_user_data_search
-    on auth.user_data using gin (nrm_search_data gin_trgm_ops);
+    on auth.user_data using gin (nrm_search_data ext.gin_trgm_ops);
 
 create unique index uq_user_identity
     on auth.user_identity (provider_code, coalesce(uid, '-1'::text));
@@ -626,17 +626,17 @@ create unique index uq_user_tenant_preference
 
 -- Search indexes for nrm_search_data columns
 create index ix_trgm_tenant_search
-    on auth.tenant using gin (nrm_search_data gin_trgm_ops);
+    on auth.tenant using gin (nrm_search_data ext.gin_trgm_ops);
 
 create index ix_trgm_user_group_search
-    on auth.user_group using gin (nrm_search_data gin_trgm_ops);
+    on auth.user_group using gin (nrm_search_data ext.gin_trgm_ops);
 
 create index ix_trgm_permission_search
-    on auth.permission using gin (nrm_search_data gin_trgm_ops);
+    on auth.permission using gin (nrm_search_data ext.gin_trgm_ops);
 
 create index ix_trgm_perm_set_search
-    on auth.perm_set using gin (nrm_search_data gin_trgm_ops);
+    on auth.perm_set using gin (nrm_search_data ext.gin_trgm_ops);
 
 create index ix_trgm_api_key_search
-    on auth.api_key using gin (nrm_search_data gin_trgm_ops);
+    on auth.api_key using gin (nrm_search_data ext.gin_trgm_ops);
 

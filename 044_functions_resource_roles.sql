@@ -538,7 +538,7 @@ begin
         from const.resource_type rt
         where rt.path @> (select path from const.resource_type where code = _resource_type)
           and rt.is_active = true
-        order by nlevel(rt.path) desc
+        order by ext.nlevel(rt.path) desc
     loop
         -- Build the ancestor key by extracting only fields from ancestor's schema
         if _ancestor.key_schema is not null and _ancestor.key_schema <> '{}'::jsonb then

@@ -80,7 +80,7 @@ create index ix_translation_ts_search
     on public.translation using gin (ts_search_data);
 
 create index ix_translation_nrm_search
-    on public.translation using gin (nrm_search_data gin_trgm_ops);
+    on public.translation using gin (nrm_search_data ext.gin_trgm_ops);
 
 create index ix_translation_group
     on public.translation (data_group, language_code);

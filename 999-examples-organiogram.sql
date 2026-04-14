@@ -403,7 +403,7 @@ select
 from auth.user_info ui
 cross join public.organization o
 where ui.code in ('alice_ceo','bob_vp_eng','charlie_techlead','diana_product','eve_hr_admin')
-  and nlevel(o.node_path) = 2  -- level-1 divisions only
+  and ext.nlevel(o.node_path) = 2  -- level-1 divisions only
 order by ui.display_name, o.title;
 
 \echo ''

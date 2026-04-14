@@ -784,7 +784,7 @@ declare
     __is_assignable boolean;
     __parent_code text;
     __source text;
-    __parent_path ltree;
+    __parent_path ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'permissions.read_permissions', _tenant_id);
 
@@ -797,7 +797,7 @@ begin
     _page_size := least(coalesce(_page_size, 30), 100);
 
     if helpers.is_not_empty_string(__parent_code) then
-        select node_path from auth.permission where full_code = __parent_code::ltree into __parent_path;
+        select node_path from auth.permission where full_code = __parent_code::ext.ltree into __parent_path;
     end if;
 
     return query

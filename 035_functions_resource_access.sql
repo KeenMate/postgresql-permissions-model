@@ -171,7 +171,7 @@ begin
         from const.resource_type rt
         where rt.path @> (select path from const.resource_type where code = _resource_type)
           and rt.is_active = true
-        order by nlevel(rt.path) desc
+        order by ext.nlevel(rt.path) desc
     loop
         -- Build the ancestor key by extracting only fields from ancestor's schema
         -- e.g., for 'project' ancestor checking 'project.documents' resource_id:
@@ -1254,7 +1254,7 @@ begin
         perform unsecure.validate_access_flags(_access_flags);
     end if;
 
-    _path := text2ltree(_code);
+    _path := ext.text2ltree(_code);
 
     insert into const.resource_type (code, source, path, key_schema)
     values (_code, _source, _path, coalesce(_key_schema, '{}'::jsonb))
@@ -1419,14 +1419,14 @@ begin
 
     for _item in
         select value from jsonb_array_elements(_resource_types)
-        order by nlevel(text2ltree(value->>'code'))
+        order by ext.nlevel(ext.text2ltree(value->>'code'))
     loop
         _code        := _item->>'code';
         _title       := _item->>'title';
         _description := _item->>'description';
         _item_source := coalesce(_item->>'source', _source);
         _key_schema  := coalesce(_item->'key_schema', '{}'::jsonb);
-        _path        := text2ltree(_code);
+        _path        := ext.text2ltree(_code);
 
         if _item ? 'access_flags' and _item->'access_flags' is not null then
             select array_agg(f.value::text)
