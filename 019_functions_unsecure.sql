@@ -1821,15 +1821,6 @@ begin
 					 inner join auth.user_info ui on ui.user_id = ugm.user_id
 		where ugm.user_group_id = _user_group_id;
 
--- OMITTING UNTIL JOURNAL MESSAGES HAVE LEVELS
--- 	perform
--- 		add_journal_msg(_requested_by, _user_id
--- 			, format('User: %s requested user group members: %s in tenant: %s'
--- 											, _requested_by, _user_group_id, _tenant_id)
--- 			, 'group', _user_group_id
--- 			, null
--- 			, 50210
--- 			, _tenant_id := _tenant_id);
 end;
 $$;
 
