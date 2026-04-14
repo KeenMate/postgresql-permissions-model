@@ -60,7 +60,7 @@ create table public.translation
     data_group       text                                             not null,
     data_object_code text,
     data_object_id   bigint,
-    context          text,
+    context          text                                             not null default 'text',
     value            text                                             not null,
     nrm_search_data   text,
     ts_search_data   tsvector,
@@ -69,11 +69,11 @@ create table public.translation
 );
 
 create unique index uq_translation_code
-    on public.translation (language_code, data_group, data_object_code, coalesce(context, ''))
+    on public.translation (language_code, data_group, data_object_code, context)
     where data_object_code is not null;
 
 create unique index uq_translation_id
-    on public.translation (language_code, data_group, data_object_id, coalesce(context, ''))
+    on public.translation (language_code, data_group, data_object_id, context)
     where data_object_id is not null;
 
 create index ix_translation_ts_search
@@ -100,7 +100,7 @@ select t.language_code,
        t.data_group,
        t.data_object_code,
        t.data_object_id,
-       jsonb_object_agg(coalesce(t.context, 'value'), t.value) as values
+       jsonb_object_agg(t.context, t.value) as values
 from public.translation t
 group by t.language_code, t.tenant_id, t.data_group, t.data_object_code, t.data_object_id;
 
@@ -116,7 +116,7 @@ create index if not exists ix_mv_translation_group
     on public.mv_translation (data_group, language_code);
 
 -- Refresh function (CONCURRENTLY = non-blocking, requires unique index)
-create or replace function unsecure.refresh_translation_cache()
+create or replace function internal.refresh_translation_cache()
 returns void
     language plpgsql
 as

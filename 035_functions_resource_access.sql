@@ -1203,13 +1203,13 @@ begin
         -- Upsert full_title translation
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
         values (_created_by, _created_by, _language_code, 'resource_type', _rt.code, 'full_title', _full_title)
-        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+        on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
     end loop;
 
     -- Refresh MV so reads see updated full_titles
-    perform unsecure.refresh_translation_cache();
+    perform internal.refresh_translation_cache();
 end;
 $$;
 
@@ -1349,7 +1349,7 @@ begin
     if _title is not null then
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
         values (_updated_by, _updated_by, _language_code, 'resource_type', _code, 'title', _title)
-        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+        on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
@@ -1359,7 +1359,7 @@ begin
     if _description is not null then
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
         values (_updated_by, _updated_by, _language_code, 'resource_type', _code, 'description', _description)
-        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+        on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
     end if;
@@ -1450,14 +1450,14 @@ begin
         if _title is not null then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
             values (_created_by, _created_by, _language_code, 'resource_type', _code, 'title', _title)
-            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
         end if;
         if _description is not null then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
             values (_created_by, _created_by, _language_code, 'resource_type', _code, 'description', _description)
-            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
         end if;
@@ -1577,12 +1577,12 @@ begin
 
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
         values (_created_by, _created_by, _language_code, 'resource_access_flag', _code, 'title', _title)
-        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+        on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
     end loop;
 
-    perform unsecure.refresh_translation_cache();
+    perform internal.refresh_translation_cache();
 
     return query
     select f.code,

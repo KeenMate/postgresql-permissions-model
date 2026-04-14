@@ -333,4 +333,4 @@ on conflict do nothing;
 
 
 -- Refresh MV after all seed translations
-select unsecure.refresh_translation_cache();
+select internal.refresh_translation_cache();

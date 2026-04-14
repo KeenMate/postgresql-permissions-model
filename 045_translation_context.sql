@@ -10,7 +10,7 @@
  * After:   (language, group, code, context)   → value   (many per object)
  *
  * Backward compatible: context defaults to null. Existing rows stay null.
- * The unique indexes use coalesce(context, '') so null still means "the one".
+ * context is NOT NULL with default 'text'. Indexes are straight btree on context.
  *
  * Updated functions: create, update, delete, copy, get_group, search.
  *
@@ -41,7 +41,7 @@ create or replace function public.create_translation(
     _value text,
     _data_object_code text default null,
     _data_object_id bigint default null,
-    _context text default null,
+    _context text default 'text',
     _tenant_id integer default 1
 )
     returns setof public.translation
@@ -64,7 +64,7 @@ begin
         returning *;
 
     -- Refresh materialized view
-    perform unsecure.refresh_translation_cache();
+    perform internal.refresh_translation_cache();
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
         , 21001  -- translation_created
@@ -138,7 +138,7 @@ begin
         where t.language_code = _to_language_code
             and t.tenant_id = _to_tenant_id
             and t.data_group = s.data_group
-            and coalesce(t.context, '') = coalesce(s.context, '')
+            and t.context = s.context
             and (
                 (t.data_object_code is not null and t.data_object_code = s.data_object_code)
                 or (t.data_object_id is not null and t.data_object_id = s.data_object_id)
@@ -161,7 +161,7 @@ begin
             where e.language_code = _to_language_code
                 and e.tenant_id = _to_tenant_id
                 and e.data_group = s.data_group
-                and coalesce(e.context, '') = coalesce(s.context, '')
+                and e.context = s.context
                 and (
                     (s.data_object_code is not null and e.data_object_code = s.data_object_code)
                     or (s.data_object_id is not null and e.data_object_id = s.data_object_id)
@@ -171,7 +171,7 @@ begin
     get diagnostics __inserted_count = row_count;
 
     -- Refresh materialized view
-    perform unsecure.refresh_translation_cache();
+    perform internal.refresh_translation_cache();
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
         , 21004  -- translations_copied
@@ -205,7 +205,7 @@ drop function if exists public.get_group_translations(text, text, integer);
 create or replace function public.get_group_translations(
     _language_code text,
     _data_group text,
-    _context text default null,
+    _context text default 'text',
     _tenant_id integer default 1
 )
     returns jsonb
@@ -259,7 +259,7 @@ create or replace function public.search_translations(
     _data_group text default null,
     _data_object_code text default null,
     _data_object_id bigint default null,
-    _context text default null,
+    _context text default 'text',
     _page integer default 1,
     _page_size integer default 10,
     _tenant_id integer default 1

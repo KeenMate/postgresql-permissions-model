@@ -22,7 +22,7 @@ update auth.permission set short_code = unsecure.compute_short_code(permission_i
 where short_code is null;
 
 -- Refresh MV after all seeds
-select unsecure.refresh_translation_cache();
+select internal.refresh_translation_cache();
 
 -- Assign service permission sets to service accounts
 select * from unsecure.assign_permission_as_system(null::integer, 2, 'svc_registrator_permissions');

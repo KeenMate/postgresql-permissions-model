@@ -1003,13 +1003,13 @@ begin
         -- Upsert full_title translation
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
         values (_created_by, _created_by, _language_code, 'permission', _perm.code, 'full_title', _full_title)
-        on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+        on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
     end loop;
 
     -- Refresh MV so reads see updated full_titles
-    perform unsecure.refresh_translation_cache();
+    perform internal.refresh_translation_cache();
 end;
 $$;
 
@@ -1130,7 +1130,7 @@ begin
 	-- Store title as translation
 	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 	values (_created_by, _created_by, 'en', 'permission', helpers.get_code(_title, '_'), 'title', _title)
-	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+	on conflict (language_code, data_group, data_object_code, context)
 		where data_object_code is not null
 	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
@@ -1267,11 +1267,11 @@ begin
 	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 	values (_created_by, _created_by, 'en', 'perm_set',
 		(select code from auth.perm_set where perm_set_id = __last_id), 'title', _title)
-	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+	on conflict (language_code, data_group, data_object_code, context)
 		where data_object_code is not null
 	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-	perform unsecure.refresh_translation_cache();
+	perform internal.refresh_translation_cache();
 
 	insert into auth.perm_set_perm(created_by, perm_set_id, permission_id)
 	select _created_by, __last_id, p.permission_id
@@ -1315,11 +1315,11 @@ begin
 	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 	values ('system', 'system', 'en', 'perm_set',
 		(select code from auth.perm_set where perm_set_id = __last_id), 'title', _title)
-	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+	on conflict (language_code, data_group, data_object_code, context)
 		where data_object_code is not null
 	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-	perform unsecure.refresh_translation_cache();
+	perform internal.refresh_translation_cache();
 
 	insert into auth.perm_set_perm(created_by, perm_set_id, permission_id)
 	select 'system', __last_id, p.permission_id
@@ -1372,11 +1372,11 @@ begin
 		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 		values (_updated_by, _updated_by, 'en', 'perm_set',
 			(select code from auth.perm_set where perm_set_id = _perm_set_id), 'title', _title)
-		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		on conflict (language_code, data_group, data_object_code, context)
 			where data_object_code is not null
 		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-		perform unsecure.refresh_translation_cache();
+		perform internal.refresh_translation_cache();
 	end if;
 
 	-- If assignability changed, invalidate cache for all affected users
@@ -2395,11 +2395,11 @@ begin
 	-- Store title as translation for the new perm_set
 	insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 	values (_created_by, _created_by, 'en', 'perm_set', __created_perm_set.code, 'title', __effective_title)
-	on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+	on conflict (language_code, data_group, data_object_code, context)
 		where data_object_code is not null
 	do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-	perform unsecure.refresh_translation_cache();
+	perform internal.refresh_translation_cache();
 
 -- copy assigned permissions
 

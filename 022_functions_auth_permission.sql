@@ -997,10 +997,10 @@ begin
         if helpers.is_not_empty_string(_title) then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
             values (_created_by, _created_by, 'en', 'permission', _full_code, 'title', _title)
-            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
-            perform unsecure.refresh_translation_cache();
+            perform internal.refresh_translation_cache();
         end if;
     end loop;
 
@@ -1162,10 +1162,10 @@ begin
         if helpers.is_not_empty_string(_title) then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
             values (_created_by, _created_by, 'en', 'perm_set', _code, 'title', _title)
-            on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+            on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
-            perform unsecure.refresh_translation_cache();
+            perform internal.refresh_translation_cache();
         end if;
     end loop;
 

@@ -98,11 +98,11 @@ begin
 	if _provider_name is not null then
 		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 		values (_created_by, _created_by, 'en', 'provider', _provider_code, 'title', _provider_name)
-		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		on conflict (language_code, data_group, data_object_code, context)
 			where data_object_code is not null
 		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-		perform unsecure.refresh_translation_cache();
+		perform internal.refresh_translation_cache();
 	end if;
 
 	return query
@@ -142,11 +142,11 @@ begin
 	if _provider_name is not null then
 		insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
 		values (_updated_by, _updated_by, 'en', 'provider', _provider_code, 'title', _provider_name)
-		on conflict (language_code, data_group, data_object_code, coalesce(context, ''))
+		on conflict (language_code, data_group, data_object_code, context)
 			where data_object_code is not null
 		do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
-		perform unsecure.refresh_translation_cache();
+		perform internal.refresh_translation_cache();
 	end if;
 
 	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id

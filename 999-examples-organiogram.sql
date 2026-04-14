@@ -192,7 +192,7 @@ insert into const.resource_role_flag (resource_role_code, access_flag_code) valu
 on conflict do nothing;
 
 -- Refresh MV so reads pick up the translations we just inserted
-select unsecure.refresh_translation_cache();
+select internal.refresh_translation_cache();
 
 \echo '=== 4. Resource type, flags, roles registered ==='
 
