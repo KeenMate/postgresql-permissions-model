@@ -605,21 +605,22 @@ create or replace function auth.assign_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _target_user_id bigint default null,
-    _user_group_id  integer default null,
-    _access_flags   text[] default array['read'],
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _target_user_id bigint    default null,
+    _user_group_id  integer   default null,
+    _access_flags   text[]    default array['read'],
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(__resource_access_id bigint, __access_flag text)
     language plpgsql
 as
 $$
 declare
-    _flag text;
-    __last_id bigint;
+    _flag        text;
+    __last_id    bigint;
     _target_type text;
     _target_name text;
-    _root_type text;
+    _root_type   text;
 begin
     -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.grant_access', _tenant_id);
@@ -629,16 +630,21 @@ begin
         perform error.raise_35002();
     end if;
 
+    -- At least one of resource_id or resource_path must be meaningful
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
+
     -- Validate resource type, flags (global + per-type), and resource_id key schema
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_access_flags(_access_flags);
     perform unsecure.validate_access_flags_for_type(_resource_type, _access_flags);
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
-    -- Compute root type
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
-    -- Determine target info for journaling
     if _target_user_id is not null then
         _target_type := 'user';
         select coalesce(display_name, code, user_id::text)
@@ -655,13 +661,13 @@ begin
     loop
         __last_id := null;
 
-        -- Check if row already exists (exact match on resource_id jsonb)
         if _target_user_id is not null then
             select ra.resource_access_id from auth.resource_access ra
             where ra.root_type = _root_type
               and ra.resource_type = _resource_type
               and ra.tenant_id = _tenant_id
               and ra.resource_id = _resource_id
+              and ra.resource_path is not distinct from _resource_path
               and ra.user_id = _target_user_id
               and ra.access_flag = _flag
             into __last_id;
@@ -671,6 +677,7 @@ begin
               and ra.resource_type = _resource_type
               and ra.tenant_id = _tenant_id
               and ra.resource_id = _resource_id
+              and ra.resource_path is not distinct from _resource_path
               and ra.user_group_id = _user_group_id
               and ra.access_flag = _flag
             into __last_id;
@@ -688,10 +695,12 @@ begin
         else
             -- Insert new grant
             insert into auth.resource_access (
-                created_by, updated_by, tenant_id, resource_type, root_type, resource_id,
+                created_by, updated_by, tenant_id, resource_type, root_type,
+                resource_id, resource_path,
                 user_id, user_group_id, access_flag, is_deny, granted_by
             ) values (
-                _created_by, _created_by, _tenant_id, _resource_type, _root_type, _resource_id,
+                _created_by, _created_by, _tenant_id, _resource_type, _root_type,
+                _resource_id, _resource_path,
                 _target_user_id, _user_group_id, _flag, false, _user_id
             )
             returning resource_access_id into __last_id;
@@ -705,6 +714,7 @@ begin
         , 18010  -- resource_access_granted
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'target_type', _target_type, 'target_name', _target_name,
             'access_flags', _access_flags)
         , _tenant_id);
@@ -723,31 +733,40 @@ create or replace function auth.deny_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _target_user_id bigint,
-    _access_flags   text[] default array['read'],
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _target_user_id bigint    default null,
+    _access_flags   text[]    default array['read'],
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(__resource_access_id bigint, __access_flag text)
     language plpgsql
 as
 $$
 declare
-    _flag text;
-    __last_id bigint;
+    _flag        text;
+    __last_id    bigint;
     _target_name text;
-    _root_type text;
+    _root_type   text;
 begin
-    -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.deny_access', _tenant_id);
 
-    -- Validate resource type, flags (global + per-type), and resource_id key schema
+    if _target_user_id is null then
+        raise exception 'Deny requires _target_user_id (denies on groups are not supported)'
+            using errcode = '35002';
+    end if;
+
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
+
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_access_flags(_access_flags);
     perform unsecure.validate_access_flags_for_type(_resource_type, _access_flags);
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
-    -- Compute root type
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
     select coalesce(display_name, code, user_id::text)
     from auth.user_info where user_id = _target_user_id
@@ -755,18 +774,17 @@ begin
 
     foreach _flag in array _access_flags
     loop
-        -- Check if a grant row already exists for this user+flag
         select ra.resource_access_id from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.resource_type = _resource_type
           and ra.tenant_id = _tenant_id
           and ra.resource_id = _resource_id
+          and ra.resource_path is not distinct from _resource_path
           and ra.user_id = _target_user_id
           and ra.access_flag = _flag
         into __last_id;
 
         if __last_id is not null then
-            -- Flip to deny
             update auth.resource_access
             set is_deny = true,
                 updated_by = _created_by,
@@ -775,12 +793,13 @@ begin
             where resource_access_id = __last_id
               and root_type = _root_type;
         else
-            -- Insert as deny
             insert into auth.resource_access (
-                created_by, updated_by, tenant_id, resource_type, root_type, resource_id,
+                created_by, updated_by, tenant_id, resource_type, root_type,
+                resource_id, resource_path,
                 user_id, access_flag, is_deny, granted_by
             ) values (
-                _created_by, _created_by, _tenant_id, _resource_type, _root_type, _resource_id,
+                _created_by, _created_by, _tenant_id, _resource_type, _root_type,
+                _resource_id, _resource_path,
                 _target_user_id, _flag, true, _user_id
             )
             returning resource_access_id into __last_id;
@@ -789,11 +808,11 @@ begin
         return query select __last_id, _flag;
     end loop;
 
-    -- Journal
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18012  -- resource_access_denied
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'target_type', 'user', 'target_name', _target_name,
             'access_flags', _access_flags)
         , _tenant_id);
@@ -812,41 +831,37 @@ create or replace function auth.revoke_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _target_user_id bigint default null,
-    _user_group_id  integer default null,
-    _access_flags   text[] default null,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _target_user_id bigint    default null,
+    _user_group_id  integer   default null,
+    _access_flags   text[]    default null,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns bigint
     language plpgsql
 as
 $$
 declare
     __deleted_count bigint;
-    _target_type text;
-    _target_name text;
-    _root_type text;
+    _target_type    text;
+    _target_name    text;
+    _root_type      text;
 begin
-    -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
 
-    -- Validate target
     if _target_user_id is null and _user_group_id is null then
         perform error.raise_35002();
     end if;
 
-    -- Validate resource type
     perform unsecure.validate_resource_type(_resource_type);
 
-    -- Validate flags if provided
     if _access_flags is not null then
         perform unsecure.validate_access_flags(_access_flags);
     end if;
 
-    -- Compute root type
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
-    -- Determine target info for journaling
     if _target_user_id is not null then
         _target_type := 'user';
         select coalesce(display_name, code, user_id::text)
@@ -864,17 +879,18 @@ begin
       and resource_type = _resource_type
       and tenant_id = _tenant_id
       and resource_id = _resource_id
+      and resource_path is not distinct from _resource_path
       and (_target_user_id is null or user_id = _target_user_id)
       and (_user_group_id is null or user_group_id = _user_group_id)
       and (_access_flags is null or access_flag = any(_access_flags));
 
     get diagnostics __deleted_count = row_count;
 
-    -- Journal
     perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 18011  -- resource_access_revoked
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'target_type', _target_type, 'target_name', _target_name,
             'access_flags', coalesce(_access_flags, array['*']),
             'deleted_count', __deleted_count)
@@ -897,39 +913,44 @@ create or replace function auth.revoke_all_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns bigint
     language plpgsql
 as
 $$
 declare
     __deleted_count bigint;
-    _root_type text;
+    _root_type      text;
 begin
-    -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
-
-    -- Validate resource type
     perform unsecure.validate_resource_type(_resource_type);
 
-    -- Compute root type
-    _root_type := split_part(_resource_type, '.', 1);
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
 
-    -- Delete all grants/denies that contain this resource_id
-    -- Uses @> so {"project_id": 42} matches {"project_id": 42, "folder_id": 100}
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
+
+    -- Composite-key cascade via jsonb @> (e.g. {"project_id": 42} matches
+    -- {"project_id": 42, "folder_id": 100}); path cascade via ltree <@
+    -- (drops self + descendants).
     delete from auth.resource_access
     where root_type = _root_type
       and tenant_id = _tenant_id
-      and resource_id @> _resource_id;
+      and (_resource_id = '{}'::jsonb or resource_id @> _resource_id)
+      and (_resource_path is null or resource_path <@ _resource_path);
 
     get diagnostics __deleted_count = row_count;
 
-    -- Journal
     perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 18013  -- resource_access_bulk_revoked
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'deleted_count', __deleted_count)
         , _tenant_id);
 

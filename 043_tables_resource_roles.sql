@@ -79,7 +79,8 @@ create table if not exists auth.resource_role_assignment
     tenant_id                   integer     not null references auth.tenant on delete cascade,
     resource_type               text        not null references const.resource_type,
     root_type                   text        not null,
-    resource_id                 jsonb       not null,
+    resource_id                 jsonb       not null default '{}'::jsonb,
+    resource_path               ext.ltree,
     user_id                     bigint      references auth.user_info on delete cascade,
     user_group_id               integer     references auth.user_group on delete cascade,
     role_code                   text        not null,
@@ -92,6 +93,8 @@ create table if not exists auth.resource_role_assignment
         check (not (user_id is not null and user_group_id is not null)),
     constraint rra_resource_id_is_object
         check (jsonb_typeof(resource_id) = 'object'),
+    constraint rra_path_or_id
+        check (resource_path is not null or resource_id <> '{}'::jsonb),
     -- Composite FK: role must be defined for exactly this resource_type.
     -- Hierarchical cascade happens via check-time walk-up, not via FK laxity.
     constraint rra_role_type_match
@@ -113,16 +116,32 @@ create table if not exists auth.resource_role_assignment_default
 create index if not exists ix_rra_resource_id
     on auth.resource_role_assignment using gin (resource_id);
 
--- Primary lookup: "does user X have role Y on resource Z?"
+-- GiST for path-based ancestor walks
+create index if not exists ix_rra_resource_path
+    on auth.resource_role_assignment using gist (resource_path)
+    where resource_path is not null;
+
+-- Primary lookup for id-only rows: "does user X have role Y on resource Z?"
 create unique index if not exists uq_rra_user_role
     on auth.resource_role_assignment
         (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, role_code)
-    where user_id is not null;
+    where user_id is not null and resource_path is null;
 
 create unique index if not exists uq_rra_group_role
     on auth.resource_role_assignment
         (root_type, resource_type, tenant_id, md5(resource_id::text), user_group_id, role_code)
-    where user_group_id is not null;
+    where user_group_id is not null and resource_path is null;
+
+-- Uniqueness for path-bearing rows
+create unique index if not exists uq_rra_user_role_path
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_id, role_code)
+    where user_id is not null and resource_path is not null;
+
+create unique index if not exists uq_rra_group_role_path
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_group_id, role_code)
+    where user_group_id is not null and resource_path is not null;
 
 -- Reverse: "what resources can user X access via roles?"
 create index if not exists ix_rra_user_resources

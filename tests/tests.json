@@ -16,6 +16,7 @@
     "test_search_functions",
     "test_cross_tenant_access",
     "test_resource_access",
+    "test_resource_access_path",
     "test_ensure_functions",
     "test_user_blacklist",
     "test_auto_lockout",

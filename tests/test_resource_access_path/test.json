@@ -1,0 +1,6 @@
+{
+  "name": "Path-based Resource Access Suite",
+  "description": "Tests for ltree path-based resource inheritance: grants cascade to descendants, denies override, path/id coexistence, tenant isolation, role paths",
+  "always_cleanup": true,
+  "isolation": "transaction"
+}

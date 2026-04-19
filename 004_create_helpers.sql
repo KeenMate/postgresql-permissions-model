@@ -170,5 +170,58 @@ $$
     select ext.subpath(path, 0, ext.nlevel(path) - levels);
 $$;
 
+-- helpers.path_to_ltree — sanitize a separator-delimited path into an ltree.
+-- Splits on _separator (default '/'), lowercases, replaces non-ltree chars
+-- with '_', collapses repeated underscores, joins segments with '.'.
+-- Inner dots inside a segment (e.g. "report.pdf") become part of the label,
+-- not a separator.
+--
+-- Examples:
+--   helpers.path_to_ltree('/srv/data/org-123/report.pdf')
+--     -> 'srv.data.org_123.report_pdf'
+--   helpers.path_to_ltree('C:\Users\Ondrej', '\')
+--     -> 'c.users.ondrej'
+--   helpers.path_to_ltree('com.example.module', '.')
+--     -> 'com.example.module'
+create function helpers.path_to_ltree(_path text, _separator text default '/')
+returns ext.ltree
+    immutable
+    language plpgsql
+as
+$$
+declare
+    _seg text;
+    _out text[] := '{}'::text[];
+    _clean text;
+begin
+    if _path is null then
+        return null;
+    end if;
+    if _separator is null or _separator = '' then
+        raise exception 'helpers.path_to_ltree: _separator must be a non-empty string'
+            using errcode = '22023';
+    end if;
+
+    foreach _seg in array string_to_array(lower(_path), _separator)
+    loop
+        if _seg = '' then
+            continue;
+        end if;
+        _clean := regexp_replace(_seg, '[^a-z0-9_]', '_', 'g');
+        _clean := regexp_replace(_clean, '_+', '_', 'g');
+        _clean := regexp_replace(_clean, '^_+|_+$', '', 'g');
+        if _clean <> '' then
+            _out := _out || _clean;
+        end if;
+    end loop;
+
+    if array_length(_out, 1) is null then
+        return null;
+    end if;
+
+    return array_to_string(_out, '.')::ext.ltree;
+end;
+$$;
+
 select *
 from stop_version_update('1', _component := 'common_helpers');

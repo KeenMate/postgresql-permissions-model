@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-04-17
+
+### Added
+
+- **Path-based resource access** — instance-level inheritance via `ltree` paths. Filesystem-style ACL where a grant on an ancestor path cascades to all descendants, with deny-override semantics.
+  - `auth.resource_access.resource_path ext.ltree` (nullable) — stored ancestor path
+  - `auth.resource_role_assignment.resource_path ext.ltree` (nullable) — same for role assignments
+  - Check constraint `ra_path_or_id` / `rra_path_or_id` — at least one of `resource_path` or non-empty `resource_id` must be present
+  - GiST index `ix_ra_resource_path` / `ix_rra_resource_path` (partial, `where resource_path is not null`) — backs `_target <@ resource_path` ancestor walks
+  - New partial unique indexes `uq_ra_user_flag_path` / `uq_ra_group_flag_path` (and `rra` equivalents) scoped to path-bearing rows; existing md5-based unique indexes now scoped to `where resource_path is null`
+  - `helpers.path_to_ltree(text)` — default path sanitizer: splits on `/`, lowercases, replaces non-ltree chars with `_`, collapses underscores
+- **Compositional match predicate** in check functions — a grant row matches the target if both the path component (`resource_path is null OR target_path <@ resource_path`) and the id component (`resource_id = '{}'::jsonb OR resource_id match`) are satisfied. Enables pure-id, pure-path, and hybrid grants to coexist uniformly.
+- `test_resource_access_path` test suite (10 files, 35 assertions) — grant/inherit, deny-override, group grants, tenant isolation, composite coexistence, revoke cascade, role paths, invalid input, flags/grants queries, bulk filter
+- **Worked example: `999-examples-icons.sql` + `gen_icons_inserts.py`** — loads the Material Design Icons filesystem (~27k paths) into a `demo.fs_item` table, registers two roles, creates 13 users with a mix of direct-flag, group-flag, user-role, group-role, hybrid, and deny grants spread across the tree, then runs single `has_resource_access` latency and 1000-candidate `filter_accessible_resources` bulk probes. Demonstrates the full check matrix at realistic scale.
+- **`has_permissions` mirror pattern** — shown in the icons example: an app-side boolean column on the domain table kept in sync with `auth.resource_access` / `auth.resource_role_assignment` via triggers that filter on `root_type` and `resource_path`. Useful for UI badges ("lock icon") and admin queries ("find rows with custom ACL"). The flag reflects direct entries only; inheritance still goes through `has_resource_access`.
+
+### Changed
+
+- **`auth.assign_resource_access`, `deny_resource_access`, `revoke_resource_access`, `revoke_all_resource_access`** — added optional trailing `_resource_path ext.ltree default null` parameter. `_resource_id` gained default `'{}'::jsonb`. Callers pass either or both.
+- **`auth.assign_resource_role`, `revoke_resource_role`, `revoke_all_resource_roles`** — same `_resource_path` addition.
+- **`auth.has_resource_access`** — added `_resource_path` parameter; check uses compositional predicate across both constraints. Deny semantics unchanged: any ancestor-matching deny blocks.
+- **`auth.filter_accessible_resources`** — now accepts either `_resource_ids jsonb[]` or `_resource_paths ext.ltree[]` (mutually exclusive). Returns matches as jsonb.
+- **`auth.get_resource_access_flags`, `get_resource_access_matrix`, `get_resource_grants`** — added `_resource_path` parameter; flags and matrix walk ancestor paths, grants uses exact-path match.
+- **`auth.get_user_accessible_resources`** — return signature grew a `__resource_path text` column so callers can tell which grants are path-based.
+- **`unsecure.validate_resource_id`** — skips key_schema validation when `_resource_id` is null or `'{}'::jsonb` (path-only grants don't assert composite keys).
+- **`auth.revoke_all_resource_access` / `revoke_all_resource_roles`** — path-cascade semantics: `resource_path <@ _resource_path` drops all descendant grants (parallel to the existing `resource_id @>` cascade for composite keys).
+
+### Notes
+
+- Changes landed in-place in the canonical migration files (034, 035, 043, 044) rather than as a separate migration — the project is still pre-release.
+- `helpers.path_to_ltree(text)` lives in `004_create_helpers.sql`.
+- Existing composite-key grants continue to work unchanged; path support is additive.
+- Applications wanting path-based ACL can either: register a resource type with an empty `key_schema` and call grant functions with `_resource_path`, or use a non-empty `key_schema` and mix both dimensions on the same grant (hybrid).
+
 ## [3.0.0] - 2026-04-12
 
 ### Added

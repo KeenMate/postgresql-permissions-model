@@ -107,7 +107,8 @@ create table auth.resource_access
     tenant_id          integer     not null references auth.tenant on delete cascade,
     resource_type      text        not null references const.resource_type,
     root_type          text        not null,
-    resource_id        jsonb       not null,
+    resource_id        jsonb       not null default '{}'::jsonb,
+    resource_path      ext.ltree,
     user_id            bigint      references auth.user_info on delete cascade,
     user_group_id      integer     references auth.user_group on delete cascade,
     access_flag        text        not null references const.resource_access_flag,
@@ -121,6 +122,8 @@ create table auth.resource_access
         check (not (user_id is not null and user_group_id is not null)),
     constraint ra_resource_id_is_object
         check (jsonb_typeof(resource_id) = 'object'),
+    constraint ra_path_or_id
+        check (resource_path is not null or resource_id <> '{}'::jsonb),
     primary key (resource_access_id, root_type)
 ) partition by list (root_type);
 
@@ -139,17 +142,32 @@ create table auth.resource_access_default
 create index ix_ra_resource_id
     on auth.resource_access using gin (resource_id);
 
--- Primary lookup: "does user X have flag Y on resource Z?"
--- With jsonb we cannot have a traditional unique btree index, so we use
--- a unique index on (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, access_flag)
--- md5 hash gives us a fixed-width key for uniqueness enforcement.
+-- GiST index for path-based ancestor walks: "_target_path <@ resource_path"
+-- Partition pruning on root_type gives locality within a resource domain.
+create index ix_ra_resource_path
+    on auth.resource_access using gist (resource_path)
+    where resource_path is not null;
+
+-- Primary lookup for id-only rows: "does user X have flag Y on resource Z?"
+-- With jsonb we cannot have a traditional unique btree index, so we use a
+-- unique index on md5(resource_id::text). Scoped to rows without a path so
+-- that md5('{}'::text) collisions across path rows don't conflict.
 create unique index uq_ra_user_flag
     on auth.resource_access (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, access_flag)
-    where user_id is not null;
+    where user_id is not null and resource_path is null;
 
 create unique index uq_ra_group_flag
     on auth.resource_access (root_type, resource_type, tenant_id, md5(resource_id::text), user_group_id, access_flag)
-    where user_group_id is not null;
+    where user_group_id is not null and resource_path is null;
+
+-- Uniqueness for path-bearing rows (path-only or hybrid)
+create unique index uq_ra_user_flag_path
+    on auth.resource_access (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_id, access_flag)
+    where user_id is not null and resource_path is not null;
+
+create unique index uq_ra_group_flag_path
+    on auth.resource_access (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_group_id, access_flag)
+    where user_group_id is not null and resource_path is not null;
 
 -- Reverse: "what resources can user X access?"
 create index ix_ra_user_resources
@@ -197,7 +215,8 @@ $$;
  * unsecure.validate_resource_id — Validates resource_id against key_schema
  *
  * Checks that all required keys from the resource_type's key_schema
- * are present in the resource_id jsonb.
+ * are present in the resource_id jsonb. Path-only grants pass an empty
+ * resource_id and skip this validation; the path is the identity.
  */
 create or replace function unsecure.validate_resource_id(_resource_type text, _resource_id jsonb)
 returns void language plpgsql as $$
@@ -205,6 +224,11 @@ declare
     _schema jsonb;
     _key text;
 begin
+    -- Empty resource_id = "no composite-key assertion" (path-only grant)
+    if _resource_id is null or _resource_id = '{}'::jsonb then
+        return;
+    end if;
+
     select key_schema from const.resource_type where code = _resource_type into _schema;
 
     -- No schema → no validation

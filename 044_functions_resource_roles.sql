@@ -246,11 +246,12 @@ create or replace function auth.assign_resource_role(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _target_user_id bigint  default null,
-    _user_group_id  integer default null,
-    _role_codes     text[]  default null,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _target_user_id bigint    default null,
+    _user_group_id  integer   default null,
+    _role_codes     text[]    default null,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(__resource_role_assignment_id bigint, __role_code text)
     language plpgsql
 as
@@ -263,27 +264,28 @@ declare
     _root_type      text;
     _role_res_type  text;
 begin
-    -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.grant_access', _tenant_id);
 
-    -- Validate target
     if _target_user_id is null and _user_group_id is null then
         perform error.raise_35002();
     end if;
 
-    -- Validate resource type and resource_id key schema
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
+
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
-    -- Validate role_codes
     if _role_codes is null or array_length(_role_codes, 1) is null then
         raise exception 'At least one role_code must be provided'
             using errcode = '35007';
     end if;
 
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
-    -- Determine target info for journaling
     if _target_user_id is not null then
         _target_type := 'user';
         select coalesce(display_name, code, user_id::text)
@@ -298,16 +300,13 @@ begin
 
     foreach _rc in array _role_codes
     loop
-        -- Validate role exists and is active
         perform unsecure.validate_resource_role(_rc);
 
-        -- Validate role's resource_type matches the assignment's resource_type
         select resource_type from const.resource_role where code = _rc into _role_res_type;
         if _role_res_type <> _resource_type then
             perform error.raise_35009(_rc, _role_res_type, _resource_type);
         end if;
 
-        -- Check if already exists
         __last_id := null;
         if _target_user_id is not null then
             select rra.resource_role_assignment_id
@@ -316,6 +315,7 @@ begin
               and rra.resource_type = _resource_type
               and rra.tenant_id = _tenant_id
               and rra.resource_id = _resource_id
+              and rra.resource_path is not distinct from _resource_path
               and rra.user_id = _target_user_id
               and rra.role_code = _rc
             into __last_id;
@@ -326,13 +326,13 @@ begin
               and rra.resource_type = _resource_type
               and rra.tenant_id = _tenant_id
               and rra.resource_id = _resource_id
+              and rra.resource_path is not distinct from _resource_path
               and rra.user_group_id = _user_group_id
               and rra.role_code = _rc
             into __last_id;
         end if;
 
         if __last_id is not null then
-            -- Already assigned; update timestamps
             update auth.resource_role_assignment
             set updated_by = _created_by,
                 updated_at = now(),
@@ -341,10 +341,12 @@ begin
               and root_type = _root_type;
         else
             insert into auth.resource_role_assignment (
-                created_by, updated_by, tenant_id, resource_type, root_type, resource_id,
+                created_by, updated_by, tenant_id, resource_type, root_type,
+                resource_id, resource_path,
                 user_id, user_group_id, role_code, granted_by
             ) values (
-                _created_by, _created_by, _tenant_id, _resource_type, _root_type, _resource_id,
+                _created_by, _created_by, _tenant_id, _resource_type, _root_type,
+                _resource_id, _resource_path,
                 _target_user_id, _user_group_id, _rc, _user_id
             )
             returning resource_role_assignment_id into __last_id;
@@ -353,11 +355,11 @@ begin
         return query select __last_id, _rc;
     end loop;
 
-    -- Journal
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18020  -- resource_role_assigned
         , 'resource_role_assignment', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'target_type', _target_type, 'target_name', _target_name,
             'role_codes', _role_codes)
         , _tenant_id);
@@ -375,11 +377,12 @@ create or replace function auth.revoke_resource_role(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _target_user_id bigint  default null,
-    _user_group_id  integer default null,
-    _role_codes     text[]  default null,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _target_user_id bigint    default null,
+    _user_group_id  integer   default null,
+    _role_codes     text[]    default null,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns bigint
     language plpgsql
 as
@@ -398,7 +401,8 @@ begin
 
     perform unsecure.validate_resource_type(_resource_type);
 
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
     if _target_user_id is not null then
         _target_type := 'user';
@@ -417,6 +421,7 @@ begin
       and resource_type = _resource_type
       and tenant_id = _tenant_id
       and resource_id = _resource_id
+      and resource_path is not distinct from _resource_path
       and (_target_user_id is null or user_id = _target_user_id)
       and (_user_group_id is null or user_group_id = _user_group_id)
       and (_role_codes is null or role_code = any(_role_codes));
@@ -427,6 +432,7 @@ begin
         , 18021  -- resource_role_revoked
         , 'resource_role_assignment', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'target_type', _target_type, 'target_name', _target_name,
             'role_codes', coalesce(_role_codes, array['*']),
             'deleted_count', __deleted_count)
@@ -447,25 +453,33 @@ create or replace function auth.revoke_all_resource_roles(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns bigint
     language plpgsql
 as
 $$
 declare
     __deleted_count bigint;
-    _root_type text;
+    _root_type      text;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
     perform unsecure.validate_resource_type(_resource_type);
 
-    _root_type := split_part(_resource_type, '.', 1);
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
+
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
     delete from auth.resource_role_assignment
     where root_type = _root_type
       and tenant_id = _tenant_id
-      and resource_id @> _resource_id;
+      and (_resource_id = '{}'::jsonb or resource_id @> _resource_id)
+      and (_resource_path is null or resource_path <@ _resource_path);
 
     get diagnostics __deleted_count = row_count;
 
@@ -473,6 +487,7 @@ begin
         , 18021  -- resource_role_revoked
         , 'resource_role_assignment', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
+            'resource_path', coalesce(_resource_path::text, ''),
             'deleted_count', __deleted_count)
         , _tenant_id);
 
@@ -481,6 +496,17 @@ end;
 $$;
 
 -- 11. auth.get_resource_role_assignments — defined below
+
+-- ============================================================================
+-- Drop older signatures from 035 so the new ones below replace cleanly
+-- (without creating overloaded pairs with different arities).
+-- ============================================================================
+drop function if exists auth.has_resource_access(bigint, text, text, jsonb, text, integer, boolean);
+drop function if exists auth.filter_accessible_resources(bigint, text, text, jsonb[], text, integer);
+drop function if exists auth.get_resource_access_flags(bigint, text, text, jsonb, integer);
+drop function if exists auth.get_resource_access_matrix(bigint, text, text, jsonb, integer);
+drop function if exists auth.get_resource_grants(bigint, text, text, jsonb, integer);
+drop function if exists auth.get_user_accessible_resources(bigint, text, bigint, text, text, integer);
 
 -- ============================================================================
 -- 12. auth.has_resource_access (REPLACED)
@@ -502,10 +528,11 @@ create or replace function auth.has_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _required_flag  text default 'read',
-    _tenant_id      integer default 1,
-    _throw_err      boolean default true
+    _resource_id    jsonb     default '{}'::jsonb,
+    _required_flag  text      default 'read',
+    _tenant_id      integer   default 1,
+    _throw_err      boolean   default true,
+    _resource_path  ext.ltree default null
 ) returns boolean
     language plpgsql
 as
@@ -516,23 +543,18 @@ declare
     _ancestor         record;
     _ancestor_key     jsonb;
 begin
-    -- System user bypasses all checks
     if _user_id = 1 then
         return true;
     end if;
 
-    -- Tenant owner bypasses all checks
     if auth.is_owner(_user_id, _correlation_id, null, _tenant_id) then
         return true;
     end if;
 
-    -- Get cached group IDs for this user/tenant
     _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    _root_type        := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
 
-    -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
-
-    -- Walk up the type hierarchy (most specific first)
     for _ancestor in
         select rt.code, rt.key_schema
         from const.resource_type rt
@@ -540,9 +562,9 @@ begin
           and rt.is_active = true
         order by ext.nlevel(rt.path) desc
     loop
-        -- Build the ancestor key by extracting only fields from ancestor's schema
+        -- Build the id-component lookup key for this ancestor
         if _ancestor.key_schema is not null and _ancestor.key_schema <> '{}'::jsonb then
-            select jsonb_object_agg(k, _resource_id->k)
+            select coalesce(jsonb_object_agg(k, _resource_id->k), '{}'::jsonb)
             from jsonb_object_keys(_ancestor.key_schema) as k
             where _resource_id ? k
             into _ancestor_key;
@@ -550,20 +572,20 @@ begin
             _ancestor_key := _resource_id;
         end if;
 
-        if _ancestor_key is null then
-            continue;
-        end if;
+        _ancestor_key := coalesce(_ancestor_key, '{}'::jsonb);
 
-        -- (a) User-level DENY overrides everything
+        -- (a) User-level DENY
         if exists (
-            select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
-              and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
-              and user_id = _user_id
-              and access_flag = _required_flag
-              and is_deny = true
+            select 1 from auth.resource_access ra
+            where ra.root_type = _root_type
+              and ra.resource_type = _ancestor.code
+              and ra.tenant_id = _tenant_id
+              and (ra.resource_path is null
+                   or (_resource_path is not null and _resource_path <@ ra.resource_path))
+              and (ra.resource_id = '{}'::jsonb or ra.resource_id = _ancestor_key)
+              and ra.user_id = _user_id
+              and ra.access_flag = _required_flag
+              and ra.is_deny = true
         ) then
             if _throw_err then
                 perform error.raise_35001(_user_id, _resource_type, _resource_id, _tenant_id);
@@ -571,21 +593,23 @@ begin
             return false;
         end if;
 
-        -- (b) User-level GRANT (direct flag)
+        -- (b) User-level GRANT
         if exists (
-            select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
-              and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
-              and user_id = _user_id
-              and access_flag = _required_flag
-              and is_deny = false
+            select 1 from auth.resource_access ra
+            where ra.root_type = _root_type
+              and ra.resource_type = _ancestor.code
+              and ra.tenant_id = _tenant_id
+              and (ra.resource_path is null
+                   or (_resource_path is not null and _resource_path <@ ra.resource_path))
+              and (ra.resource_id = '{}'::jsonb or ra.resource_id = _ancestor_key)
+              and ra.user_id = _user_id
+              and ra.access_flag = _required_flag
+              and ra.is_deny = false
         ) then
             return true;
         end if;
 
-        -- (c) User role GRANT (role assignment with matching flag)
+        -- (c) User role GRANT
         if exists (
             select 1 from auth.resource_role_assignment rra
             inner join const.resource_role_flag rrf
@@ -593,28 +617,32 @@ begin
             where rra.root_type = _root_type
               and rra.resource_type = _ancestor.code
               and rra.tenant_id = _tenant_id
-              and rra.resource_id = _ancestor_key
+              and (rra.resource_path is null
+                   or (_resource_path is not null and _resource_path <@ rra.resource_path))
+              and (rra.resource_id = '{}'::jsonb or rra.resource_id = _ancestor_key)
               and rra.user_id = _user_id
               and rrf.access_flag_code = _required_flag
         ) then
             return true;
         end if;
 
-        -- (d) Group-level GRANT (direct flag via cached group IDs)
+        -- (d) Group-level GRANT
         if exists (
-            select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
-              and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
-              and user_group_id = any(_cached_group_ids)
-              and access_flag = _required_flag
-              and is_deny = false
+            select 1 from auth.resource_access ra
+            where ra.root_type = _root_type
+              and ra.resource_type = _ancestor.code
+              and ra.tenant_id = _tenant_id
+              and (ra.resource_path is null
+                   or (_resource_path is not null and _resource_path <@ ra.resource_path))
+              and (ra.resource_id = '{}'::jsonb or ra.resource_id = _ancestor_key)
+              and ra.user_group_id = any(_cached_group_ids)
+              and ra.access_flag = _required_flag
+              and ra.is_deny = false
         ) then
             return true;
         end if;
 
-        -- (e) Group role GRANT (role assigned to any of user's groups)
+        -- (e) Group role GRANT
         if exists (
             select 1 from auth.resource_role_assignment rra
             inner join const.resource_role_flag rrf
@@ -622,7 +650,9 @@ begin
             where rra.root_type = _root_type
               and rra.resource_type = _ancestor.code
               and rra.tenant_id = _tenant_id
-              and rra.resource_id = _ancestor_key
+              and (rra.resource_path is null
+                   or (_resource_path is not null and _resource_path <@ rra.resource_path))
+              and (rra.resource_id = '{}'::jsonb or rra.resource_id = _ancestor_key)
               and rra.user_group_id = any(_cached_group_ids)
               and rrf.access_flag_code = _required_flag
         ) then
@@ -630,7 +660,6 @@ begin
         end if;
     end loop;
 
-    -- No grant found
     if _throw_err then
         perform error.raise_35001(_user_id, _resource_type, _resource_id, _tenant_id);
     end if;
@@ -645,12 +674,13 @@ $$;
 -- Added: role-derived grants unioned with direct flag grants.
 --
 create or replace function auth.filter_accessible_resources(
-    _user_id        bigint,
-    _correlation_id text,
-    _resource_type  text,
-    _resource_ids   jsonb[],
-    _required_flag  text default 'read',
-    _tenant_id      integer default 1
+    _user_id         bigint,
+    _correlation_id  text,
+    _resource_type   text,
+    _resource_ids    jsonb[]     default null,
+    _required_flag   text        default 'read',
+    _tenant_id       integer     default 1,
+    _resource_paths  ext.ltree[] default null
 ) returns table(__resource_id jsonb)
     language plpgsql
 as
@@ -660,97 +690,160 @@ declare
     _root_type        text;
     _ancestor_types   text[];
 begin
-    -- System user sees everything
-    if _user_id = 1 then
-        return query select unnest(_resource_ids);
+    if _resource_ids is null and _resource_paths is null then
         return;
     end if;
 
-    -- Tenant owner sees everything
-    if auth.is_owner(_user_id, _correlation_id, null, _tenant_id) then
-        return query select unnest(_resource_ids);
+    if _user_id = 1 or auth.is_owner(_user_id, _correlation_id, null, _tenant_id) then
+        if _resource_ids is not null then
+            return query select unnest(_resource_ids);
+        end if;
+        if _resource_paths is not null then
+            return query select jsonb_build_object('path', p::text) from unnest(_resource_paths) as p;
+        end if;
         return;
     end if;
 
-    -- Get cached group IDs
     _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    _root_type        := split_part(_resource_type, '.', 1);
 
-    -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
-
-    -- Get all ancestor types (including self)
     select array_agg(rt.code)
     from const.resource_type rt
     where rt.path @> (select path from const.resource_type where code = _resource_type)
       and rt.is_active = true
     into _ancestor_types;
 
-    return query
-    select r.id
-    from unnest(_resource_ids) as r(id)
-    where
-        -- Not denied at user level (at any ancestor level)
-        not exists (
-            select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = any(_ancestor_types)
-              and tenant_id = _tenant_id
-              and resource_id @> r.id
-              and user_id = _user_id
-              and access_flag = _required_flag
-              and is_deny = true
+    -- ID-based filtering (composite-key rows only; path rows are excluded)
+    if _resource_ids is not null then
+        return query
+        select r.id
+        from unnest(_resource_ids) as r(id)
+        where not exists (
+            select 1 from auth.resource_access ra
+            where ra.root_type = _root_type
+              and ra.resource_type = any(_ancestor_types)
+              and ra.tenant_id = _tenant_id
+              and ra.resource_path is null
+              and ra.resource_id @> r.id
+              and ra.user_id = _user_id
+              and ra.access_flag = _required_flag
+              and ra.is_deny = true
         )
         and (
-            -- User-level GRANT (direct flag)
             exists (
-                select 1 from auth.resource_access
-                where root_type = _root_type
-                  and resource_type = any(_ancestor_types)
-                  and tenant_id = _tenant_id
-                  and resource_id @> r.id
-                  and user_id = _user_id
-                  and access_flag = _required_flag
-                  and is_deny = false
+                select 1 from auth.resource_access ra
+                where ra.root_type = _root_type
+                  and ra.resource_type = any(_ancestor_types)
+                  and ra.tenant_id = _tenant_id
+                  and ra.resource_path is null
+                  and ra.resource_id @> r.id
+                  and ra.user_id = _user_id
+                  and ra.access_flag = _required_flag
+                  and ra.is_deny = false
             )
-            or
-            -- User role GRANT
-            exists (
+            or exists (
                 select 1 from auth.resource_role_assignment rra
                 inner join const.resource_role_flag rrf
                     on rrf.resource_role_code = rra.role_code
                 where rra.root_type = _root_type
                   and rra.resource_type = any(_ancestor_types)
                   and rra.tenant_id = _tenant_id
+                  and rra.resource_path is null
                   and rra.resource_id @> r.id
                   and rra.user_id = _user_id
                   and rrf.access_flag_code = _required_flag
             )
-            or
-            -- Group-level GRANT (direct flag)
-            exists (
-                select 1 from auth.resource_access
-                where root_type = _root_type
-                  and resource_type = any(_ancestor_types)
-                  and tenant_id = _tenant_id
-                  and resource_id @> r.id
-                  and user_group_id = any(_cached_group_ids)
-                  and access_flag = _required_flag
-                  and is_deny = false
+            or exists (
+                select 1 from auth.resource_access ra
+                where ra.root_type = _root_type
+                  and ra.resource_type = any(_ancestor_types)
+                  and ra.tenant_id = _tenant_id
+                  and ra.resource_path is null
+                  and ra.resource_id @> r.id
+                  and ra.user_group_id = any(_cached_group_ids)
+                  and ra.access_flag = _required_flag
+                  and ra.is_deny = false
             )
-            or
-            -- Group role GRANT
-            exists (
+            or exists (
                 select 1 from auth.resource_role_assignment rra
                 inner join const.resource_role_flag rrf
                     on rrf.resource_role_code = rra.role_code
                 where rra.root_type = _root_type
                   and rra.resource_type = any(_ancestor_types)
                   and rra.tenant_id = _tenant_id
+                  and rra.resource_path is null
                   and rra.resource_id @> r.id
                   and rra.user_group_id = any(_cached_group_ids)
                   and rrf.access_flag_code = _required_flag
             )
         );
+    end if;
+
+    -- Path-based filtering (ancestor-walk via <@)
+    if _resource_paths is not null then
+        return query
+        select jsonb_build_object('path', p.path::text)
+        from unnest(_resource_paths) as p(path)
+        where not exists (
+            select 1 from auth.resource_access ra
+            where ra.root_type = _root_type
+              and ra.resource_type = any(_ancestor_types)
+              and ra.tenant_id = _tenant_id
+              and ra.resource_path is not null
+              and p.path <@ ra.resource_path
+              and ra.user_id = _user_id
+              and ra.access_flag = _required_flag
+              and ra.is_deny = true
+        )
+        and (
+            exists (
+                select 1 from auth.resource_access ra
+                where ra.root_type = _root_type
+                  and ra.resource_type = any(_ancestor_types)
+                  and ra.tenant_id = _tenant_id
+                  and ra.resource_path is not null
+                  and p.path <@ ra.resource_path
+                  and ra.user_id = _user_id
+                  and ra.access_flag = _required_flag
+                  and ra.is_deny = false
+            )
+            or exists (
+                select 1 from auth.resource_role_assignment rra
+                inner join const.resource_role_flag rrf
+                    on rrf.resource_role_code = rra.role_code
+                where rra.root_type = _root_type
+                  and rra.resource_type = any(_ancestor_types)
+                  and rra.tenant_id = _tenant_id
+                  and rra.resource_path is not null
+                  and p.path <@ rra.resource_path
+                  and rra.user_id = _user_id
+                  and rrf.access_flag_code = _required_flag
+            )
+            or exists (
+                select 1 from auth.resource_access ra
+                where ra.root_type = _root_type
+                  and ra.resource_type = any(_ancestor_types)
+                  and ra.tenant_id = _tenant_id
+                  and ra.resource_path is not null
+                  and p.path <@ ra.resource_path
+                  and ra.user_group_id = any(_cached_group_ids)
+                  and ra.access_flag = _required_flag
+                  and ra.is_deny = false
+            )
+            or exists (
+                select 1 from auth.resource_role_assignment rra
+                inner join const.resource_role_flag rrf
+                    on rrf.resource_role_code = rra.role_code
+                where rra.root_type = _root_type
+                  and rra.resource_type = any(_ancestor_types)
+                  and rra.tenant_id = _tenant_id
+                  and rra.resource_path is not null
+                  and p.path <@ rra.resource_path
+                  and rra.user_group_id = any(_cached_group_ids)
+                  and rrf.access_flag_code = _required_flag
+            )
+        );
+    end if;
 end;
 $$;
 
@@ -763,8 +856,9 @@ create or replace function auth.get_resource_access_flags(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(__access_flag text, __source text)
     language plpgsql
 as
@@ -774,7 +868,6 @@ declare
     _root_type        text;
     _ancestor_types   text[];
 begin
-    -- System user gets all flags
     if _user_id = 1 then
         return query
             select raf.code, 'system'::text
@@ -782,7 +875,6 @@ begin
         return;
     end if;
 
-    -- Tenant owner gets all flags
     if auth.is_owner(_user_id, _correlation_id, null, _tenant_id) then
         return query
             select raf.code, 'owner'::text
@@ -790,13 +882,10 @@ begin
         return;
     end if;
 
-    -- Get cached group IDs
     _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    _root_type        := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
 
-    -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
-
-    -- Get all ancestor types (including self)
     select array_agg(rt.code)
     from const.resource_type rt
     where rt.path @> (select path from const.resource_type where code = _resource_type)
@@ -804,87 +893,80 @@ begin
     into _ancestor_types;
 
     return query
-    with denied_flags as (
-        -- Collect user-level denies across all ancestor types
-        select ra.access_flag
+    with matching as (
+        select ra.access_flag, ra.is_deny, ra.user_id, ra.user_group_id, null::text as role_code
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.resource_type = any(_ancestor_types)
           and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
-          and ra.user_id = _user_id
-          and ra.is_deny = true
+          and (ra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ ra.resource_path))
+          and (ra.resource_id = '{}'::jsonb or ra.resource_id @> _resource_id)
+          and (ra.user_id = _user_id or ra.user_group_id = any(_cached_group_ids))
+        union all
+        select rrf.access_flag_code, false, rra.user_id, rra.user_group_id, rra.role_code
+        from auth.resource_role_assignment rra
+        inner join const.resource_role_flag rrf
+            on rrf.resource_role_code = rra.role_code
+        where rra.root_type = _root_type
+          and rra.resource_type = any(_ancestor_types)
+          and rra.tenant_id = _tenant_id
+          and (rra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ rra.resource_path))
+          and (rra.resource_id = '{}'::jsonb or rra.resource_id @> _resource_id)
+          and (rra.user_id = _user_id or rra.user_group_id = any(_cached_group_ids))
+    ),
+    denied_flags as (
+        select access_flag
+        from matching
+        where user_id = _user_id and is_deny = true
     ),
     direct_grants as (
-        -- User-level grants not denied
-        select distinct ra.access_flag, 'direct'::text as source
-        from auth.resource_access ra
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
-          and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
-          and ra.user_id = _user_id
-          and ra.is_deny = false
-          and ra.access_flag not in (select df.access_flag from denied_flags df)
+        select distinct access_flag, 'direct'::text as source
+        from matching
+        where user_id = _user_id
+          and is_deny = false
+          and role_code is null
+          and access_flag not in (select access_flag from denied_flags)
     ),
     user_role_grants as (
-        -- User role-derived grants not denied
-        select distinct rrf.access_flag_code as access_flag,
-               ('role:' || rra.role_code)::text as source
-        from auth.resource_role_assignment rra
-        inner join const.resource_role_flag rrf
-            on rrf.resource_role_code = rra.role_code
-        where rra.root_type = _root_type
-          and rra.resource_type = any(_ancestor_types)
-          and rra.tenant_id = _tenant_id
-          and rra.resource_id @> _resource_id
-          and rra.user_id = _user_id
-          and rrf.access_flag_code not in (select df.access_flag from denied_flags df)
-          and rrf.access_flag_code not in (select dg.access_flag from direct_grants dg)
+        select distinct m.access_flag,
+               ('role:' || m.role_code)::text as source
+        from matching m
+        where m.user_id = _user_id
+          and m.role_code is not null
+          and m.access_flag not in (select access_flag from denied_flags)
+          and m.access_flag not in (select access_flag from direct_grants)
     ),
     group_grants as (
-        -- Group-level grants not denied, not already covered
-        select distinct on (ra.access_flag) ra.access_flag, ug.title as source
-        from auth.resource_access ra
-        inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
-          and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
-          and ra.user_group_id = any(_cached_group_ids)
-          and ra.is_deny = false
-          and ra.access_flag not in (select df.access_flag from denied_flags df)
-          and ra.access_flag not in (select dg.access_flag from direct_grants dg)
-          and ra.access_flag not in (select urg.access_flag from user_role_grants urg)
-        order by ra.access_flag, ug.title
+        select distinct on (m.access_flag) m.access_flag, ug.title as source
+        from matching m
+        inner join auth.user_group ug on ug.user_group_id = m.user_group_id
+        where m.user_group_id is not null
+          and m.is_deny = false
+          and m.role_code is null
+          and m.access_flag not in (select access_flag from denied_flags)
+          and m.access_flag not in (select access_flag from direct_grants)
+          and m.access_flag not in (select access_flag from user_role_grants)
+        order by m.access_flag, ug.title
     ),
     group_role_grants as (
-        -- Group role-derived grants not denied, not already covered
-        select distinct on (rrf.access_flag_code)
-               rrf.access_flag_code as access_flag,
-               (ug.title || ' (role:' || rra.role_code || ')')::text as source
-        from auth.resource_role_assignment rra
-        inner join const.resource_role_flag rrf
-            on rrf.resource_role_code = rra.role_code
-        inner join auth.user_group ug on ug.user_group_id = rra.user_group_id
-        where rra.root_type = _root_type
-          and rra.resource_type = any(_ancestor_types)
-          and rra.tenant_id = _tenant_id
-          and rra.resource_id @> _resource_id
-          and rra.user_group_id = any(_cached_group_ids)
-          and rrf.access_flag_code not in (select df.access_flag from denied_flags df)
-          and rrf.access_flag_code not in (select dg.access_flag from direct_grants dg)
-          and rrf.access_flag_code not in (select urg.access_flag from user_role_grants urg)
-          and rrf.access_flag_code not in (select gg.access_flag from group_grants gg)
-        order by rrf.access_flag_code, ug.title
+        select distinct on (m.access_flag) m.access_flag,
+               (ug.title || ' (role:' || m.role_code || ')')::text as source
+        from matching m
+        inner join auth.user_group ug on ug.user_group_id = m.user_group_id
+        where m.user_group_id is not null
+          and m.role_code is not null
+          and m.access_flag not in (select access_flag from denied_flags)
+          and m.access_flag not in (select access_flag from direct_grants)
+          and m.access_flag not in (select access_flag from user_role_grants)
+          and m.access_flag not in (select access_flag from group_grants)
+        order by m.access_flag, ug.title
     )
     select * from direct_grants
-    union all
-    select * from user_role_grants
-    union all
-    select * from group_grants
-    union all
-    select * from group_role_grants;
+    union all select * from user_role_grants
+    union all select * from group_grants
+    union all select * from group_role_grants;
 end;
 $$;
 
@@ -897,8 +979,9 @@ create or replace function auth.get_resource_access_matrix(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(
     __resource_type text,
     __access_flag   text,
@@ -939,11 +1022,9 @@ begin
         return;
     end if;
 
-    -- Get cached group IDs
     _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
-
-    -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    _root_type        := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
 
     return query
     with descendant_types as (
@@ -957,23 +1038,25 @@ begin
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
+          and (ra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ ra.resource_path))
+          and (ra.resource_id = '{}'::jsonb or ra.resource_id @> _resource_id)
           and ra.user_id = _user_id
           and ra.is_deny = true
           and ra.resource_type in (select dt.code from descendant_types dt)
     ),
-    -- Direct flag grants (user)
     direct_grants as (
         select ra.resource_type, ra.access_flag, 'direct'::text as source
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
+          and (ra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ ra.resource_path))
+          and (ra.resource_id = '{}'::jsonb or ra.resource_id @> _resource_id)
           and ra.user_id = _user_id
           and ra.is_deny = false
           and ra.resource_type in (select dt.code from descendant_types dt)
     ),
-    -- User role grants
     user_role_grants as (
         select rra.resource_type, rrf.access_flag_code as access_flag,
                ('role:' || rra.role_code)::text as source
@@ -982,11 +1065,12 @@ begin
             on rrf.resource_role_code = rra.role_code
         where rra.root_type = _root_type
           and rra.tenant_id = _tenant_id
-          and rra.resource_id @> _resource_id
+          and (rra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ rra.resource_path))
+          and (rra.resource_id = '{}'::jsonb or rra.resource_id @> _resource_id)
           and rra.user_id = _user_id
           and rra.resource_type in (select dt.code from descendant_types dt)
     ),
-    -- Direct flag grants (group)
     group_grants as (
         select distinct on (ra.resource_type, ra.access_flag)
             ra.resource_type, ra.access_flag, ug.title as source
@@ -994,13 +1078,14 @@ begin
         inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
         where ra.root_type = _root_type
           and ra.tenant_id = _tenant_id
-          and ra.resource_id @> _resource_id
+          and (ra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ ra.resource_path))
+          and (ra.resource_id = '{}'::jsonb or ra.resource_id @> _resource_id)
           and ra.user_group_id = any(_cached_group_ids)
           and ra.is_deny = false
           and ra.resource_type in (select dt.code from descendant_types dt)
         order by ra.resource_type, ra.access_flag, ug.title
     ),
-    -- Group role grants
     group_role_grants as (
         select distinct on (rra.resource_type, rrf.access_flag_code)
                rra.resource_type, rrf.access_flag_code as access_flag,
@@ -1011,7 +1096,9 @@ begin
         inner join auth.user_group ug on ug.user_group_id = rra.user_group_id
         where rra.root_type = _root_type
           and rra.tenant_id = _tenant_id
-          and rra.resource_id @> _resource_id
+          and (rra.resource_path is null
+               or (_resource_path is not null and _resource_path <@ rra.resource_path))
+          and (rra.resource_id = '{}'::jsonb or rra.resource_id @> _resource_id)
           and rra.user_group_id = any(_cached_group_ids)
           and rra.resource_type in (select dt.code from descendant_types dt)
         order by rra.resource_type, rrf.access_flag_code, ug.title
@@ -1092,19 +1179,20 @@ create or replace function auth.get_resource_grants(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb,
-    _tenant_id      integer default 1
+    _resource_id    jsonb     default '{}'::jsonb,
+    _tenant_id      integer   default 1,
+    _resource_path  ext.ltree default null
 ) returns table(
     __resource_access_id bigint,
-    __user_id bigint,
-    __user_display_name text,
-    __user_group_id integer,
-    __group_title text,
-    __access_flag text,
-    __is_deny boolean,
-    __granted_by bigint,
-    __granted_by_name text,
-    __created_at timestamptz
+    __user_id            bigint,
+    __user_display_name  text,
+    __user_group_id      integer,
+    __group_title        text,
+    __access_flag        text,
+    __is_deny            boolean,
+    __granted_by         bigint,
+    __granted_by_name    text,
+    __created_at         timestamptz
 )
     stable
     language plpgsql
@@ -1115,10 +1203,10 @@ declare
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.get_grants', _tenant_id);
 
-    _root_type := split_part(_resource_type, '.', 1);
+    _resource_id := coalesce(_resource_id, '{}'::jsonb);
+    _root_type   := split_part(_resource_type, '.', 1);
 
     return query
-    -- Direct flag grants/denies
     select
         ra.resource_access_id,
         ra.user_id,
@@ -1138,10 +1226,10 @@ begin
       and ra.resource_type = _resource_type
       and ra.tenant_id = _tenant_id
       and ra.resource_id = _resource_id
+      and ra.resource_path is not distinct from _resource_path
 
     union all
 
-    -- Role-derived grants (expanded to individual flags)
     select
         rra.resource_role_assignment_id,
         rra.user_id,
@@ -1162,6 +1250,7 @@ begin
       and rra.resource_type = _resource_type
       and rra.tenant_id = _tenant_id
       and rra.resource_id = _resource_id
+      and rra.resource_path is not distinct from _resource_path
 
     order by access_flag, is_deny, created_at;
 end;
@@ -1177,12 +1266,13 @@ create or replace function auth.get_user_accessible_resources(
     _correlation_id  text,
     _target_user_id  bigint,
     _resource_type   text,
-    _access_flag     text default 'read',
+    _access_flag     text    default 'read',
     _tenant_id       integer default 1
 ) returns table(
-    __resource_id jsonb,
-    __access_flags text[],
-    __source text
+    __resource_id   jsonb,
+    __resource_path text,
+    __access_flags  text[],
+    __source        text
 )
     language plpgsql
 as
@@ -1197,7 +1287,7 @@ begin
     end if;
 
     _cached_group_ids := unsecure.get_cached_group_ids(_target_user_id, _tenant_id);
-    _root_type := split_part(_resource_type, '.', 1);
+    _root_type        := split_part(_resource_type, '.', 1);
 
     select array_agg(rt.code)
     from const.resource_type rt
@@ -1207,7 +1297,7 @@ begin
 
     return query
     with denied_flags as (
-        select ra.resource_id, ra.access_flag
+        select ra.resource_id, ra.resource_path, ra.access_flag
         from auth.resource_access ra
         where ra.root_type = _root_type
           and ra.resource_type = any(_ancestor_types)
@@ -1216,7 +1306,7 @@ begin
           and ra.is_deny = true
     ),
     direct_resources as (
-        select ra.resource_id,
+        select ra.resource_id, ra.resource_path,
                array_agg(distinct ra.access_flag) as access_flags,
                'direct'::text as source
         from auth.resource_access ra
@@ -1228,13 +1318,14 @@ begin
           and not exists (
               select 1 from denied_flags df
               where df.resource_id = ra.resource_id
+                and df.resource_path is not distinct from ra.resource_path
                 and df.access_flag = ra.access_flag
           )
           and (_access_flag is null or ra.access_flag = _access_flag)
-        group by ra.resource_id
+        group by ra.resource_id, ra.resource_path
     ),
     user_role_resources as (
-        select rra.resource_id,
+        select rra.resource_id, rra.resource_path,
                array_agg(distinct rrf.access_flag_code) as access_flags,
                ('role:' || string_agg(distinct rra.role_code, ','))::text as source
         from auth.resource_role_assignment rra
@@ -1247,16 +1338,19 @@ begin
           and not exists (
               select 1 from denied_flags df
               where df.resource_id = rra.resource_id
+                and df.resource_path is not distinct from rra.resource_path
                 and df.access_flag = rrf.access_flag_code
           )
           and (_access_flag is null or rrf.access_flag_code = _access_flag)
           and not exists (
-              select 1 from direct_resources dr where dr.resource_id = rra.resource_id
+              select 1 from direct_resources dr
+              where dr.resource_id = rra.resource_id
+                and dr.resource_path is not distinct from rra.resource_path
           )
-        group by rra.resource_id
+        group by rra.resource_id, rra.resource_path
     ),
     group_resources as (
-        select ra.resource_id,
+        select ra.resource_id, ra.resource_path,
                array_agg(distinct ra.access_flag) as access_flags,
                string_agg(distinct ug.title, ', ') as source
         from auth.resource_access ra
@@ -1269,19 +1363,24 @@ begin
           and not exists (
               select 1 from denied_flags df
               where df.resource_id = ra.resource_id
+                and df.resource_path is not distinct from ra.resource_path
                 and df.access_flag = ra.access_flag
           )
           and (_access_flag is null or ra.access_flag = _access_flag)
           and not exists (
-              select 1 from direct_resources dr where dr.resource_id = ra.resource_id
+              select 1 from direct_resources dr
+              where dr.resource_id = ra.resource_id
+                and dr.resource_path is not distinct from ra.resource_path
           )
           and not exists (
-              select 1 from user_role_resources urr where urr.resource_id = ra.resource_id
+              select 1 from user_role_resources urr
+              where urr.resource_id = ra.resource_id
+                and urr.resource_path is not distinct from ra.resource_path
           )
-        group by ra.resource_id
+        group by ra.resource_id, ra.resource_path
     ),
     group_role_resources as (
-        select rra.resource_id,
+        select rra.resource_id, rra.resource_path,
                array_agg(distinct rrf.access_flag_code) as access_flags,
                (string_agg(distinct ug.title, ', ') || ' (role)')::text as source
         from auth.resource_role_assignment rra
@@ -1295,27 +1394,34 @@ begin
           and not exists (
               select 1 from denied_flags df
               where df.resource_id = rra.resource_id
+                and df.resource_path is not distinct from rra.resource_path
                 and df.access_flag = rrf.access_flag_code
           )
           and (_access_flag is null or rrf.access_flag_code = _access_flag)
           and not exists (
-              select 1 from direct_resources dr where dr.resource_id = rra.resource_id
+              select 1 from direct_resources dr
+              where dr.resource_id = rra.resource_id
+                and dr.resource_path is not distinct from rra.resource_path
           )
           and not exists (
-              select 1 from user_role_resources urr where urr.resource_id = rra.resource_id
+              select 1 from user_role_resources urr
+              where urr.resource_id = rra.resource_id
+                and urr.resource_path is not distinct from rra.resource_path
           )
           and not exists (
-              select 1 from group_resources gr where gr.resource_id = rra.resource_id
+              select 1 from group_resources gr
+              where gr.resource_id = rra.resource_id
+                and gr.resource_path is not distinct from rra.resource_path
           )
-        group by rra.resource_id
+        group by rra.resource_id, rra.resource_path
     )
-    select * from direct_resources
+    select dr.resource_id, dr.resource_path::text, dr.access_flags, dr.source from direct_resources dr
     union all
-    select * from user_role_resources
+    select urr.resource_id, urr.resource_path::text, urr.access_flags, urr.source from user_role_resources urr
     union all
-    select * from group_resources
+    select gr.resource_id, gr.resource_path::text, gr.access_flags, gr.source from group_resources gr
     union all
-    select * from group_role_resources;
+    select grr.resource_id, grr.resource_path::text, grr.access_flags, grr.source from group_role_resources grr;
 end;
 $$;
 -- 6. Replaced functions — resource role management
