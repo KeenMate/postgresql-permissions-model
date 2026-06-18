@@ -191,13 +191,18 @@ begin
             continue;
         end if;
 
+        -- Matching uses containment: the queried ancestor key must contain the
+        -- stored key. This means stored full keys match exact resources AND
+        -- stored partial keys (denies scoped to a parent slice) match any
+        -- resource under that slice.
+
         -- User-level DENY overrides everything
         if exists (
             select 1 from auth.resource_access
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
+              and _ancestor_key @> resource_id
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = true
@@ -214,7 +219,7 @@ begin
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
+              and _ancestor_key @> resource_id
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = false
@@ -228,7 +233,7 @@ begin
             where root_type = _root_type
               and resource_type = _ancestor.code
               and tenant_id = _tenant_id
-              and resource_id = _ancestor_key
+              and _ancestor_key @> resource_id
               and user_group_id = any(_cached_group_ids)
               and access_flag = _required_flag
               and is_deny = false

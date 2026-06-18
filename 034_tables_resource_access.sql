@@ -214,11 +214,19 @@ $$;
 /*
  * unsecure.validate_resource_id — Validates resource_id against key_schema
  *
- * Checks that all required keys from the resource_type's key_schema
- * are present in the resource_id jsonb. Path-only grants pass an empty
- * resource_id and skip this validation; the path is the identity.
+ * _resource_id may carry any subset of the schema's keys; unknown keys
+ * are rejected. This lets grants and denies be scoped at any level of the
+ * key hierarchy (e.g. {project_id: 42} on 'project.invoices' means
+ * "all invoices under project 42") and read-time containment matching
+ * resolves the cascade.
+ *
+ * Empty/null _resource_id is a path-only assertion and skips validation;
+ * the resource_path is the identity.
  */
-create or replace function unsecure.validate_resource_id(_resource_type text, _resource_id jsonb)
+create or replace function unsecure.validate_resource_id(
+    _resource_type text,
+    _resource_id jsonb
+)
 returns void language plpgsql as $$
 declare
     _schema jsonb;
@@ -236,11 +244,11 @@ begin
         return;
     end if;
 
-    -- Check each required key is present
-    for _key in select jsonb_object_keys(_schema)
+    -- Reject any key not in the schema
+    for _key in select jsonb_object_keys(_resource_id)
     loop
-        if not (_resource_id ? _key) then
-            raise exception 'resource_id missing required key "%" for resource type "%"', _key, _resource_type
+        if not (_schema ? _key) then
+            raise exception 'resource_id key "%" is not part of key_schema for resource type "%"', _key, _resource_type
                 using errcode = '35005';
         end if;
     end loop;

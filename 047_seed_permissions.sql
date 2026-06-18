@@ -13,6 +13,10 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
 -- Seed permissions, providers, groups, and perm sets
 select auth.seed_permission_data();
 
+-- End of the v2 line for the postgresql_permissionmodel component.
+-- Pairs with start_version_update('2', ...) at the top of 010_functions_auth_prereq.sql.
+select * from public.stop_version_update('2', _component := 'postgresql_permissionmodel');
+
 -- Reset sequences to 1000 to reserve space for system tenants and groups
 alter sequence auth.tenant_tenant_id_seq restart with 1000;
 alter sequence auth.user_group_user_group_id_seq restart with 1000;

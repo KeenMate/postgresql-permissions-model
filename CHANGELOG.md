@@ -2,10 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
-## [3.1.0] - 2026-04-17
+## 2026-06-18
+
+### Changed
+
+- **Partial-key grants and denies** — `unsecure.validate_resource_id` no longer requires every key from the `key_schema` to be present in `_resource_id`. Any subset of the schema's keys is accepted; only unknown keys (not in the schema) are rejected. This lets a grant or deny be scoped at any level of the composite key (e.g. `{project_id: 42}` on `project.invoices` means "all invoices under project 42" — no `invoice_id` required). The `_allow_partial` parameter is **not** introduced; the relaxed validation applies uniformly.
+- **`auth.has_resource_access` matching** — ancestor-level lookups now use containment (`_ancestor_key @> resource_id`) instead of exact equality (`resource_id = _ancestor_key`). Full-key stored grants/denies still match the exact resource; partial-key stored rows match every descendant resource under that key slice. Parent-grant cascade through ancestor key extraction is unchanged. Read semantics are otherwise identical.
+
+### Notes
+
+- Symmetric model: grants and denies share the same validation and matching semantics. A partial-key grant ("read on all invoices under project 42 for group X") and a partial-key deny ("no invoices under project 42 for user Y") are both expressible.
+- No new function signatures, parameters, or error codes. Existing full-key callers are unaffected.
+- All 791 tests across 36 suites pass after the change.
+
+## 2026-04-17
 
 ### Added
 
@@ -39,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Existing composite-key grants continue to work unchanged; path support is additive.
 - Applications wanting path-based ACL can either: register a resource type with an empty `key_schema` and call grant functions with `_resource_path`, or use a non-empty `key_schema` and mix both dimensions on the same grant (hybrid).
 
-## [3.0.0] - 2026-04-12
+## 2026-04-12
 
 ### Added
 
@@ -118,7 +130,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - System user (id=1) was not marked `is_system = true` in seed data
 - Removed hardcoded `aad` provider from seed — apps register their own via `auth.ensure_provider`
 
-## [2.25.0] - 2026-03-10
+## 2026-03-10
 
 ### Added
 
@@ -146,7 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `auth.search_user_events` — `_correlation_id` was used as both an auth tracing parameter and a WHERE filter, causing empty results when the app passed a real correlation_id. The filter is now a separate `correlation_id` key in `_search_criteria`.
 
-## [2.24.0] - 2026-03-09
+## 2026-03-09
 
 ### Added
 
@@ -182,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `auth.create_blacklist_user` now prevents blacklisting system users (checks `is_system` by username and provider identity, raises error 33002).
 
-## [2.23.0] - 2026-03-09
+## 2026-03-09
 
 ### Added
 
@@ -234,7 +246,7 @@ All `auth.*` functions that call `has_permission` now accept `_tenant_id integer
 - `unsecure.get_perm_sets` and `unsecure.get_invitations` now accept `null` tenant_id (returns all tenants)
 - Permission matrix documentation page added to docs site
 
-## [2.22.0] - 2026-03-07
+## 2026-03-07
 
 ### Added
 
@@ -312,7 +324,7 @@ A generic invitation system that supports inviting users to tenants, groups, per
 
 ---
 
-## [2.21.0] - 2026-03-07
+## 2026-03-07
 
 ### Added
 
@@ -355,7 +367,7 @@ New MFA permissions created in migrations 036/039 are now automatically added to
 - `test_user_blacklist/000_setup.sql` — removed `updated_by` from `tenant_user` and `permission_assignment` inserts (columns don't exist on those tables), fixed `clear_permission_cache` call signature
 - `test_auto_lockout/006-008` — fixed test ordering issues: unlock user and clear failure events between lockout tests and verify_user_by_email tests; removed event checks from `BEGIN...EXCEPTION` blocks (PostgreSQL rolls back side effects on exception)
 
-## [2.20.0] - 2026-03-05
+## 2026-03-05
 
 ### Added
 
@@ -371,7 +383,7 @@ New function `auth.verify_user_by_email` that combines email lookup, status vali
 
 **Key difference from `get_user_by_email_for_authentication`:** Only logs `user_logged_in` after a confirmed hash match (cleaner audit trail). Does not return `password_hash`/`password_salt` since the DB does the comparison. The existing two-step flow (`get_user_by_email_for_authentication` + `record_login_failure`) remains unchanged for apps that prefer it.
 
-## [2.19.1] - 2026-03-04
+## 2026-03-04
 
 ### Changed
 
@@ -384,7 +396,7 @@ Failed MFA challenges now count toward the auto-lockout threshold alongside wron
 - `unsecure.check_and_auto_lock_user` — now counts both `user_login_failed` and `mfa_challenge_failed` events within the lockout window
 - `auth.verify_mfa_challenge` — on failure (Case 3), logs `mfa_challenge_failed` event and calls `check_and_auto_lock_user`. Raises 33004 (user locked) if threshold exceeded, otherwise raises 38004 (MFA challenge failed)
 
-## [2.19.0] - 2026-03-04
+## 2026-03-04
 
 ### Added
 
@@ -439,7 +451,7 @@ Scope-based rules table (`auth.mfa_policy`) to signal whether MFA is required fo
 
 **Files:** `039_mfa_policy.sql`, `040_functions_mfa_policy.sql`
 
-## [2.18.0] - 2026-03-04
+## 2026-03-04
 
 ### Added
 
@@ -528,7 +540,7 @@ Complete MFA implementation with two-step enrollment (enroll → confirm), TOTP 
 
 **Files:** `036_tables_mfa.sql`, `038_functions_mfa.sql`
 
-## [2.17.0] - 2026-03-02
+## 2026-03-02
 
 ### Added
 
@@ -577,7 +589,7 @@ New `auth.user_blacklist` table and supporting functions to prevent re-creation 
 
 The function body was a copy-paste from `auth.delete_user_group` — it referenced `auth.user_group`, `_user_group_id`, and journaled event 13003 (group_deleted). Fixed to correctly reference `auth.user_info`, `_target_user_id`, use proper error checks (33001 user not found, 33002 user is system), call `unsecure.delete_user_by_id()`, and journal event 10003 (user_deleted). Also added `_blacklist boolean default false` parameter for the new blacklist feature.
 
-## [2.16.0] - 2026-03-02
+## 2026-03-02
 
 ### Added
 
@@ -663,7 +675,7 @@ New `source text default null` column on `auth.user_group` table, matching the e
 - `019_functions_unsecure.sql` — `_source` parameter added to `unsecure.create_user_group`
 - `021_functions_auth_group.sql` — `_source` parameter added to `auth.create_user_group`
 
-## [2.15.0] - 2026-03-01
+## 2026-03-01
 
 ### Changed
 
@@ -703,7 +715,7 @@ Replaced `./tests/run-tests.sh` and `./exec-sql.sh` references with `debee.ps1` 
 - `unsecure.recalculate_user_permissions` — added `drop table if exists` before creating temp table `__temp_users_groups_permissions` to prevent failure when called twice in the same transaction
 - Resource access test suite — fixed column names, type mismatches, missing FK cleanup, and missing perm set creation for non-default tenants
 
-## [2.14.0] - 2026-02-28
+## 2026-02-28
 
 ### Added
 
@@ -781,7 +793,7 @@ New columns on `auth.provider` to control group mapping and sync behavior per pr
 
 - Reset `auth.tenant` and `auth.user_group` identity sequences to start at 1000 (IDs 1-999 reserved for system use) (`029_seed_data.sql`)
 
-## [2.13.0] - 2026-02-28
+## 2026-02-28
 
 ### Changed
 
@@ -826,7 +838,7 @@ Global test ordering controlled by `tests/tests.json`.
 - `tests/run-tests.sh` — Replaced by `debee runTests`
 - All flat `tests/test_*.sql` files — Replaced by suite directories
 
-## [2.12.0] - 2026-02-26
+## 2026-02-26
 
 ### Added
 
@@ -869,7 +881,7 @@ Journal messages and user events can now be routed to an external system (e.g., 
 
 **Note:** When mode is `notify`, search/query functions (`search_journal`, `get_journal_entry`, `search_user_events`, `get_user_audit_trail`, `get_security_events`) return empty results since data is not in PostgreSQL. The app should query the external store directly.
 
-## [2.11.0] - 2026-02-26
+## 2026-02-26
 
 ### Changed
 
@@ -955,7 +967,7 @@ select auth.enable_user('admin', 1, 'corr-123', 42);
 
 ---
 
-## [2.10.0] - 2026-02-23
+## 2026-02-23
 
 ### Added
 
@@ -1007,7 +1019,7 @@ Both `public.journal` and `auth.user_event` are now range-partitioned by `create
 
 ---
 
-## [2.9.0] - 2026-02-22
+## 2026-02-22
 
 ### Added
 
@@ -1102,7 +1114,7 @@ select source, count(*) from const.event_code group by source;
 
 ---
 
-## [2.8.0] - 2026-02-21
+## 2026-02-21
 
 ### Added
 
@@ -1249,7 +1261,7 @@ Fix: changed to `ON CONFLICT (user_group_id, user_id, coalesce(mapping_id, 0))`.
 
 ---
 
-## [2.7.0] - 2026-02-21
+## 2026-02-21
 
 ### Added
 
@@ -1304,7 +1316,7 @@ The `system_admin` perm set didn't include `tokens` or `authentication` parent p
 
 ---
 
-## [2.6.0] - 2026-02-20
+## 2026-02-20
 
 ### Added
 
@@ -1404,7 +1416,7 @@ Multiple mutation points changed effective permissions but did NOT invalidate th
 
 ---
 
-## [2.5.0] - 2026-02-14
+## 2026-02-14
 
 ### Added
 
@@ -1494,7 +1506,7 @@ The provider-based flow (`auth.ensure_user_from_provider()`) was not affected.
 
 ---
 
-## [2.4.0] - 2026-02-14
+## 2026-02-14
 
 ### Added
 
@@ -1674,7 +1686,7 @@ Added to `system_admin` permission set.
 
 ---
 
-## [2.3.0] - 2026-02-12
+## 2026-02-12
 
 ### Added
 
@@ -1713,7 +1725,7 @@ Backend (generates correlation_id)
 
 ---
 
-## [2.2.0] - 2026-02-11
+## 2026-02-11
 
 ### Fixed
 
@@ -1845,7 +1857,7 @@ SELECT auth.get_outbound_api_key_secret('admin', 1, 'sendgrid', 1);
 
 ---
 
-## [2.1.0] - 2026-02-11
+## 2026-02-11
 
 ### Added
 
@@ -1894,7 +1906,7 @@ Added trigger functions in `017_functions_triggers.sql` to auto-populate search 
 
 ---
 
-## [2.0.0] - 2026-02-10
+## 2026-02-10
 
 ### Breaking Changes
 
@@ -2125,7 +2137,7 @@ Consolidated migration files into modular structure:
 
 ---
 
-## [1.16] - Previous Release
+## Pre-v2 (legacy)
 
 See git history for v1.x changes.
 
@@ -2133,24 +2145,41 @@ See git history for v1.x changes.
 
 ## Version History
 
+All rows below are work inside `postgresql_permissionmodel` **v2** — recorded as a single row in `public.__version` dated 2026-02-10 (see `010_functions_auth_prereq.sql`). The Version column is informational: the component version is not bumped per change. The table is a quick chronological glance over what shipped when; full detail lives in the date-tagged sections above.
+
 | Version | Date | Description |
 |---------|------|-------------|
-| 2.16.0 | 2026-03-02 | Bulk ensure functions for app bootstrapping, `_is_final_state` declarative sync, `source` column on user_group |
-| 2.15.0 | 2026-03-01 | Event ID collision fix, column renames, Makefile debee migration |
-| 2.14.0 | 2026-02-28 | Resource access (ACL) system, provider capability flags |
-| 2.13.0 | 2026-02-28 | User group caching, hierarchical resource access |
-| 2.12.0 | 2026-02-26 | Search function fixes, group member tenant functions |
-| 2.11.0 | 2026-02-26 | Event code management, audit partitioning, storage modes |
-| 2.10.0 | 2026-02-23 | Request context tracking, user events for registration/login |
-| 2.9.0 | 2026-02-22 | User event system, registration/login bug fixes |
-| 2.8.0 | 2026-02-21 | Audit infrastructure, composable admin permission sets, ensure_provider, bug fixes |
-| 2.7.0 | 2026-02-21 | Dedicated service accounts with least-privilege permissions, missing permission seed fixes |
-| 2.6.0 | 2026-02-20 | Real-time LISTEN/NOTIFY notifications, cache invalidation gap fixes |
-| 2.5.0 | 2026-02-14 | Code generator compatibility: unique journal function names, throw_no_permission moved to internal |
-| 2.4.0 | 2026-02-14 | Hierarchical numeric permission codes, language & translation system, colored test output |
-| 2.3.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |
-| 2.2.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |
-| 2.1.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |
+| 2.0.0 | 2026-06-18 | Partial-key grants/denies on resource_access (subset key validation, containment-based matching in `has_resource_access`) |
+| 2.0.0 | 2026-04-17 | Path-based resource access (ltree) with cascading grants and deny-overrides; icons example demo |
+| 2.0.0 | 2026-04-12 | Resource roles (named flag bundles); translation `context` column + `mv_translation` materialized view; `user_data` jsonb columns (`settings`, `preferences`, `custom_data`) |
+| 2.0.0 | 2026-03-10 | Unified `_search_criteria jsonb` across 12 search/audit functions; multi-tenant columns on group queries |
+| 2.0.0 | 2026-03-09 | `resolve_cross_tenant_access` + `resolve_user/tenant/group` helpers; `add_*` → `create_*`/`assign_*` renames |
+| 2.0.0 | 2026-03-09 | Tenant isolation + cross-tenant data access pattern; 13 new `read_all_*` permissions; 21 functions updated |
+| 2.0.0 | 2026-03-07 | Invitation system (generic, templated, phased actions with conditional execution) |
+| 2.0.0 | 2026-03-07 | `is_verified` on `user_identity`; MFA permissions auto-assigned to existing perm sets |
+| 2.0.0 | 2026-03-05 | Single-call email/password verification (`auth.verify_user_by_email`) |
+| 2.0.0 | 2026-03-04 | MFA challenge failures now count toward auto-lockout |
+| 2.0.0 | 2026-03-04 | MFA recovery code reset (`auth.reset_mfa`); MFA policy (`auth.mfa_policy`) with scope-based resolution |
+| 2.0.0 | 2026-03-04 | Auto-lockout on repeated login failures; Multi-Factor Authentication (TOTP) |
+| 2.0.0 | 2026-03-02 | User blacklist for deleted users (`auth.user_blacklist`) |
+| 2.0.0 | 2026-03-02 | Bulk ensure functions for app bootstrapping, `_is_final_state` declarative sync, `source` column on user_group |
+| 2.0.0 | 2026-03-01 | Event ID collision fix, column renames, Makefile debee migration |
+| 2.0.0 | 2026-02-28 | Resource access (ACL) system, provider capability flags |
+| 2.0.0 | 2026-02-28 | User group caching, hierarchical resource access |
+| 2.0.0 | 2026-02-26 | Search function fixes, group member tenant functions |
+| 2.0.0 | 2026-02-26 | Event code management, audit partitioning, storage modes |
+| 2.0.0 | 2026-02-23 | Request context tracking, user events for registration/login |
+| 2.0.0 | 2026-02-22 | User event system, registration/login bug fixes |
+| 2.0.0 | 2026-02-21 | Audit infrastructure, composable admin permission sets, ensure_provider, bug fixes |
+| 2.0.0 | 2026-02-21 | Dedicated service accounts with least-privilege permissions, missing permission seed fixes |
+| 2.0.0 | 2026-02-20 | Real-time LISTEN/NOTIFY notifications, cache invalidation gap fixes |
+| 2.0.0 | 2026-02-14 | Code generator compatibility: unique journal function names, throw_no_permission moved to internal |
+| 2.0.0 | 2026-02-14 | Hierarchical numeric permission codes, language & translation system, colored test output |
+| 2.0.0 | 2026-02-12 | Correlation ID tracing, consolidate seed data |
+| 2.0.0 | 2026-02-11 | Cache invalidation fixes, soft invalidation strategy, parameter validation |
+| 2.0.0 | 2026-02-11 | Search/paging functions, set_user_group_as_internal |
 | 2.0.0 | 2026-02-10 | Major restructure: removed inheritance, new event codes |
-| 1.16 | - | API key tenant_id fix |
-| 1.0-1.15 | - | Incremental feature additions |
+| 1.16  | —          | API key tenant_id fix (legacy) |
+| 1.0–1.15 | —       | Incremental feature additions (legacy) |
+
+Other component tracks recorded in `public.__version`: `common_helpers` 1.0–1.6 (per file in `004`–`013`); historic `keen_auth_permissions` 1.0–1.15 and `versions_management` 1.0–1.2 (folded into canonical files; scripts live in `old/`).
