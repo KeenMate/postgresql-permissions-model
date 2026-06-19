@@ -65,7 +65,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'coexist.root'::ext.ltree
+        _resource_path  := 'coexist.root'
     );
 
     __result := auth.has_resource_access(
@@ -73,7 +73,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'coexist.root.child'::ext.ltree,
+        _resource_path  := 'coexist.root.child',
         _throw_err      := false
     );
 
@@ -89,7 +89,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'proj',
         _required_flag  := 'read',
-        _resource_path  := 'some.arbitrary.path'::ext.ltree,
+        _resource_path  := 'some.arbitrary.path',
         _throw_err      := false
     );
 

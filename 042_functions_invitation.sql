@@ -1442,10 +1442,10 @@ create or replace function unsecure.ensure_invitation_templates(
 as
 $$
 declare
-    _item             jsonb;
-    _code             text;
-    _input_codes      text[] := '{}';
-    _tmpl_to_delete   record;
+    __item             jsonb;
+    __code             text;
+    __input_codes      text[] := '{}';
+    __tmpl_to_delete   record;
     ___template_id    integer;
     ___action         jsonb;
 begin
@@ -1453,25 +1453,25 @@ begin
         raise exception '_source is required when _is_final_state is true';
     end if;
 
-    for _item in
+    for __item in
         select value from jsonb_array_elements(_templates)
     loop
-        _code := _item ->> 'code';
-        _input_codes := array_append(_input_codes, _code);
+        __code := __item ->> 'code';
+        __input_codes := array_append(__input_codes, __code);
 
         -- Skip if already exists for this tenant
-        if exists (select 1 from auth.invitation_template where code = _code and tenant_id = _tenant_id) then
+        if exists (select 1 from auth.invitation_template where code = __code and tenant_id = _tenant_id) then
             continue;
         end if;
 
         -- Create template
         insert into auth.invitation_template (created_by, updated_by, tenant_id, code, title, description, default_message, source)
-        values (_created_by, _created_by, _tenant_id, _code,
-                _item ->> 'title', _item ->> 'description', _item ->> 'default_message', _source)
+        values (_created_by, _created_by, _tenant_id, __code,
+                __item ->> 'title', __item ->> 'description', __item ->> 'default_message', _source)
         returning template_id into ___template_id;
 
         -- Create actions
-        for ___action in select * from jsonb_array_elements(coalesce(_item -> 'actions', '[]'::jsonb))
+        for ___action in select * from jsonb_array_elements(coalesce(__item -> 'actions', '[]'::jsonb))
         loop
             insert into auth.invitation_template_action (
                 created_by, updated_by, template_id, action_type_code, executor_code,
@@ -1491,27 +1491,27 @@ begin
 
         perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
             22010, 'invitation_template', ___template_id,
-            jsonb_build_object('template_code', _code),
+            jsonb_build_object('template_code', __code),
             _tenant_id);
     end loop;
 
     -- Final state: remove templates with same source+tenant that are not in the input set
     if _is_final_state then
-        for _tmpl_to_delete in
+        for __tmpl_to_delete in
             select it.template_id, it.code
             from auth.invitation_template it
             where it.source = _source
               and it.tenant_id = _tenant_id
-              and it.code != all (_input_codes)
+              and it.code != all (__input_codes)
         loop
             -- Cascade deletes template_actions
             delete from auth.invitation_template
-            where template_id = _tmpl_to_delete.template_id;
+            where template_id = __tmpl_to_delete.template_id;
 
             perform create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
-                22012, 'invitation_template', _tmpl_to_delete.template_id,
-                jsonb_build_object('template_code', _tmpl_to_delete.code,
+                22012, 'invitation_template', __tmpl_to_delete.template_id,
+                jsonb_build_object('template_code', __tmpl_to_delete.code,
                     'reason', 'final_state_sync', 'source', _source),
                 _tenant_id
             );
@@ -1523,7 +1523,7 @@ begin
         select it.*
         from auth.invitation_template it
         where it.tenant_id = _tenant_id
-          and it.code = any (_input_codes)
+          and it.code = any (__input_codes)
         order by it.title;
 end;
 $$;

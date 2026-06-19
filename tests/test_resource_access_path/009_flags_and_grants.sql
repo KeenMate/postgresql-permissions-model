@@ -23,7 +23,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read', 'write'],
-        _resource_path  := 'flags_test.root'::ext.ltree
+        _resource_path  := 'flags_test.root'
     );
 
     -- TEST 1: get_resource_access_flags on descendant returns inherited flags
@@ -32,7 +32,7 @@ BEGIN
         _user_id        := __user_2,
         _correlation_id := null,
         _resource_type  := 'fsitem',
-        _resource_path  := 'flags_test.root.sub.leaf'::ext.ltree
+        _resource_path  := 'flags_test.root.sub.leaf'
     );
 
     IF __flag_count >= 2 THEN
@@ -47,7 +47,7 @@ BEGIN
         _user_id        := __user_1,
         _correlation_id := null,
         _resource_type  := 'fsitem',
-        _resource_path  := 'flags_test.root'::ext.ltree
+        _resource_path  := 'flags_test.root'
     )
     WHERE __user_id = __user_2;
 
@@ -63,7 +63,7 @@ BEGIN
         _user_id        := __user_1,
         _correlation_id := null,
         _resource_type  := 'fsitem',
-        _resource_path  := 'flags_test.root.sub'::ext.ltree
+        _resource_path  := 'flags_test.root.sub'
     )
     WHERE __user_id = __user_2;
 

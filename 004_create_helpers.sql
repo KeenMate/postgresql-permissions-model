@@ -190,9 +190,9 @@ returns ext.ltree
 as
 $$
 declare
-    _seg text;
-    _out text[] := '{}'::text[];
-    _clean text;
+    __seg text;
+    __out text[] := '{}'::text[];
+    __clean text;
 begin
     if _path is null then
         return null;
@@ -202,24 +202,24 @@ begin
             using errcode = '22023';
     end if;
 
-    foreach _seg in array string_to_array(lower(_path), _separator)
+    foreach __seg in array string_to_array(lower(_path), _separator)
     loop
-        if _seg = '' then
+        if __seg = '' then
             continue;
         end if;
-        _clean := regexp_replace(_seg, '[^a-z0-9_]', '_', 'g');
-        _clean := regexp_replace(_clean, '_+', '_', 'g');
-        _clean := regexp_replace(_clean, '^_+|_+$', '', 'g');
-        if _clean <> '' then
-            _out := _out || _clean;
+        __clean := regexp_replace(__seg, '[^a-z0-9_]', '_', 'g');
+        __clean := regexp_replace(__clean, '_+', '_', 'g');
+        __clean := regexp_replace(__clean, '^_+|_+$', '', 'g');
+        if __clean <> '' then
+            __out := __out || __clean;
         end if;
     end loop;
 
-    if array_length(_out, 1) is null then
+    if array_length(__out, 1) is null then
         return null;
     end if;
 
-    return array_to_string(_out, '.')::ext.ltree;
+    return array_to_string(__out, '.')::ext.ltree;
 end;
 $$;
 

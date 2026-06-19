@@ -482,7 +482,13 @@ All tests are organized as suite directories with `test.json` manifests:
 - All timestamps use `timestamptz` for timezone awareness
 - **Schema Security Model**: `public` and `auth` always check permissions; `internal` is for trusted contexts; `unsecure` is only for security internals
 - **SQL Convention**: Always use fully qualified schema names (e.g., `auth.has_permission`, `public.__version`) to prevent search_path related errors
-- **Variable Naming Convention**: Function parameters use `_` prefix (e.g., `_user_id`), return columns use `__` prefix (e.g., `__user_id`). When a local variable would clash with a `__` return column, use `___` (triple underscore) prefix for the local variable (e.g., `___user_id`). This prevents ambiguous column/variable errors in PL/pgSQL blocks that query functions returning `__`-prefixed columns.
+- **Variable Naming Convention**:
+  - **Single `_` prefix is reserved for input parameters only** (e.g., `_user_id`). Never use a single underscore for local variables — readers expect single-underscore identifiers to be call-site arguments.
+  - **Local variables use `__` prefix** (e.g., `__last_id`, `__resource_path_lt`).
+  - **Return columns also use `__` prefix** (e.g., `__user_id` in `returns table(...)`).
+  - **Locals that would clash with a `__` return column use `___` (triple underscore)** to disambiguate (e.g., `___user_id`). This prevents ambiguous column/variable errors in PL/pgSQL blocks that query functions returning `__`-prefixed columns.
+  - Legacy code in this repo still uses single `_` for some locals — leave that alone in unrelated edits, but follow the new convention in any code you add or substantially rewrite.
+- **Public API Types**: Functions in `public.*` and `auth.*` (the callable API surface) MUST use only stock PostgreSQL types and `jsonb` in parameters and return columns — never extension types like `ext.ltree`, `ext.ltree[]`, `ext.uuid`, etc. Convert at the boundary: accept `text`/`text[]` and convert internally with `ext.text2ltree(...)`; return paths as `text` (cast via `::text`). Rationale: downstream code generators (Elixir, Go, TypeScript) and many client libraries cannot map extension types and fail with "dbType '_ltree' not found" or similar. Tables, `internal.*`, `unsecure.*`, and `helpers.*` may use extension types freely.
 - **Group Mapping Strategy**: Supports internal, external, and hybrid group membership models for flexible integration with any identity provider (Windows Auth, AzureAD, Google, Facebook, KeyCloak, LDAP, etc.)
 - **User Data**: `user_data` table has three jsonb columns (`settings`, `preferences`, `custom_data`) with partial merge via `auth.update_user_data`. Additional custom columns can still be added, or create separate tables referencing `user_info.user_id`
 - Permission caching is implemented - use `unsecure.clear_permission_cache()` when needed

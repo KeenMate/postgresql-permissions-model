@@ -246,7 +246,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u2,
             _access_flags   := array['read'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -264,7 +264,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u3,
             _access_flags   := array['read'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -282,7 +282,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u4,
             _access_flags   := array['read'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -300,7 +300,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u5,
             _access_flags   := array['read', 'write'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -312,7 +312,7 @@ begin
         _resource_type  := 'fsitem',
         _target_user_id := _u6,
         _access_flags   := array['read'],
-        _resource_path  := 'src'::ext.ltree
+        _resource_path  := 'src'
     );
     for _r in
         select path from demo.fs_item
@@ -327,7 +327,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u6,
             _access_flags   := array['read'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -345,7 +345,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u7,
             _access_flags   := array['read'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -364,7 +364,7 @@ begin
         _resource_type  := 'fsitem',
         _user_group_id  := _group_designers,
         _access_flags   := array['read'],
-        _resource_path  := 'src.action'::ext.ltree
+        _resource_path  := 'src.action'
     );
 
     -- user 9: nothing
@@ -376,10 +376,10 @@ begin
         _resource_type  := 'fsitem',
         _target_user_id := _u10,
         _access_flags   := array['read'],
-        _resource_path  := 'src.social'::ext.ltree
+        _resource_path  := 'src.social'
     );
     select path into _p from demo.fs_item
-    where path <@ 'src.social'::ext.ltree and kind = 'folder' and nlevel(path) = 3
+    where path <@ 'src.social' and kind = 'folder' and nlevel(path) = 3
     order by random() limit 1;
     if _p is not null then
         perform auth.deny_resource_access(
@@ -389,7 +389,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u10,
             _access_flags   := array['read'],
-            _resource_path  := _p
+            _resource_path  := _p::text
         );
     end if;
 
@@ -409,7 +409,7 @@ begin
             _resource_type  := 'fsitem',
             _target_user_id := _u11,
             _role_codes     := array['fsitem_editor'],
-            _resource_path  := _r.path
+            _resource_path  := _r.path::text
         );
     end loop;
 
@@ -431,7 +431,7 @@ begin
         _resource_type  := 'fsitem',
         _user_group_id  := _group_curators,
         _role_codes     := array['fsitem_reader'],
-        _resource_path  := 'src.image'::ext.ltree
+        _resource_path  := 'src.image'
     );
 
     -- ------------------------------------------------------------------
@@ -446,7 +446,7 @@ begin
         _resource_type  := 'fsitem',
         _target_user_id := _u13,
         _role_codes     := array['fsitem_reader'],
-        _resource_path  := 'src.communication'::ext.ltree
+        _resource_path  := 'src.communication'
     );
     perform auth.assign_resource_access(
         _created_by     := 'demo',
@@ -455,7 +455,7 @@ begin
         _resource_type  := 'fsitem',
         _target_user_id := _u13,
         _access_flags   := array['write'],
-        _resource_path  := 'src.communication.chat'::ext.ltree
+        _resource_path  := 'src.communication.chat'
     );
 end $$;
 
@@ -549,7 +549,7 @@ begin
             _correlation_id := null,
             _resource_type  := 'fsitem',
             _required_flag  := 'read',
-            _resource_path  := _target,
+            _resource_path  := _target::text,
             _throw_err      := false
         );
         _dt_us := extract(epoch from clock_timestamp() - _t0) * 1000000;
@@ -586,7 +586,7 @@ begin
             _correlation_id  := null,
             _resource_type   := 'fsitem',
             _required_flag   := 'read',
-            _resource_paths  := _paths
+            _resource_paths  := _paths::text[]
         );
         _dt_ms := extract(epoch from clock_timestamp() - _t0) * 1000;
         raise notice '%  accessible=% / 1000  %ms',
@@ -611,7 +611,7 @@ begin
     raise notice '      _correlation_id := null,';
     raise notice '      _resource_type := ''fsitem'',';
     raise notice '      _required_flag := ''read'',';
-    raise notice '      _resource_path := %::ext.ltree,', quote_literal(_target::text);
+    raise notice '      _resource_path := %,', quote_literal(_target::text);
     raise notice '      _throw_err := false);';
 end $$;
 

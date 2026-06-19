@@ -193,19 +193,19 @@ create index ix_ra_resource_grants
 create or replace function unsecure.ensure_resource_access_partition(_resource_type text)
 returns void language plpgsql as $$
 declare
-    _root_type text;
-    _partition_name text;
+    __root_type text;
+    __partition_name text;
 begin
-    _root_type := split_part(_resource_type, '.', 1);
-    _partition_name := 'resource_access_' || _root_type;
+    __root_type := split_part(_resource_type, '.', 1);
+    __partition_name := 'resource_access_' || __root_type;
     if not exists (
         select 1 from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'auth' and c.relname = _partition_name
+        where n.nspname = 'auth' and c.relname = __partition_name
     ) then
         execute format(
             'create table auth.%I partition of auth.resource_access for values in (%L)',
-            _partition_name, _root_type
+            __partition_name, __root_type
         );
     end if;
 end;
@@ -229,26 +229,26 @@ create or replace function unsecure.validate_resource_id(
 )
 returns void language plpgsql as $$
 declare
-    _schema jsonb;
-    _key text;
+    __schema jsonb;
+    __key text;
 begin
     -- Empty resource_id = "no composite-key assertion" (path-only grant)
     if _resource_id is null or _resource_id = '{}'::jsonb then
         return;
     end if;
 
-    select key_schema from const.resource_type where code = _resource_type into _schema;
+    select key_schema from const.resource_type where code = _resource_type into __schema;
 
     -- No schema → no validation
-    if _schema is null or _schema = '{}'::jsonb then
+    if __schema is null or __schema = '{}'::jsonb then
         return;
     end if;
 
     -- Reject any key not in the schema
-    for _key in select jsonb_object_keys(_resource_id)
+    for __key in select jsonb_object_keys(_resource_id)
     loop
-        if not (_schema ? _key) then
-            raise exception 'resource_id key "%" is not part of key_schema for resource type "%"', _key, _resource_type
+        if not (__schema ? __key) then
+            raise exception 'resource_id key "%" is not part of key_schema for resource type "%"', __key, _resource_type
                 using errcode = '35005';
         end if;
     end loop;

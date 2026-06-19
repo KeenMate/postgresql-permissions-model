@@ -166,35 +166,35 @@ create index if not exists ix_rra_resource_assignments
 create or replace function unsecure.ensure_resource_access_partition(_resource_type text)
 returns void language plpgsql as $$
 declare
-    _root_type      text;
-    _ra_partition   text;
-    _rra_partition  text;
+    __root_type      text;
+    __ra_partition   text;
+    __rra_partition  text;
 begin
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     -- auth.resource_access_<root>
-    _ra_partition := 'resource_access_' || _root_type;
+    __ra_partition := 'resource_access_' || __root_type;
     if not exists (
         select 1 from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'auth' and c.relname = _ra_partition
+        where n.nspname = 'auth' and c.relname = __ra_partition
     ) then
         execute format(
             'create table auth.%I partition of auth.resource_access for values in (%L)',
-            _ra_partition, _root_type
+            __ra_partition, __root_type
         );
     end if;
 
     -- auth.resource_role_assignment_<root>
-    _rra_partition := 'resource_role_assignment_' || _root_type;
+    __rra_partition := 'resource_role_assignment_' || __root_type;
     if not exists (
         select 1 from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'auth' and c.relname = _rra_partition
+        where n.nspname = 'auth' and c.relname = __rra_partition
     ) then
         execute format(
             'create table auth.%I partition of auth.resource_role_assignment for values in (%L)',
-            _rra_partition, _root_type
+            __rra_partition, __root_type
         );
     end if;
 end;
@@ -209,12 +209,12 @@ $$;
 -- it with existing root types is safe.
 do $$
 declare
-    _root text;
+    __root text;
 begin
-    for _root in
+    for __root in
         select distinct split_part(code, '.', 1) from const.resource_type
     loop
-        perform unsecure.ensure_resource_access_partition(_root);
+        perform unsecure.ensure_resource_access_partition(__root);
     end loop;
 end $$;
 

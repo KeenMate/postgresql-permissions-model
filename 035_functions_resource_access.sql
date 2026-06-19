@@ -60,14 +60,14 @@ returns void
 as
 $$
 declare
-    _flag text;
+    __flag text;
 begin
-    foreach _flag in array _access_flags
+    foreach __flag in array _access_flags
     loop
         if not exists (
-            select 1 from const.resource_access_flag where code = _flag
+            select 1 from const.resource_access_flag where code = __flag
         ) then
-            perform error.raise_35004(_flag);
+            perform error.raise_35004(__flag);
         end if;
     end loop;
 end;
@@ -86,27 +86,27 @@ returns void
 as
 $$
 declare
-    _flag text;
-    _has_type_flags boolean;
+    __flag text;
+    __has_type_flags boolean;
 begin
     -- Check if this resource type has any flag mappings
     select exists(
         select 1 from const.resource_type_flag where resource_type_code = _resource_type
-    ) into _has_type_flags;
+    ) into __has_type_flags;
 
     -- No mappings → all flags allowed (backward compat)
-    if not _has_type_flags then
+    if not __has_type_flags then
         return;
     end if;
 
     -- Validate each flag against the type's allowed flags
-    foreach _flag in array _access_flags
+    foreach __flag in array _access_flags
     loop
         if not exists (
             select 1 from const.resource_type_flag
-            where resource_type_code = _resource_type and access_flag_code = _flag
+            where resource_type_code = _resource_type and access_flag_code = __flag
         ) then
-            raise exception 'Access flag "%" is not valid for resource type "%"', _flag, _resource_type
+            raise exception 'Access flag "%" is not valid for resource type "%"', __flag, _resource_type
                 using errcode = '35006';
         end if;
     end loop;
@@ -144,10 +144,10 @@ create or replace function auth.has_resource_access(
 as
 $$
 declare
-    _cached_group_ids integer[];
-    _root_type        text;
-    _ancestor         record;
-    _ancestor_key     jsonb;
+    __cached_group_ids integer[];
+    __root_type        text;
+    __ancestor         record;
+    __ancestor_key     jsonb;
 begin
     -- System user bypasses all checks
     if _user_id = 1 then
@@ -160,13 +160,13 @@ begin
     end if;
 
     -- Get cached group IDs for this user/tenant
-    _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    __cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
 
     -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     -- Walk up the type hierarchy (most specific first)
-    for _ancestor in
+    for __ancestor in
         select rt.code, rt.key_schema
         from const.resource_type rt
         where rt.path @> (select path from const.resource_type where code = _resource_type)
@@ -178,16 +178,16 @@ begin
         --   resource_id = {"project_id": 42, "folder_id": 100}
         --   ancestor key_schema = {"project_id": "bigint"}
         --   ancestor_key = {"project_id": 42}
-        if _ancestor.key_schema is not null and _ancestor.key_schema <> '{}'::jsonb then
+        if __ancestor.key_schema is not null and __ancestor.key_schema <> '{}'::jsonb then
             select jsonb_object_agg(k, _resource_id->k)
-            from jsonb_object_keys(_ancestor.key_schema) as k
+            from jsonb_object_keys(__ancestor.key_schema) as k
             where _resource_id ? k
-            into _ancestor_key;
+            into __ancestor_key;
         else
-            _ancestor_key := _resource_id;
+            __ancestor_key := _resource_id;
         end if;
 
-        if _ancestor_key is null then
+        if __ancestor_key is null then
             continue;
         end if;
 
@@ -199,10 +199,10 @@ begin
         -- User-level DENY overrides everything
         if exists (
             select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
+            where root_type = __root_type
+              and resource_type = __ancestor.code
               and tenant_id = _tenant_id
-              and _ancestor_key @> resource_id
+              and __ancestor_key @> resource_id
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = true
@@ -216,10 +216,10 @@ begin
         -- User-level GRANT
         if exists (
             select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
+            where root_type = __root_type
+              and resource_type = __ancestor.code
               and tenant_id = _tenant_id
-              and _ancestor_key @> resource_id
+              and __ancestor_key @> resource_id
               and user_id = _user_id
               and access_flag = _required_flag
               and is_deny = false
@@ -230,11 +230,11 @@ begin
         -- Group-level GRANT (via cached group IDs)
         if exists (
             select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = _ancestor.code
+            where root_type = __root_type
+              and resource_type = __ancestor.code
               and tenant_id = _tenant_id
-              and _ancestor_key @> resource_id
-              and user_group_id = any(_cached_group_ids)
+              and __ancestor_key @> resource_id
+              and user_group_id = any(__cached_group_ids)
               and access_flag = _required_flag
               and is_deny = false
         ) then
@@ -272,9 +272,9 @@ create or replace function auth.filter_accessible_resources(
 as
 $$
 declare
-    _cached_group_ids integer[];
-    _root_type        text;
-    _ancestor_types   text[];
+    __cached_group_ids integer[];
+    __root_type        text;
+    __ancestor_types   text[];
 begin
     -- System user sees everything
     if _user_id = 1 then
@@ -289,17 +289,17 @@ begin
     end if;
 
     -- Get cached group IDs
-    _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    __cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
 
     -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     -- Get all ancestor types (including self)
     select array_agg(rt.code)
     from const.resource_type rt
     where rt.path @> (select path from const.resource_type where code = _resource_type)
       and rt.is_active = true
-    into _ancestor_types;
+    into __ancestor_types;
 
     return query
     select r.id
@@ -308,8 +308,8 @@ begin
         -- Not denied at user level (at any ancestor level)
         not exists (
             select 1 from auth.resource_access
-            where root_type = _root_type
-              and resource_type = any(_ancestor_types)
+            where root_type = __root_type
+              and resource_type = any(__ancestor_types)
               and tenant_id = _tenant_id
               and resource_id @> r.id
               and user_id = _user_id
@@ -320,8 +320,8 @@ begin
             -- User-level GRANT (at any ancestor level)
             exists (
                 select 1 from auth.resource_access
-                where root_type = _root_type
-                  and resource_type = any(_ancestor_types)
+                where root_type = __root_type
+                  and resource_type = any(__ancestor_types)
                   and tenant_id = _tenant_id
                   and resource_id @> r.id
                   and user_id = _user_id
@@ -332,11 +332,11 @@ begin
             -- Group-level GRANT (via cached group IDs, at any ancestor level)
             exists (
                 select 1 from auth.resource_access
-                where root_type = _root_type
-                  and resource_type = any(_ancestor_types)
+                where root_type = __root_type
+                  and resource_type = any(__ancestor_types)
                   and tenant_id = _tenant_id
                   and resource_id @> r.id
-                  and user_group_id = any(_cached_group_ids)
+                  and user_group_id = any(__cached_group_ids)
                   and access_flag = _required_flag
                   and is_deny = false
             )
@@ -363,9 +363,9 @@ create or replace function auth.get_resource_access_flags(
 as
 $$
 declare
-    _cached_group_ids integer[];
-    _root_type        text;
-    _ancestor_types   text[];
+    __cached_group_ids integer[];
+    __root_type        text;
+    __ancestor_types   text[];
 begin
     -- System user gets all flags
     if _user_id = 1 then
@@ -384,25 +384,25 @@ begin
     end if;
 
     -- Get cached group IDs
-    _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    __cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
 
     -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     -- Get all ancestor types (including self)
     select array_agg(rt.code)
     from const.resource_type rt
     where rt.path @> (select path from const.resource_type where code = _resource_type)
       and rt.is_active = true
-    into _ancestor_types;
+    into __ancestor_types;
 
     return query
     with denied_flags as (
         -- Collect user-level denies across all ancestor types
         select ra.access_flag
         from auth.resource_access ra
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
@@ -412,8 +412,8 @@ begin
         -- User-level grants not denied, across all ancestor types
         select distinct ra.access_flag, 'direct'::text as source
         from auth.resource_access ra
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
@@ -425,11 +425,11 @@ begin
         select distinct on (ra.access_flag) ra.access_flag, ug.title as source
         from auth.resource_access ra
         inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
-          and ra.user_group_id = any(_cached_group_ids)
+          and ra.user_group_id = any(__cached_group_ids)
           and ra.is_deny = false
           and ra.access_flag not in (select df.access_flag from denied_flags df)
           and ra.access_flag not in (select dg.access_flag from direct_grants dg)
@@ -468,9 +468,9 @@ create or replace function auth.get_resource_access_matrix(
 as
 $$
 declare
-    _cached_group_ids integer[];
-    _root_type        text;
-    _is_owner         boolean;
+    __cached_group_ids integer[];
+    __root_type        text;
+    __is_owner         boolean;
 begin
     -- System user gets all valid flags on all descendant types
     if _user_id = 1 then
@@ -487,8 +487,8 @@ begin
     end if;
 
     -- Tenant owner gets all valid flags on all descendant types
-    _is_owner := auth.is_owner(_user_id, _correlation_id, null, _tenant_id);
-    if _is_owner then
+    __is_owner := auth.is_owner(_user_id, _correlation_id, null, _tenant_id);
+    if __is_owner then
         return query
             select rt.code, raf.code, 'owner'::text
             from const.resource_type rt
@@ -501,10 +501,10 @@ begin
     end if;
 
     -- Get cached group IDs
-    _cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
+    __cached_group_ids := unsecure.get_cached_group_ids(_user_id, _tenant_id);
 
     -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     return query
     with descendant_types as (
@@ -518,7 +518,7 @@ begin
         -- User-level denies at any level in the subtree for this resource
         select ra.resource_type, ra.access_flag
         from auth.resource_access ra
-        where ra.root_type = _root_type
+        where ra.root_type = __root_type
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
@@ -529,7 +529,7 @@ begin
         -- User-level grants on this resource within the subtree
         select ra.resource_type, ra.access_flag, 'direct'::text as source
         from auth.resource_access ra
-        where ra.root_type = _root_type
+        where ra.root_type = __root_type
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
           and ra.user_id = _user_id
@@ -542,10 +542,10 @@ begin
             ra.resource_type, ra.access_flag, ug.title as source
         from auth.resource_access ra
         inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
-        where ra.root_type = _root_type
+        where ra.root_type = __root_type
           and ra.tenant_id = _tenant_id
           and ra.resource_id @> _resource_id
-          and ra.user_group_id = any(_cached_group_ids)
+          and ra.user_group_id = any(__cached_group_ids)
           and ra.is_deny = false
           and ra.resource_type in (select dt.code from descendant_types dt)
         order by ra.resource_type, ra.access_flag, ug.title
@@ -610,22 +610,23 @@ create or replace function auth.assign_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb     default '{}'::jsonb,
-    _target_user_id bigint    default null,
-    _user_group_id  integer   default null,
-    _access_flags   text[]    default array['read'],
-    _tenant_id      integer   default 1,
-    _resource_path  ext.ltree default null
+    _resource_id    jsonb   default '{}'::jsonb,
+    _target_user_id bigint  default null,
+    _user_group_id  integer default null,
+    _access_flags   text[]  default array['read'],
+    _tenant_id      integer default 1,
+    _resource_path  text    default null
 ) returns table(__resource_access_id bigint, __access_flag text)
     language plpgsql
 as
 $$
 declare
-    _flag        text;
-    __last_id    bigint;
-    _target_type text;
-    _target_name text;
-    _root_type   text;
+    __flag           text;
+    __last_id       bigint;
+    __target_type    text;
+    __target_name    text;
+    __root_type      text;
+    __resource_path_lt ext.ltree;
 begin
     -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.grant_access', _tenant_id);
@@ -641,6 +642,8 @@ begin
             using errcode = '35005';
     end if;
 
+    __resource_path_lt := ext.text2ltree(_resource_path);
+
     -- Validate resource type, flags (global + per-type), and resource_id key schema
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_access_flags(_access_flags);
@@ -648,43 +651,43 @@ begin
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
     _resource_id := coalesce(_resource_id, '{}'::jsonb);
-    _root_type   := split_part(_resource_type, '.', 1);
+    __root_type   := split_part(_resource_type, '.', 1);
 
     if _target_user_id is not null then
-        _target_type := 'user';
+        __target_type := 'user';
         select coalesce(display_name, code, user_id::text)
         from auth.user_info where user_id = _target_user_id
-        into _target_name;
+        into __target_name;
     else
-        _target_type := 'group';
+        __target_type := 'group';
         select coalesce(title, code, user_group_id::text)
         from auth.user_group where user_group_id = _user_group_id
-        into _target_name;
+        into __target_name;
     end if;
 
-    foreach _flag in array _access_flags
+    foreach __flag in array _access_flags
     loop
         __last_id := null;
 
         if _target_user_id is not null then
             select ra.resource_access_id from auth.resource_access ra
-            where ra.root_type = _root_type
+            where ra.root_type = __root_type
               and ra.resource_type = _resource_type
               and ra.tenant_id = _tenant_id
               and ra.resource_id = _resource_id
-              and ra.resource_path is not distinct from _resource_path
+              and ra.resource_path is not distinct from __resource_path_lt
               and ra.user_id = _target_user_id
-              and ra.access_flag = _flag
+              and ra.access_flag = __flag
             into __last_id;
         else
             select ra.resource_access_id from auth.resource_access ra
-            where ra.root_type = _root_type
+            where ra.root_type = __root_type
               and ra.resource_type = _resource_type
               and ra.tenant_id = _tenant_id
               and ra.resource_id = _resource_id
-              and ra.resource_path is not distinct from _resource_path
+              and ra.resource_path is not distinct from __resource_path_lt
               and ra.user_group_id = _user_group_id
-              and ra.access_flag = _flag
+              and ra.access_flag = __flag
             into __last_id;
         end if;
 
@@ -696,7 +699,7 @@ begin
                 updated_at = now(),
                 granted_by = _user_id
             where resource_access_id = __last_id
-              and root_type = _root_type;
+              and root_type = __root_type;
         else
             -- Insert new grant
             insert into auth.resource_access (
@@ -704,14 +707,14 @@ begin
                 resource_id, resource_path,
                 user_id, user_group_id, access_flag, is_deny, granted_by
             ) values (
-                _created_by, _created_by, _tenant_id, _resource_type, _root_type,
-                _resource_id, _resource_path,
-                _target_user_id, _user_group_id, _flag, false, _user_id
+                _created_by, _created_by, _tenant_id, _resource_type, __root_type,
+                _resource_id, __resource_path_lt,
+                _target_user_id, _user_group_id, __flag, false, _user_id
             )
             returning resource_access_id into __last_id;
         end if;
 
-        return query select __last_id, _flag;
+        return query select __last_id, __flag;
     end loop;
 
     -- Journal
@@ -719,8 +722,8 @@ begin
         , 18010  -- resource_access_granted
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
-            'resource_path', coalesce(_resource_path::text, ''),
-            'target_type', _target_type, 'target_name', _target_name,
+            'resource_path', coalesce(_resource_path, ''),
+            'target_type', __target_type, 'target_name', __target_name,
             'access_flags', _access_flags)
         , _tenant_id);
 end;
@@ -738,20 +741,21 @@ create or replace function auth.deny_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb     default '{}'::jsonb,
-    _target_user_id bigint    default null,
-    _access_flags   text[]    default array['read'],
-    _tenant_id      integer   default 1,
-    _resource_path  ext.ltree default null
+    _resource_id    jsonb   default '{}'::jsonb,
+    _target_user_id bigint  default null,
+    _access_flags   text[]  default array['read'],
+    _tenant_id      integer default 1,
+    _resource_path  text    default null
 ) returns table(__resource_access_id bigint, __access_flag text)
     language plpgsql
 as
 $$
 declare
-    _flag        text;
-    __last_id    bigint;
-    _target_name text;
-    _root_type   text;
+    __flag             text;
+    __last_id         bigint;
+    __target_name      text;
+    __root_type        text;
+    __resource_path_lt ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.deny_access', _tenant_id);
 
@@ -770,23 +774,24 @@ begin
     perform unsecure.validate_access_flags_for_type(_resource_type, _access_flags);
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
 
-    _resource_id := coalesce(_resource_id, '{}'::jsonb);
-    _root_type   := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
+    __root_type        := split_part(_resource_type, '.', 1);
+    __resource_path_lt := ext.text2ltree(_resource_path);
 
     select coalesce(display_name, code, user_id::text)
     from auth.user_info where user_id = _target_user_id
-    into _target_name;
+    into __target_name;
 
-    foreach _flag in array _access_flags
+    foreach __flag in array _access_flags
     loop
         select ra.resource_access_id from auth.resource_access ra
-        where ra.root_type = _root_type
+        where ra.root_type = __root_type
           and ra.resource_type = _resource_type
           and ra.tenant_id = _tenant_id
           and ra.resource_id = _resource_id
-          and ra.resource_path is not distinct from _resource_path
+          and ra.resource_path is not distinct from __resource_path_lt
           and ra.user_id = _target_user_id
-          and ra.access_flag = _flag
+          and ra.access_flag = __flag
         into __last_id;
 
         if __last_id is not null then
@@ -796,29 +801,29 @@ begin
                 updated_at = now(),
                 granted_by = _user_id
             where resource_access_id = __last_id
-              and root_type = _root_type;
+              and root_type = __root_type;
         else
             insert into auth.resource_access (
                 created_by, updated_by, tenant_id, resource_type, root_type,
                 resource_id, resource_path,
                 user_id, access_flag, is_deny, granted_by
             ) values (
-                _created_by, _created_by, _tenant_id, _resource_type, _root_type,
-                _resource_id, _resource_path,
-                _target_user_id, _flag, true, _user_id
+                _created_by, _created_by, _tenant_id, _resource_type, __root_type,
+                _resource_id, __resource_path_lt,
+                _target_user_id, __flag, true, _user_id
             )
             returning resource_access_id into __last_id;
         end if;
 
-        return query select __last_id, _flag;
+        return query select __last_id, __flag;
     end loop;
 
     perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 18012  -- resource_access_denied
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
-            'resource_path', coalesce(_resource_path::text, ''),
-            'target_type', 'user', 'target_name', _target_name,
+            'resource_path', coalesce(_resource_path, ''),
+            'target_type', 'user', 'target_name', __target_name,
             'access_flags', _access_flags)
         , _tenant_id);
 end;
@@ -836,21 +841,22 @@ create or replace function auth.revoke_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb     default '{}'::jsonb,
-    _target_user_id bigint    default null,
-    _user_group_id  integer   default null,
-    _access_flags   text[]    default null,
-    _tenant_id      integer   default 1,
-    _resource_path  ext.ltree default null
+    _resource_id    jsonb   default '{}'::jsonb,
+    _target_user_id bigint  default null,
+    _user_group_id  integer default null,
+    _access_flags   text[]  default null,
+    _tenant_id      integer default 1,
+    _resource_path  text    default null
 ) returns bigint
     language plpgsql
 as
 $$
 declare
-    __deleted_count bigint;
-    _target_type    text;
-    _target_name    text;
-    _root_type      text;
+    __deleted_count   bigint;
+    __target_type      text;
+    __target_name      text;
+    __root_type        text;
+    __resource_path_lt ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
 
@@ -864,27 +870,28 @@ begin
         perform unsecure.validate_access_flags(_access_flags);
     end if;
 
-    _resource_id := coalesce(_resource_id, '{}'::jsonb);
-    _root_type   := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
+    __root_type        := split_part(_resource_type, '.', 1);
+    __resource_path_lt := ext.text2ltree(_resource_path);
 
     if _target_user_id is not null then
-        _target_type := 'user';
+        __target_type := 'user';
         select coalesce(display_name, code, user_id::text)
         from auth.user_info where user_id = _target_user_id
-        into _target_name;
+        into __target_name;
     else
-        _target_type := 'group';
+        __target_type := 'group';
         select coalesce(title, code, user_group_id::text)
         from auth.user_group where user_group_id = _user_group_id
-        into _target_name;
+        into __target_name;
     end if;
 
     delete from auth.resource_access
-    where root_type = _root_type
+    where root_type = __root_type
       and resource_type = _resource_type
       and tenant_id = _tenant_id
       and resource_id = _resource_id
-      and resource_path is not distinct from _resource_path
+      and resource_path is not distinct from __resource_path_lt
       and (_target_user_id is null or user_id = _target_user_id)
       and (_user_group_id is null or user_group_id = _user_group_id)
       and (_access_flags is null or access_flag = any(_access_flags));
@@ -895,8 +902,8 @@ begin
         , 18011  -- resource_access_revoked
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
-            'resource_path', coalesce(_resource_path::text, ''),
-            'target_type', _target_type, 'target_name', _target_name,
+            'resource_path', coalesce(_resource_path, ''),
+            'target_type', __target_type, 'target_name', __target_name,
             'access_flags', coalesce(_access_flags, array['*']),
             'deleted_count', __deleted_count)
         , _tenant_id);
@@ -918,16 +925,17 @@ create or replace function auth.revoke_all_resource_access(
     _user_id        bigint,
     _correlation_id text,
     _resource_type  text,
-    _resource_id    jsonb     default '{}'::jsonb,
-    _tenant_id      integer   default 1,
-    _resource_path  ext.ltree default null
+    _resource_id    jsonb   default '{}'::jsonb,
+    _tenant_id      integer default 1,
+    _resource_path  text    default null
 ) returns bigint
     language plpgsql
 as
 $$
 declare
-    __deleted_count bigint;
-    _root_type      text;
+    __deleted_count   bigint;
+    __root_type        text;
+    __resource_path_lt ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
     perform unsecure.validate_resource_type(_resource_type);
@@ -937,17 +945,18 @@ begin
             using errcode = '35005';
     end if;
 
-    _resource_id := coalesce(_resource_id, '{}'::jsonb);
-    _root_type   := split_part(_resource_type, '.', 1);
+    _resource_id      := coalesce(_resource_id, '{}'::jsonb);
+    __root_type        := split_part(_resource_type, '.', 1);
+    __resource_path_lt := ext.text2ltree(_resource_path);
 
     -- Composite-key cascade via jsonb @> (e.g. {"project_id": 42} matches
     -- {"project_id": 42, "folder_id": 100}); path cascade via ltree <@
     -- (drops self + descendants).
     delete from auth.resource_access
-    where root_type = _root_type
+    where root_type = __root_type
       and tenant_id = _tenant_id
       and (_resource_id = '{}'::jsonb or resource_id @> _resource_id)
-      and (_resource_path is null or resource_path <@ _resource_path);
+      and (__resource_path_lt is null or resource_path <@ __resource_path_lt);
 
     get diagnostics __deleted_count = row_count;
 
@@ -955,7 +964,7 @@ begin
         , 18013  -- resource_access_bulk_revoked
         , 'resource_access', 0
         , jsonb_build_object('resource_type', _resource_type, 'resource_id', _resource_id,
-            'resource_path', coalesce(_resource_path::text, ''),
+            'resource_path', coalesce(_resource_path, ''),
             'deleted_count', __deleted_count)
         , _tenant_id);
 
@@ -992,12 +1001,12 @@ create or replace function auth.get_resource_grants(
 as
 $$
 declare
-    _root_type text;
+    __root_type text;
 begin
     -- Permission check
     perform auth.has_permission(_user_id, _correlation_id, 'resources.get_grants', _tenant_id);
 
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     return query
     select
@@ -1015,7 +1024,7 @@ begin
     left join auth.user_info ui on ui.user_id = ra.user_id
     left join auth.user_group ug on ug.user_group_id = ra.user_group_id
     left join auth.user_info gb on gb.user_id = ra.granted_by
-    where ra.root_type = _root_type
+    where ra.root_type = __root_type
       and ra.resource_type = _resource_type
       and ra.tenant_id = _tenant_id
       and ra.resource_id = _resource_id
@@ -1046,9 +1055,9 @@ create or replace function auth.get_user_accessible_resources(
 as
 $$
 declare
-    _cached_group_ids integer[];
-    _root_type        text;
-    _ancestor_types   text[];
+    __cached_group_ids integer[];
+    __root_type        text;
+    __ancestor_types   text[];
 begin
     -- Self access is free, others require permission
     if _user_id <> _target_user_id then
@@ -1056,24 +1065,24 @@ begin
     end if;
 
     -- Get cached group IDs for the target user
-    _cached_group_ids := unsecure.get_cached_group_ids(_target_user_id, _tenant_id);
+    __cached_group_ids := unsecure.get_cached_group_ids(_target_user_id, _tenant_id);
 
     -- Root type for partition pruning
-    _root_type := split_part(_resource_type, '.', 1);
+    __root_type := split_part(_resource_type, '.', 1);
 
     -- Get all ancestor types (including self)
     select array_agg(rt.code)
     from const.resource_type rt
     where rt.path @> (select path from const.resource_type where code = _resource_type)
       and rt.is_active = true
-    into _ancestor_types;
+    into __ancestor_types;
 
     return query
     with denied_flags as (
         select ra.resource_id, ra.access_flag
         from auth.resource_access ra
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
           and ra.user_id = _target_user_id
           and ra.is_deny = true
@@ -1083,8 +1092,8 @@ begin
                array_agg(distinct ra.access_flag) as access_flags,
                'direct'::text as source
         from auth.resource_access ra
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
           and ra.user_id = _target_user_id
           and ra.is_deny = false
@@ -1102,10 +1111,10 @@ begin
                string_agg(distinct ug.title, ', ') as source
         from auth.resource_access ra
         inner join auth.user_group ug on ug.user_group_id = ra.user_group_id
-        where ra.root_type = _root_type
-          and ra.resource_type = any(_ancestor_types)
+        where ra.root_type = __root_type
+          and ra.resource_type = any(__ancestor_types)
           and ra.tenant_id = _tenant_id
-          and ra.user_group_id = any(_cached_group_ids)
+          and ra.user_group_id = any(__cached_group_ids)
           and ra.is_deny = false
           and not exists (
               select 1 from denied_flags df
@@ -1149,7 +1158,7 @@ create or replace function auth.ensure_resource_type_flags(
 as
 $$
 declare
-    _flag text;
+    __flag text;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
@@ -1174,10 +1183,10 @@ begin
     where resource_type_code = _resource_type
       and access_flag_code != all(_access_flags);
 
-    foreach _flag in array _access_flags
+    foreach __flag in array _access_flags
     loop
         insert into const.resource_type_flag (resource_type_code, access_flag_code)
-        values (_resource_type, _flag)
+        values (_resource_type, __flag)
         on conflict do nothing;
     end loop;
 
@@ -1204,10 +1213,10 @@ create or replace function unsecure.update_resource_type_full_title_translations
 as
 $$
 declare
-    _rt record;
-    _full_title text;
+    __rt record;
+    __full_title text;
 begin
-    for _rt in
+    for __rt in
         select code, path
         from const.resource_type
         where path <@ _path
@@ -1221,14 +1230,14 @@ begin
                 left join public.translation t
                     on t.data_group = 'resource_type' and t.data_object_code = a.code
                     and t.context = 'title' and t.language_code = _language_code
-                where a.path @> _rt.path
+                where a.path @> __rt.path
                 order by a.path
             ), ' > ')
-        into _full_title;
+        into __full_title;
 
         -- Upsert full_title translation
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-        values (_created_by, _created_by, _language_code, 'resource_type', _rt.code, 'full_title', _full_title)
+        values (_created_by, _created_by, _language_code, 'resource_type', __rt.code, 'full_title', __full_title)
         on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
@@ -1263,7 +1272,7 @@ create or replace function auth.create_resource_type(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __path         ext.ltree,
+    __path         text,
     __key_schema   jsonb,
     __access_flags text[]
 )
@@ -1271,8 +1280,8 @@ create or replace function auth.create_resource_type(
 as
 $$
 declare
-    _path ext.ltree;
-    _flag text;
+    ___path ext.ltree;
+    __flag text;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
@@ -1280,10 +1289,10 @@ begin
         perform unsecure.validate_access_flags(_access_flags);
     end if;
 
-    _path := ext.text2ltree(_code);
+    ___path := ext.text2ltree(_code);
 
     insert into const.resource_type (code, source, path, key_schema)
-    values (_code, _source, _path, coalesce(_key_schema, '{}'::jsonb))
+    values (_code, _source, ___path, coalesce(_key_schema, '{}'::jsonb))
     on conflict do nothing;
 
     -- Translations for title + description
@@ -1299,13 +1308,13 @@ begin
     end if;
 
     -- Recompute full_title for this type and all descendants
-    perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _created_by);
+    perform unsecure.update_resource_type_full_title_translations(___path, _language_code, _created_by);
 
     if _access_flags is not null then
-        foreach _flag in array _access_flags
+        foreach __flag in array _access_flags
         loop
             insert into const.resource_type_flag (resource_type_code, access_flag_code)
-            values (_code, _flag) on conflict do nothing;
+            values (_code, __flag) on conflict do nothing;
         end loop;
     end if;
 
@@ -1316,7 +1325,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path::text, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt where rt.code = _code;
@@ -1348,7 +1357,7 @@ create or replace function auth.update_resource_type(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __path         ext.ltree,
+    __path         text,
     __key_schema   jsonb,
     __access_flags text[]
 )
@@ -1356,7 +1365,7 @@ create or replace function auth.update_resource_type(
 as
 $$
 declare
-    _path ext.ltree;
+    ___path ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
@@ -1364,7 +1373,7 @@ begin
         perform error.raise_35003(_code);
     end if;
 
-    select path from const.resource_type where code = _code into _path;
+    select path from const.resource_type where code = _code into ___path;
 
     update const.resource_type
     set is_active = coalesce(_is_active, is_active),
@@ -1380,7 +1389,7 @@ begin
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
 
         -- Recompute full_title for this type and all descendants
-        perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _updated_by);
+        perform unsecure.update_resource_type_full_title_translations(___path, _language_code, _updated_by);
     end if;
     if _description is not null then
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
@@ -1395,7 +1404,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path::text, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt where rt.code = _code;
@@ -1423,7 +1432,7 @@ create or replace function auth.ensure_resource_types(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __path         ext.ltree,
+    __path         text,
     __key_schema   jsonb,
     __access_flags text[]
 )
@@ -1431,80 +1440,80 @@ create or replace function auth.ensure_resource_types(
 as
 $$
 declare
-    _item          jsonb;
-    _code          text;
-    _title         text;
-    _description   text;
-    _item_source   text;
-    _key_schema    jsonb;
-    _access_flags  text[];
-    _flag          text;
-    _path          ext.ltree;
+    __item          jsonb;
+    ___code          text;
+    ___title         text;
+    ___description   text;
+    __item_source   text;
+    ___key_schema    jsonb;
+    ___access_flags  text[];
+    __flag          text;
+    ___path          ext.ltree;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
-    for _item in
+    for __item in
         select value from jsonb_array_elements(_resource_types)
         order by ext.nlevel(ext.text2ltree(value->>'code'))
     loop
-        _code        := _item->>'code';
-        _title       := _item->>'title';
-        _description := _item->>'description';
-        _item_source := coalesce(_item->>'source', _source);
-        _key_schema  := coalesce(_item->'key_schema', '{}'::jsonb);
-        _path        := ext.text2ltree(_code);
+        ___code        := __item->>'code';
+        ___title       := __item->>'title';
+        ___description := __item->>'description';
+        __item_source := coalesce(__item->>'source', _source);
+        ___key_schema  := coalesce(__item->'key_schema', '{}'::jsonb);
+        ___path        := ext.text2ltree(___code);
 
-        if _item ? 'access_flags' and _item->'access_flags' is not null then
+        if __item ? 'access_flags' and __item->'access_flags' is not null then
             select array_agg(f.value::text)
-            from jsonb_array_elements_text(_item->'access_flags') as f(value)
-            into _access_flags;
+            from jsonb_array_elements_text(__item->'access_flags') as f(value)
+            into ___access_flags;
         else
-            _access_flags := null;
+            ___access_flags := null;
         end if;
 
-        if not exists (select 1 from const.resource_type where code = _code) then
-            if _access_flags is not null then
-                perform unsecure.validate_access_flags(_access_flags);
+        if not exists (select 1 from const.resource_type where code = ___code) then
+            if ___access_flags is not null then
+                perform unsecure.validate_access_flags(___access_flags);
             end if;
 
             insert into const.resource_type (code, source, path, key_schema)
-            values (_code, _item_source, _path, _key_schema)
+            values (___code, __item_source, ___path, ___key_schema)
             on conflict do nothing;
         end if;
 
         -- Translations (upsert)
-        if _title is not null then
+        if ___title is not null then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-            values (_created_by, _created_by, _language_code, 'resource_type', _code, 'title', _title)
+            values (_created_by, _created_by, _language_code, 'resource_type', ___code, 'title', ___title)
             on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
         end if;
-        if _description is not null then
+        if ___description is not null then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-            values (_created_by, _created_by, _language_code, 'resource_type', _code, 'description', _description)
+            values (_created_by, _created_by, _language_code, 'resource_type', ___code, 'description', ___description)
             on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
         end if;
 
         -- Recompute full_title for this type and all descendants
-        perform unsecure.update_resource_type_full_title_translations(_path, _language_code, _created_by);
+        perform unsecure.update_resource_type_full_title_translations(___path, _language_code, _created_by);
 
-        if _access_flags is not null then
-            foreach _flag in array _access_flags
+        if ___access_flags is not null then
+            foreach __flag in array ___access_flags
             loop
                 insert into const.resource_type_flag (resource_type_code, access_flag_code)
-                values (_code, _flag) on conflict do nothing;
+                values (___code, __flag) on conflict do nothing;
             end loop;
         end if;
 
-        perform unsecure.ensure_resource_access_partition(_code);
+        perform unsecure.ensure_resource_access_partition(___code);
 
         perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
             , 18001, 'resource_type', 0
-            , jsonb_build_object('resource_type', _code, 'title', _title,
-                'key_schema', _key_schema, 'access_flags', _access_flags)
+            , jsonb_build_object('resource_type', ___code, 'title', ___title,
+                'key_schema', ___key_schema, 'access_flags', ___access_flags)
             , _tenant_id);
     end loop;
 
@@ -1513,7 +1522,7 @@ begin
                coalesce((select mv.values->>'title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code), rt.code),
                (select mv.values->>'full_title' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
                (select mv.values->>'description' from public.mv_translation mv where mv.data_group = 'resource_type' and mv.data_object_code = rt.code and mv.language_code = _language_code),
-               rt.is_active, rt.source, rt.path, rt.key_schema,
+               rt.is_active, rt.source, rt.path::text, rt.key_schema,
                (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
                 from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
         from const.resource_type rt
@@ -1534,7 +1543,7 @@ create or replace function auth.get_resource_types(
     __description  text,
     __is_active    boolean,
     __source       text,
-    __path         ext.ltree,
+    __path         text,
     __key_schema   jsonb,
     __access_flags text[]
 )
@@ -1548,7 +1557,7 @@ begin
            coalesce(mv.values->>'title', rt.code),
            mv.values->>'full_title',
            mv.values->>'description',
-           rt.is_active, rt.source, rt.path, rt.key_schema,
+           rt.is_active, rt.source, rt.path::text, rt.key_schema,
            (select array_agg(rtf.access_flag_code order by rtf.access_flag_code)
             from const.resource_type_flag rtf where rtf.resource_type_code = rt.code)
     from const.resource_type rt
@@ -1579,30 +1588,30 @@ create or replace function auth.ensure_access_flags(
 as
 $$
 declare
-    _item jsonb;
-    _code text;
-    _title text;
-    _item_source text;
+    __item jsonb;
+    ___code text;
+    ___title text;
+    __item_source text;
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.create_resource_type', _tenant_id);
 
-    for _item in select value from jsonb_array_elements(_flags)
+    for __item in select value from jsonb_array_elements(_flags)
     loop
-        _code        := _item->>'code';
-        _title       := _item->>'title';
-        _item_source := coalesce(_item->>'source', _source);
+        ___code        := __item->>'code';
+        ___title       := __item->>'title';
+        __item_source := coalesce(__item->>'source', _source);
 
-        if _code is null or _title is null then
+        if ___code is null or ___title is null then
             raise exception 'Access flag requires both "code" and "title" fields'
                 using errcode = '35004';
         end if;
 
         insert into const.resource_access_flag (code, source)
-        values (_code, _item_source)
+        values (___code, __item_source)
         on conflict do nothing;
 
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-        values (_created_by, _created_by, _language_code, 'resource_access_flag', _code, 'title', _title)
+        values (_created_by, _created_by, _language_code, 'resource_access_flag', ___code, 'title', ___title)
         on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();

@@ -23,7 +23,7 @@ BEGIN
         _resource_type   := 'fsitem',
         _target_user_id  := __user_2,
         _access_flags    := ARRAY['read'],
-        _resource_path   := 'srv.data.org_123'::ext.ltree
+        _resource_path   := 'srv.data.org_123'
     );
 
     SELECT COUNT(*) INTO __count
@@ -44,7 +44,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'srv.data.org_123'::ext.ltree,
+        _resource_path  := 'srv.data.org_123',
         _throw_err      := false
     );
 
@@ -60,7 +60,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'srv.data.org_123.reports.q1.summary_pdf'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.reports.q1.summary_pdf',
         _throw_err      := false
     );
 
@@ -76,7 +76,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem.file',
         _required_flag  := 'read',
-        _resource_path  := 'srv.data.org_123.reports.q1.summary_pdf'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.reports.q1.summary_pdf',
         _throw_err      := false
     );
 
@@ -92,7 +92,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'srv.data.org_123.reports'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.reports',
         _throw_err      := false
     );
 
@@ -108,7 +108,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'srv.data.org_999'::ext.ltree,
+        _resource_path  := 'srv.data.org_999',
         _throw_err      := false
     );
 

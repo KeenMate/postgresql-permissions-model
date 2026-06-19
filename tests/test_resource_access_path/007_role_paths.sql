@@ -22,7 +22,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _role_codes     := ARRAY['fsitem_editor'],
-        _resource_path  := 'roles_test.root'::ext.ltree
+        _resource_path  := 'roles_test.root'
     );
 
     -- TEST 1: Role-derived read on descendant
@@ -31,7 +31,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'roles_test.root.sub.leaf'::ext.ltree,
+        _resource_path  := 'roles_test.root.sub.leaf',
         _throw_err      := false
     );
 
@@ -47,7 +47,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'roles_test.root.sub.leaf'::ext.ltree,
+        _resource_path  := 'roles_test.root.sub.leaf',
         _throw_err      := false
     );
 
@@ -63,7 +63,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'delete',
-        _resource_path  := 'roles_test.root.sub.leaf'::ext.ltree,
+        _resource_path  := 'roles_test.root.sub.leaf',
         _throw_err      := false
     );
 
@@ -81,7 +81,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _role_codes     := ARRAY['fsitem_editor'],
-        _resource_path  := 'roles_test.root'::ext.ltree
+        _resource_path  := 'roles_test.root'
     );
 
     __result := auth.has_resource_access(
@@ -89,7 +89,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'roles_test.root.sub.leaf'::ext.ltree,
+        _resource_path  := 'roles_test.root.sub.leaf',
         _throw_err      := false
     );
 

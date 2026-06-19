@@ -22,7 +22,7 @@ BEGIN
         _resource_type   := 'fsitem',
         _target_user_id  := __user_2,
         _access_flags    := ARRAY['write'],
-        _resource_path   := 'srv.data.org_123'::ext.ltree
+        _resource_path   := 'srv.data.org_123'
     );
 
     -- TEST 1: Write cascades to descendant
@@ -31,7 +31,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'srv.data.org_123.private.secret_txt'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.private.secret_txt',
         _throw_err      := false
     );
 
@@ -49,7 +49,7 @@ BEGIN
         _resource_type   := 'fsitem',
         _target_user_id  := __user_2,
         _access_flags    := ARRAY['write'],
-        _resource_path   := 'srv.data.org_123.private'::ext.ltree
+        _resource_path   := 'srv.data.org_123.private'
     );
 
     -- TEST 2: Deny on deeper path blocks write
@@ -58,7 +58,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'srv.data.org_123.private.secret_txt'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.private.secret_txt',
         _throw_err      := false
     );
 
@@ -74,7 +74,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'srv.data.org_123.public.notes_txt'::ext.ltree,
+        _resource_path  := 'srv.data.org_123.public.notes_txt',
         _throw_err      := false
     );
 
@@ -90,7 +90,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'write',
-        _resource_path  := 'srv.data.org_123'::ext.ltree,
+        _resource_path  := 'srv.data.org_123',
         _throw_err      := false
     );
 

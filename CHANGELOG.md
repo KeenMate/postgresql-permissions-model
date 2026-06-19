@@ -10,12 +10,29 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 
 - **Partial-key grants and denies** — `unsecure.validate_resource_id` no longer requires every key from the `key_schema` to be present in `_resource_id`. Any subset of the schema's keys is accepted; only unknown keys (not in the schema) are rejected. This lets a grant or deny be scoped at any level of the composite key (e.g. `{project_id: 42}` on `project.invoices` means "all invoices under project 42" — no `invoice_id` required). The `_allow_partial` parameter is **not** introduced; the relaxed validation applies uniformly.
 - **`auth.has_resource_access` matching** — ancestor-level lookups now use containment (`_ancestor_key @> resource_id`) instead of exact equality (`resource_id = _ancestor_key`). Full-key stored grants/denies still match the exact resource; partial-key stored rows match every descendant resource under that key slice. Parent-grant cascade through ancestor key extraction is unchanged. Read semantics are otherwise identical.
+- **Public-API ltree → text (API break)** — all `auth.*` resource-access and resource-role functions now accept `text` / `text[]` for path parameters and return `text` for path columns, never `ext.ltree` / `ext.ltree[]`. Conversion happens internally via `ext.text2ltree(...)`. Read-time semantics are unchanged.
+  - Parameters changed: `auth.assign_resource_access`, `deny_resource_access`, `revoke_resource_access`, `revoke_all_resource_access`, `assign_resource_role`, `revoke_resource_role`, `revoke_all_resource_roles`, `has_resource_access`, `get_resource_access_flags`, `get_resource_access_matrix`, `get_resource_grants` — `_resource_path` is now `text default null`.
+  - `auth.filter_accessible_resources` — `_resource_paths` is now `text[] default null` (was `ext.ltree[]`). This was the proximate cause: downstream code generators (Elixir, Go, TypeScript) cannot map the `_ltree` array type and failed with "dbType '_ltree' not found".
+  - Return columns changed: `auth.create_resource_type`, `auth.update_resource_type`, `auth.ensure_resource_types`, `auth.get_resource_types` — `__path` is now `text` (was `ext.ltree`).
+- **Variable naming convention tightened** — single underscore (`_`) is now reserved exclusively for input parameters; locals use `__` (and `___` on collision with `__`-prefixed return columns). See CLAUDE.md.
+- **Codebase-wide locals sweep** — all PL/pgSQL local variables across the migration files were renamed from single `_` to `__` (or `___` where they would collide with `__`-prefixed return columns), bringing every existing function in line with the new naming rule. ~200 locals renamed across 12 files:
+  - `004_create_helpers.sql` (3 locals in `helpers.path_to_ltree`)
+  - `013_tables_auth.sql`, `014_tables_stage.sql`, `034_tables_resource_access.sql`, `043_tables_resource_roles.sql` (partition/setup helpers)
+  - `019_functions_unsecure.sql` (5 locals; `_payload` scoped to `unsecure.notify_permission_change` since it's also a param of `unsecure.notify_journal_event`)
+  - `021_functions_auth_group.sql` (22 locals across `auth.ensure_user_groups` + `auth.ensure_user_group_mappings`)
+  - `022_functions_auth_permission.sql` (21 locals across `auth.ensure_permissions` + `auth.ensure_perm_sets`)
+  - `033_triggers_cache_and_notify.sql` (23 locals across 11 trigger functions)
+  - `035_functions_resource_access.sql` (50 locals; triple-underscore for locals colliding with `__path` / `__code` / `__title` / `__description` / `__key_schema` / `__access_flags` return columns in `auth.create_resource_type`, `auth.update_resource_type`, `auth.ensure_resource_types`, `auth.ensure_access_flags`)
+  - `042_functions_invitation.sql` (4 locals; `_code` scoped to `unsecure.ensure_invitation_templates` since it's also a param elsewhere)
+  - `044_functions_resource_roles.sql` (41 locals; triple-underscore for `___code`/`___title`/`___access_flags` in `auth.ensure_resource_roles`)
+  - Done via word-boundary `sed` with per-function line ranges where local names overlapped with parameters in sibling functions in the same file. Each batch verified with `fullService` + the full 791-test suite.
 
 ### Notes
 
 - Symmetric model: grants and denies share the same validation and matching semantics. A partial-key grant ("read on all invoices under project 42 for group X") and a partial-key deny ("no invoices under project 42 for user Y") are both expressible.
-- No new function signatures, parameters, or error codes. Existing full-key callers are unaffected.
-- All 791 tests across 36 suites pass after the change.
+- New CLAUDE.md rule: **public `auth.*` / `public.*` signatures must use only stock PostgreSQL types + `jsonb`**. Extension types (`ext.ltree`, etc.) stay inside tables, `internal.*`, `unsecure.*`, and `helpers.*`. This unblocks code generation and keeps the callable surface portable.
+- Tests, examples (`999-examples-icons.sql`), and `tests/test_resource_access_path/*` updated to pass plain text paths.
+- All 791 tests across 36 suites pass after every step of the refactor.
 
 ## 2026-04-17
 

@@ -335,9 +335,9 @@ create or replace function unsecure.notify_permission_change(
 as
 $$
 declare
-    _payload jsonb;
+    __payload jsonb;
 begin
-    _payload := jsonb_build_object(
+    __payload := jsonb_build_object(
         'event', _event,
         'tenant_id', _tenant_id,
         'target_type', _target_type,
@@ -346,10 +346,10 @@ begin
     );
 
     if _detail is not null then
-        _payload := _payload || jsonb_build_object('detail', _detail);
+        __payload := __payload || jsonb_build_object('detail', _detail);
     end if;
 
-    perform pg_notify('permission_changes', _payload::text);
+    perform pg_notify('permission_changes', __payload::text);
 end;
 $$;
 
@@ -370,9 +370,9 @@ create or replace function unsecure.notify_journal_event(
 as
 $$
 declare
-    _notify_payload jsonb;
+    __notify_payload jsonb;
 begin
-    _notify_payload := jsonb_build_object(
+    __notify_payload := jsonb_build_object(
         'type', 'journal',
         'event_id', _event_id,
         'tenant_id', _tenant_id,
@@ -386,12 +386,12 @@ begin
     );
 
     -- pg_notify has 8000 byte limit; strip large fields if payload is too big
-    if length(_notify_payload::text) > 7900 then
-        _notify_payload := _notify_payload - 'data_payload' - 'request_context';
-        _notify_payload := _notify_payload || jsonb_build_object('truncated', true);
+    if length(__notify_payload::text) > 7900 then
+        __notify_payload := __notify_payload - 'data_payload' - 'request_context';
+        __notify_payload := __notify_payload || jsonb_build_object('truncated', true);
     end if;
 
-    perform pg_notify('journal_events', _notify_payload::text);
+    perform pg_notify('journal_events', __notify_payload::text);
 end;
 $$;
 
@@ -414,9 +414,9 @@ create or replace function unsecure.notify_user_event(
 as
 $$
 declare
-    _notify_payload jsonb;
+    __notify_payload jsonb;
 begin
-    _notify_payload := jsonb_build_object(
+    __notify_payload := jsonb_build_object(
         'type', 'user_event',
         'event_type_code', _event_type_code,
         'user_id', _user_id,
@@ -432,12 +432,12 @@ begin
     );
 
     -- pg_notify has 8000 byte limit; strip large fields if payload is too big
-    if length(_notify_payload::text) > 7900 then
-        _notify_payload := _notify_payload - 'event_data' - 'request_context';
-        _notify_payload := _notify_payload || jsonb_build_object('truncated', true);
+    if length(__notify_payload::text) > 7900 then
+        __notify_payload := __notify_payload - 'event_data' - 'request_context';
+        __notify_payload := __notify_payload || jsonb_build_object('truncated', true);
     end if;
 
-    perform pg_notify('user_events', _notify_payload::text);
+    perform pg_notify('user_events', __notify_payload::text);
 end;
 $$;
 
@@ -977,10 +977,10 @@ create or replace function unsecure.update_permission_full_title(
 as
 $$
 declare
-    _perm       record;
-    _full_title text;
+    __perm       record;
+    __full_title text;
 begin
-    for _perm in
+    for __perm in
         select p.permission_id, p.code, p.node_path
         from auth.permission p
         where p.node_path <@ _perm_path
@@ -994,15 +994,15 @@ begin
                 left join public.translation t
                     on t.data_group = 'permission' and t.data_object_code = a.code
                     and t.context = 'title' and t.language_code = _language_code
-                where a.node_path @> _perm.node_path
+                where a.node_path @> __perm.node_path
                     and a.permission_id <> 1
                 order by a.node_path
             ), ' > ')
-        into _full_title;
+        into __full_title;
 
         -- Upsert full_title translation
         insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-        values (_created_by, _created_by, _language_code, 'permission', _perm.code, 'full_title', _full_title)
+        values (_created_by, _created_by, _language_code, 'permission', __perm.code, 'full_title', __full_title)
         on conflict (language_code, data_group, data_object_code, context)
             where data_object_code is not null
         do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();

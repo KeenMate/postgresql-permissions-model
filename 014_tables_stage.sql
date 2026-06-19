@@ -89,24 +89,24 @@ create table public.journal_default partition of public.journal default;
 -- Create initial monthly partitions for journal
 do $$
 declare
-    _start date;
-    _end date;
-    _partition_name text;
-    _i integer;
+    __start date;
+    __end date;
+    __partition_name text;
+    __i integer;
 begin
-    for _i in -1..3 loop
-        _start := date_trunc('month', now()) + make_interval(months => _i);
-        _end := _start + interval '1 month';
-        _partition_name := 'journal_' || to_char(_start, 'YYYY_MM');
+    for __i in -1..3 loop
+        __start := date_trunc('month', now()) + make_interval(months => __i);
+        __end := __start + interval '1 month';
+        __partition_name := 'journal_' || to_char(__start, 'YYYY_MM');
 
         if not exists (
             select 1 from pg_class c
             join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relname = _partition_name
+            where n.nspname = 'public' and c.relname = __partition_name
         ) then
             execute format(
                 'create table public.%I partition of public.journal for values from (%L) to (%L)',
-                _partition_name, _start, _end
+                __partition_name, __start, __end
             );
         end if;
     end loop;

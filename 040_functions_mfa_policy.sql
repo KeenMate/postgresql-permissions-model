@@ -62,7 +62,7 @@ begin
     -- Generate 10 new recovery codes
     __plain_codes  := array[]::text[];
     __hashed_codes := array[]::text[];
-    for _i in 1..10 loop
+    for __i in 1..10 loop
         __code := helpers.random_string(20);
         __plain_codes  := array_append(__plain_codes, __code);
         __hashed_codes := array_append(__hashed_codes, encode(ext.digest(__code, 'sha256'), 'hex'));

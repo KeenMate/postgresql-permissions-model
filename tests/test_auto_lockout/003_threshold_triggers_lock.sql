@@ -14,7 +14,7 @@ BEGIN
     RAISE NOTICE '-- Test 3: Threshold triggers auto-lock --';
 
     -- We already have 1 failure from Test 2. Add 4 more to reach threshold of 5.
-    FOR _i IN 2..5 LOOP
+    FOR __i IN 2..5 LOOP
         PERFORM unsecure.create_user_event(
             'system', 1, 'test-corr-03', 'user_login_failed',
             __test_user_id,

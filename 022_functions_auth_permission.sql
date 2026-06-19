@@ -937,16 +937,16 @@ create or replace function auth.ensure_permissions(
 as
 $$
 declare
-    _item           jsonb;
-    _title          text;
-    _parent_code    text;
-    _is_assignable  boolean;
-    _short_code     text;
-    _item_source    text;
-    _code           text;
-    _full_code      text;
-    _full_codes     text[] := '{}';
-    _perm_to_delete record;
+    __item           jsonb;
+    __title          text;
+    __parent_code    text;
+    __is_assignable  boolean;
+    __short_code     text;
+    __item_source    text;
+    __code           text;
+    __full_code      text;
+    __full_codes     text[] := '{}';
+    __perm_to_delete record;
 begin
     -- Single permission check for the batch
     perform auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
@@ -960,43 +960,43 @@ begin
     end if;
 
     -- Process items sorted by hierarchy depth (parents before children)
-    for _item in
+    for __item in
         select value
         from jsonb_array_elements(_permissions)
         order by coalesce(ext.nlevel(ext.text2ltree(value ->> 'parent_code')), 0)
     loop
-        _title         := _item ->> 'title';
-        _parent_code   := _item ->> 'parent_code';
-        _is_assignable := coalesce((_item ->> 'is_assignable')::boolean, true);
-        _short_code    := _item ->> 'short_code';
-        _item_source   := coalesce(_item ->> 'source', _source);
-        _code          := helpers.get_code(_title, '_');
+        __title         := __item ->> 'title';
+        __parent_code   := __item ->> 'parent_code';
+        __is_assignable := coalesce((__item ->> 'is_assignable')::boolean, true);
+        __short_code    := __item ->> 'short_code';
+        __item_source   := coalesce(__item ->> 'source', _source);
+        __code          := helpers.get_code(__title, '_');
 
         -- Compute the full_code that would result
-        if helpers.is_empty_string(_parent_code) then
-            _full_code := _code;
+        if helpers.is_empty_string(__parent_code) then
+            __full_code := __code;
         else
-            _full_code := _parent_code || '.' || _code;
+            __full_code := __parent_code || '.' || __code;
         end if;
 
-        _full_codes := array_append(_full_codes, _full_code);
+        __full_codes := array_append(__full_codes, __full_code);
 
         -- Skip if already exists
-        if exists (select 1 from auth.permission where full_code = _full_code::ext.ltree) then
+        if exists (select 1 from auth.permission where full_code = __full_code::ext.ltree) then
             continue;
         end if;
 
         -- Delegate to unsecure.create_permission (handles node_path, full_code, short_code)
         perform unsecure.create_permission(
             _created_by, _user_id, _correlation_id,
-            _title, _parent_code,
-            _is_assignable, _short_code, _item_source
+            __title, __parent_code,
+            __is_assignable, __short_code, __item_source
         );
 
         -- Store title as translation
-        if helpers.is_not_empty_string(_title) then
+        if helpers.is_not_empty_string(__title) then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-            values (_created_by, _created_by, 'en', 'permission', _full_code, 'title', _title)
+            values (_created_by, _created_by, 'en', 'permission', __full_code, 'title', __title)
             on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
@@ -1006,35 +1006,35 @@ begin
 
     -- Final state: remove permissions with same source that are not in the input set
     if _is_final_state then
-        for _perm_to_delete in
+        for __perm_to_delete in
             select p.permission_id, p.full_code::text as full_code_text, p.node_path
             from auth.permission p
             where p.source = _source
-              and p.full_code::text != all (_full_codes)
+              and p.full_code::text != all (__full_codes)
               -- also exclude descendants of input permissions (they may have different source)
               -- but include descendants of to-be-deleted permissions that share the same source
             order by ext.nlevel(p.node_path) desc  -- deepest first (children before parents)
         loop
             -- Skip if already deleted (as part of a parent deletion cascade)
-            if not exists (select 1 from auth.permission where permission_id = _perm_to_delete.permission_id) then
+            if not exists (select 1 from auth.permission where permission_id = __perm_to_delete.permission_id) then
                 continue;
             end if;
 
             -- Clean up perm_set_perm references
-            delete from auth.perm_set_perm where permission_id = _perm_to_delete.permission_id;
+            delete from auth.perm_set_perm where permission_id = __perm_to_delete.permission_id;
 
             -- Clean up permission_assignment references
-            delete from auth.permission_assignment where permission_id = _perm_to_delete.permission_id;
+            delete from auth.permission_assignment where permission_id = __perm_to_delete.permission_id;
 
             -- Delete the permission itself
-            delete from auth.permission where permission_id = _perm_to_delete.permission_id;
+            delete from auth.permission where permission_id = __perm_to_delete.permission_id;
 
             -- Journal the removal
             perform create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 12003,  -- permission_deleted
-                'permission', _perm_to_delete.permission_id,
-                jsonb_build_object('permission_code', _perm_to_delete.full_code_text,
+                'permission', __perm_to_delete.permission_id,
+                jsonb_build_object('permission_code', __perm_to_delete.full_code_text,
                     'reason', 'final_state_sync', 'source', _source),
                 1
             );
@@ -1047,14 +1047,14 @@ begin
             where c.node_path <@ p.node_path
               and c.node_path != p.node_path
         )
-        where p.full_code::text = any (_full_codes);
+        where p.full_code::text = any (__full_codes);
     end if;
 
     -- Return all processed permissions (existing + newly created)
     return query
         select p.*
         from auth.permission p
-        where p.full_code::text = any (_full_codes)
+        where p.full_code::text = any (__full_codes)
         order by p.full_code;
 end;
 $$;
@@ -1077,17 +1077,17 @@ create or replace function auth.ensure_perm_sets(
 as
 $$
 declare
-    _item            jsonb;
-    _title           text;
-    _is_system       boolean;
-    _is_assignable   boolean;
-    _item_source     text;
-    _permissions     text[];
-    _code            text;
-    _existing_id     integer;
-    _input_codes     text[] := '{}';
-    _extra_perms     text[];
-    _set_to_delete   record;
+    __item            jsonb;
+    __title           text;
+    __is_system       boolean;
+    __is_assignable   boolean;
+    __item_source     text;
+    __permissions     text[];
+    __code            text;
+    __existing_id     integer;
+    __input_codes     text[] := '{}';
+    __extra_perms     text[];
+    __set_to_delete   record;
 begin
     -- Single permission check for the batch
     perform auth.has_permission(_user_id, _correlation_id, 'permissions.create_permission_set', _tenant_id);
@@ -1100,52 +1100,52 @@ begin
         end if;
     end if;
 
-    for _item in
+    for __item in
         select value
         from jsonb_array_elements(_perm_sets)
     loop
-        _title         := _item ->> 'title';
-        _is_system     := coalesce((_item ->> 'is_system')::boolean, false);
-        _is_assignable := coalesce((_item ->> 'is_assignable')::boolean, true);
-        _item_source   := coalesce(_item ->> 'source', _source);
-        _code          := helpers.get_code(_title, '_');
+        __title         := __item ->> 'title';
+        __is_system     := coalesce((__item ->> 'is_system')::boolean, false);
+        __is_assignable := coalesce((__item ->> 'is_assignable')::boolean, true);
+        __item_source   := coalesce(__item ->> 'source', _source);
+        __code          := helpers.get_code(__title, '_');
 
-        _input_codes := array_append(_input_codes, _code);
+        __input_codes := array_append(__input_codes, __code);
 
         -- Convert JSONB array of permission codes to text[]
         select array_agg(elem::text)
-        from jsonb_array_elements_text(_item -> 'permissions') as elem
-        into _permissions;
+        from jsonb_array_elements_text(__item -> 'permissions') as elem
+        into __permissions;
 
         -- Check if perm set already exists for this tenant
         select ps.perm_set_id
         from auth.perm_set ps
-        where ps.code = _code
+        where ps.code = __code
           and ps.tenant_id = _tenant_id
-        into _existing_id;
+        into __existing_id;
 
-        if _existing_id is not null then
+        if __existing_id is not null then
             -- Add any missing permissions to existing perm set
-            if _permissions is not null and array_length(_permissions, 1) > 0 then
+            if __permissions is not null and array_length(__permissions, 1) > 0 then
                 perform unsecure.create_perm_set_permissions(
                     _created_by, _user_id, _correlation_id,
-                    _existing_id, _permissions, _tenant_id
+                    __existing_id, __permissions, _tenant_id
                 );
             end if;
 
             -- Final state: remove permissions from this set that are not in the input
-            if _is_final_state and _permissions is not null then
+            if _is_final_state and __permissions is not null then
                 select array_agg(p.full_code::text)
                 from auth.perm_set_perm psp
                 inner join auth.permission p on p.permission_id = psp.permission_id
-                where psp.perm_set_id = _existing_id
-                  and p.full_code::text != all (_permissions)
-                into _extra_perms;
+                where psp.perm_set_id = __existing_id
+                  and p.full_code::text != all (__permissions)
+                into __extra_perms;
 
-                if _extra_perms is not null and array_length(_extra_perms, 1) > 0 then
+                if __extra_perms is not null and array_length(__extra_perms, 1) > 0 then
                     perform unsecure.delete_perm_set_permissions(
                         _created_by, _user_id, _correlation_id,
-                        _existing_id, _extra_perms, _tenant_id
+                        __existing_id, __extra_perms, _tenant_id
                     );
                 end if;
             end if;
@@ -1153,15 +1153,15 @@ begin
             -- Create new perm set with permissions
             perform unsecure.create_perm_set(
                 _created_by, _user_id, _correlation_id,
-                _title, _is_system, _is_assignable,
-                _permissions, _tenant_id, _item_source
+                __title, __is_system, __is_assignable,
+                __permissions, _tenant_id, __item_source
             );
         end if;
 
         -- Store title as translation
-        if helpers.is_not_empty_string(_title) then
+        if helpers.is_not_empty_string(__title) then
             insert into public.translation (created_by, updated_by, language_code, data_group, data_object_code, context, value)
-            values (_created_by, _created_by, 'en', 'perm_set', _code, 'title', _title)
+            values (_created_by, _created_by, 'en', 'perm_set', __code, 'title', __title)
             on conflict (language_code, data_group, data_object_code, context)
                 where data_object_code is not null
             do update set value = excluded.value, updated_by = excluded.updated_by, updated_at = now();
@@ -1171,32 +1171,32 @@ begin
 
     -- Final state: remove perm sets with same source+tenant that are not in the input set
     if _is_final_state then
-        for _set_to_delete in
+        for __set_to_delete in
             select ps.perm_set_id, ps.code
             from auth.perm_set ps
             where ps.source = _source
               and ps.tenant_id = _tenant_id
-              and ps.code != all (_input_codes)
+              and ps.code != all (__input_codes)
         loop
             -- Invalidate cache for users affected by this perm set
             perform unsecure.invalidate_perm_set_users_permission_cache(
-                _created_by, _set_to_delete.perm_set_id, _tenant_id
+                _created_by, __set_to_delete.perm_set_id, _tenant_id
             );
 
             -- Clean up permission_assignment references
             delete from auth.permission_assignment
-            where perm_set_id = _set_to_delete.perm_set_id;
+            where perm_set_id = __set_to_delete.perm_set_id;
 
             -- Delete the perm set (cascades to perm_set_perm)
             delete from auth.perm_set
-            where perm_set_id = _set_to_delete.perm_set_id;
+            where perm_set_id = __set_to_delete.perm_set_id;
 
             -- Journal the removal
             perform create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 12022,  -- perm_set_deleted
-                'perm_set', _set_to_delete.perm_set_id,
-                jsonb_build_object('perm_set_code', _set_to_delete.code,
+                'perm_set', __set_to_delete.perm_set_id,
+                jsonb_build_object('perm_set_code', __set_to_delete.code,
                     'reason', 'final_state_sync', 'source', _source),
                 _tenant_id
             );

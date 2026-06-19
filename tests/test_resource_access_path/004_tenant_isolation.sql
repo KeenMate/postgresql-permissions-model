@@ -25,7 +25,7 @@ BEGIN
         _target_user_id  := __user_2,
         _access_flags    := ARRAY['read'],
         _tenant_id       := 1,
-        _resource_path   := 'shared.tenant1_only'::ext.ltree
+        _resource_path   := 'shared.tenant1_only'
     );
 
     -- TEST 1: Grant visible in tenant 1
@@ -35,7 +35,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
         _tenant_id      := 1,
-        _resource_path  := 'shared.tenant1_only.file_txt'::ext.ltree,
+        _resource_path  := 'shared.tenant1_only.file_txt',
         _throw_err      := false
     );
 
@@ -52,7 +52,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
         _tenant_id      := __tenant_2,
-        _resource_path  := 'shared.tenant1_only.file_txt'::ext.ltree,
+        _resource_path  := 'shared.tenant1_only.file_txt',
         _throw_err      := false
     );
 

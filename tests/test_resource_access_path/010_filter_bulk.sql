@@ -22,7 +22,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'bulk_test.allowed'::ext.ltree
+        _resource_path  := 'bulk_test.allowed'
     );
 
     -- Filter a list of candidate paths
@@ -33,10 +33,10 @@ BEGIN
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
         _resource_paths := ARRAY[
-            'bulk_test.allowed.a'::ext.ltree,
-            'bulk_test.allowed.b.c'::ext.ltree,
-            'bulk_test.forbidden.x'::ext.ltree,
-            'bulk_test.forbidden.y'::ext.ltree
+            'bulk_test.allowed.a',
+            'bulk_test.allowed.b.c',
+            'bulk_test.forbidden.x',
+            'bulk_test.forbidden.y'
         ]
     );
 

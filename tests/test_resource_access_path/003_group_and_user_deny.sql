@@ -24,7 +24,7 @@ BEGIN
         _resource_type   := 'fsitem',
         _user_group_id   := __group_1,
         _access_flags    := ARRAY['read'],
-        _resource_path   := 'shared.projects'::ext.ltree
+        _resource_path   := 'shared.projects'
     );
 
     -- TEST 1: Group member gets read via group grant on ancestor
@@ -33,7 +33,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'shared.projects.alpha.doc_md'::ext.ltree,
+        _resource_path  := 'shared.projects.alpha.doc_md',
         _throw_err      := false
     );
 
@@ -51,7 +51,7 @@ BEGIN
         _resource_type   := 'fsitem',
         _target_user_id  := __user_2,
         _access_flags    := ARRAY['read'],
-        _resource_path   := 'shared.projects.alpha'::ext.ltree
+        _resource_path   := 'shared.projects.alpha'
     );
 
     -- TEST 2: User deny overrides group grant on matching subtree
@@ -60,7 +60,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'shared.projects.alpha.doc_md'::ext.ltree,
+        _resource_path  := 'shared.projects.alpha.doc_md',
         _throw_err      := false
     );
 
@@ -76,7 +76,7 @@ BEGIN
         _correlation_id := null,
         _resource_type  := 'fsitem',
         _required_flag  := 'read',
-        _resource_path  := 'shared.projects.beta.doc_md'::ext.ltree,
+        _resource_path  := 'shared.projects.beta.doc_md',
         _throw_err      := false
     );
 

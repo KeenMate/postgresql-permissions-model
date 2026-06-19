@@ -68,18 +68,18 @@ create or replace function triggers.cache_user_group_before_delete() returns tri
 as
 $$
 declare
-    _affected_user_ids bigint[];
+    __affected_user_ids bigint[];
 begin
     select array_agg(user_id)
     from auth.user_group_member
     where user_group_id = OLD.user_group_id
-    into _affected_user_ids;
+    into __affected_user_ids;
 
-    if _affected_user_ids is not null then
-        perform unsecure.invalidate_users_permission_cache('trigger', _affected_user_ids, OLD.tenant_id);
+    if __affected_user_ids is not null then
+        perform unsecure.invalidate_users_permission_cache('trigger', __affected_user_ids, OLD.tenant_id);
         -- Hard-clear group ID cache for all affected members
         perform unsecure.invalidate_user_group_id_cache(uid, OLD.tenant_id)
-        from unnest(_affected_user_ids) as uid;
+        from unnest(__affected_user_ids) as uid;
     end if;
 
     return OLD;
@@ -93,15 +93,15 @@ create or replace function triggers.cache_provider_before_delete() returns trigg
 as
 $$
 declare
-    _affected_user_ids bigint[];
+    __affected_user_ids bigint[];
 begin
     select array_agg(distinct ui.user_id)
     from auth.user_identity ui
     where ui.provider_code = OLD.code
-    into _affected_user_ids;
+    into __affected_user_ids;
 
-    if _affected_user_ids is not null then
-        perform unsecure.invalidate_users_permission_cache('trigger', _affected_user_ids, null);
+    if __affected_user_ids is not null then
+        perform unsecure.invalidate_users_permission_cache('trigger', __affected_user_ids, null);
     end if;
 
     return OLD;
@@ -115,16 +115,16 @@ create or replace function triggers.cache_provider_status_change() returns trigg
 as
 $$
 declare
-    _affected_user_ids bigint[];
+    __affected_user_ids bigint[];
 begin
     if OLD.is_active is distinct from NEW.is_active and NEW.is_active = false then
         select array_agg(distinct ui.user_id)
         from auth.user_identity ui
         where ui.provider_code = NEW.code
-        into _affected_user_ids;
+        into __affected_user_ids;
 
-        if _affected_user_ids is not null then
-            perform unsecure.invalidate_users_permission_cache('trigger', _affected_user_ids, null);
+        if __affected_user_ids is not null then
+            perform unsecure.invalidate_users_permission_cache('trigger', __affected_user_ids, null);
         end if;
     end if;
 
@@ -178,27 +178,27 @@ create or replace function triggers.notify_permission_assignment() returns trigg
 as
 $$
 declare
-    _row          auth.permission_assignment;
-    _event        text;
-    _target_type  text;
-    _target_id    bigint;
+    __row          auth.permission_assignment;
+    __event        text;
+    __target_type  text;
+    __target_id    bigint;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'permission_assigned' else 'permission_unassigned' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'permission_assigned' else 'permission_unassigned' end;
 
-    if _row.user_id is not null then
-        _target_type := 'user';
-        _target_id := _row.user_id;
+    if __row.user_id is not null then
+        __target_type := 'user';
+        __target_id := __row.user_id;
     else
-        _target_type := 'group';
-        _target_id := _row.user_group_id;
+        __target_type := 'group';
+        __target_id := __row.user_group_id;
     end if;
 
     perform unsecure.notify_permission_change(
-        _event, _row.tenant_id, _target_type, _target_id,
-        jsonb_build_object('perm_set_id', _row.perm_set_id, 'permission_id', _row.permission_id));
+        __event, __row.tenant_id, __target_type, __target_id,
+        jsonb_build_object('perm_set_id', __row.perm_set_id, 'permission_id', __row.permission_id));
 
-    return _row;
+    return __row;
 end;
 $$;
 
@@ -208,20 +208,20 @@ create or replace function triggers.notify_perm_set_perm() returns trigger
 as
 $$
 declare
-    _row       auth.perm_set_perm;
-    _event     text;
-    _tenant_id int;
+    __row       auth.perm_set_perm;
+    __event     text;
+    __tenant_id int;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'perm_set_permissions_added' else 'perm_set_permissions_removed' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'perm_set_permissions_added' else 'perm_set_permissions_removed' end;
 
-    select tenant_id from auth.perm_set where perm_set_id = _row.perm_set_id into _tenant_id;
+    select tenant_id from auth.perm_set where perm_set_id = __row.perm_set_id into __tenant_id;
 
     perform unsecure.notify_permission_change(
-        _event, _tenant_id, 'perm_set', _row.perm_set_id,
-        jsonb_build_object('permission_id', _row.permission_id));
+        __event, __tenant_id, 'perm_set', __row.perm_set_id,
+        jsonb_build_object('permission_id', __row.permission_id));
 
-    return _row;
+    return __row;
 end;
 $$;
 
@@ -231,20 +231,20 @@ create or replace function triggers.notify_user_group_member() returns trigger
 as
 $$
 declare
-    _row       auth.user_group_member;
-    _event     text;
-    _tenant_id int;
+    __row       auth.user_group_member;
+    __event     text;
+    __tenant_id int;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'group_member_added' else 'group_member_removed' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'group_member_added' else 'group_member_removed' end;
 
-    select tenant_id from auth.user_group where user_group_id = _row.user_group_id into _tenant_id;
+    select tenant_id from auth.user_group where user_group_id = __row.user_group_id into __tenant_id;
 
     perform unsecure.notify_permission_change(
-        _event, _tenant_id, 'user', _row.user_id,
-        jsonb_build_object('group_id', _row.user_group_id));
+        __event, __tenant_id, 'user', __row.user_id,
+        jsonb_build_object('group_id', __row.user_group_id));
 
-    return _row;
+    return __row;
 end;
 $$;
 
@@ -254,7 +254,7 @@ create or replace function triggers.notify_user_group() returns trigger
 as
 $$
 declare
-    _event text;
+    __event text;
 begin
     if TG_OP = 'DELETE' then
         perform unsecure.notify_permission_change(
@@ -264,9 +264,9 @@ begin
 
     -- UPDATE cases
     if OLD.is_active is distinct from NEW.is_active then
-        _event := case when NEW.is_active then 'group_enabled' else 'group_disabled' end;
+        __event := case when NEW.is_active then 'group_enabled' else 'group_disabled' end;
         perform unsecure.notify_permission_change(
-            _event, NEW.tenant_id, 'group', NEW.user_group_id, null);
+            __event, NEW.tenant_id, 'group', NEW.user_group_id, null);
     end if;
 
     if OLD.is_external is distinct from NEW.is_external then
@@ -285,20 +285,20 @@ create or replace function triggers.notify_user_group_mapping() returns trigger
 as
 $$
 declare
-    _row       auth.user_group_mapping;
-    _event     text;
-    _tenant_id int;
+    __row       auth.user_group_mapping;
+    __event     text;
+    __tenant_id int;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'group_mapping_created' else 'group_mapping_deleted' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'group_mapping_created' else 'group_mapping_deleted' end;
 
-    select tenant_id from auth.user_group where user_group_id = _row.user_group_id into _tenant_id;
+    select tenant_id from auth.user_group where user_group_id = __row.user_group_id into __tenant_id;
 
     perform unsecure.notify_permission_change(
-        _event, _tenant_id, 'group', _row.user_group_id,
-        jsonb_build_object('provider_code', _row.provider_code));
+        __event, __tenant_id, 'group', __row.user_group_id,
+        jsonb_build_object('provider_code', __row.provider_code));
 
-    return _row;
+    return __row;
 end;
 $$;
 
@@ -308,7 +308,7 @@ create or replace function triggers.notify_user_status() returns trigger
 as
 $$
 declare
-    _event text;
+    __event text;
 begin
     if TG_OP = 'DELETE' then
         perform unsecure.notify_permission_change(
@@ -318,15 +318,15 @@ begin
 
     -- UPDATE cases
     if OLD.is_active is distinct from NEW.is_active then
-        _event := case when NEW.is_active then 'user_enabled' else 'user_disabled' end;
+        __event := case when NEW.is_active then 'user_enabled' else 'user_disabled' end;
         perform unsecure.notify_permission_change(
-            _event, null, 'user', NEW.user_id, null);
+            __event, null, 'user', NEW.user_id, null);
     end if;
 
     if OLD.is_locked is distinct from NEW.is_locked then
-        _event := case when NEW.is_locked then 'user_locked' else 'user_unlocked' end;
+        __event := case when NEW.is_locked then 'user_locked' else 'user_unlocked' end;
         perform unsecure.notify_permission_change(
-            _event, null, 'user', NEW.user_id, null);
+            __event, null, 'user', NEW.user_id, null);
     end if;
 
     return NEW;
@@ -339,19 +339,19 @@ create or replace function triggers.notify_owner() returns trigger
 as
 $$
 declare
-    _row   auth.owner;
-    _event text;
-    _scope text;
+    __row   auth.owner;
+    __event text;
+    __scope text;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'owner_created' else 'owner_deleted' end;
-    _scope := case when _row.user_group_id is not null then 'group' else 'tenant' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'owner_created' else 'owner_deleted' end;
+    __scope := case when __row.user_group_id is not null then 'group' else 'tenant' end;
 
     perform unsecure.notify_permission_change(
-        _event, _row.tenant_id, 'user', _row.user_id,
-        jsonb_build_object('scope', _scope, 'user_group_id', _row.user_group_id));
+        __event, __row.tenant_id, 'user', __row.user_id,
+        jsonb_build_object('scope', __scope, 'user_group_id', __row.user_group_id));
 
-    return _row;
+    return __row;
 end;
 $$;
 
@@ -430,17 +430,17 @@ create or replace function triggers.notify_api_key() returns trigger
 as
 $$
 declare
-    _row   auth.api_key;
-    _event text;
+    __row   auth.api_key;
+    __event text;
 begin
-    _row := coalesce(NEW, OLD);
-    _event := case TG_OP when 'INSERT' then 'api_key_created' else 'api_key_deleted' end;
+    __row := coalesce(NEW, OLD);
+    __event := case TG_OP when 'INSERT' then 'api_key_created' else 'api_key_deleted' end;
 
     perform unsecure.notify_permission_change(
-        _event, _row.tenant_id, 'api_key', _row.api_key_id,
-        jsonb_build_object('api_key', _row.api_key));
+        __event, __row.tenant_id, 'api_key', __row.api_key_id,
+        jsonb_build_object('api_key', __row.api_key));
 
-    return _row;
+    return __row;
 end;
 $$;
 

@@ -24,7 +24,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'revoke_test.a'::ext.ltree
+        _resource_path  := 'revoke_test.a'
     );
 
     PERFORM auth.assign_resource_access(
@@ -34,7 +34,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'revoke_test.a.child'::ext.ltree
+        _resource_path  := 'revoke_test.a.child'
     );
 
     PERFORM auth.assign_resource_access(
@@ -44,7 +44,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'revoke_test.b'::ext.ltree
+        _resource_path  := 'revoke_test.b'
     );
 
     -- TEST 1: revoke specific path (not descendants)
@@ -55,7 +55,7 @@ BEGIN
         _resource_type  := 'fsitem',
         _target_user_id := __user_2,
         _access_flags   := ARRAY['read'],
-        _resource_path  := 'revoke_test.a'::ext.ltree
+        _resource_path  := 'revoke_test.a'
     );
 
     IF __deleted = 1 THEN
@@ -82,7 +82,7 @@ BEGIN
         _user_id        := __user_1,
         _correlation_id := null,
         _resource_type  := 'fsitem',
-        _resource_path  := 'revoke_test'::ext.ltree
+        _resource_path  := 'revoke_test'
     );
 
     IF __deleted >= 2 THEN
