@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
+## 2026-06-20
+
+### Changed
+
+- **Read-side validation for resource identifier** — `auth.has_resource_access`, `auth.get_resource_access_flags`, `auth.get_resource_access_matrix`, and `auth.get_resource_grants` now raise `35005` when both `_resource_id` is empty/null **and** `_resource_path` is null, matching the existing rejection in `auth.assign_resource_access` / `auth.assign_resource_role`. The check runs **before** the `user_id = 1` system-user shortcut and the owner shortcut, so a malformed call fails loudly regardless of caller identity (previously the system user silently got `true` while regular users silently got `false` — an asymmetry that could mask caller bugs by passing in tests but failing in production).
+- The rule is now centralized in new helper `unsecure.validate_resource_identifier(_resource_id jsonb, _resource_path text)`; the two writers (`assign_resource_access`, `assign_resource_role`) call it instead of inlining the check. Single source of truth for the "must supply an identifier" invariant.
+- `_throw_err` on `has_resource_access` is unchanged and does **not** suppress this validation — the assert is about a malformed call, not a permission verdict.
+- Tests: `tests/test_resource_access_path/008_invalid_input.sql` extended with 5 new cases (TEST 5–9) covering the new read-side raise for all four functions, including the system-user case. 796 tests across 36 suites pass.
+
 ## 2026-06-18
 
 ### Changed

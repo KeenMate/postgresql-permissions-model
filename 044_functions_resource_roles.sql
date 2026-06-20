@@ -271,10 +271,7 @@ begin
         perform error.raise_35002();
     end if;
 
-    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
-        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
-            using errcode = '35005';
-    end if;
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
 
     perform unsecure.validate_resource_type(_resource_type);
     perform unsecure.validate_resource_id(_resource_type, _resource_id);
@@ -550,6 +547,8 @@ declare
     __ancestor_key     jsonb;
     __resource_path_lt ext.ltree;
 begin
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
+
     if _user_id = 1 then
         return true;
     end if;
@@ -884,6 +883,8 @@ declare
     __ancestor_types   text[];
     __resource_path_lt ext.ltree;
 begin
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
+
     if _user_id = 1 then
         return query
             select raf.code, 'system'::text
@@ -1013,6 +1014,8 @@ declare
     __is_owner         boolean;
     __resource_path_lt ext.ltree;
 begin
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
+
     -- System user gets all valid flags on all descendant types
     if _user_id = 1 then
         return query
@@ -1221,6 +1224,7 @@ declare
     __root_type        text;
     __resource_path_lt ext.ltree;
 begin
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
     perform auth.has_permission(_user_id, _correlation_id, 'resources.get_grants', _tenant_id);
 
     _resource_id      := coalesce(_resource_id, '{}'::jsonb);

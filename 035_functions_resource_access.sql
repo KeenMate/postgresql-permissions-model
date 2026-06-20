@@ -113,6 +113,25 @@ begin
 end;
 $$;
 
+-- Asserts that at least one of _resource_id or _resource_path identifies a target.
+-- Used by both write paths (so you can't grant access to nothing) and read paths
+-- (so a malformed query fails loudly instead of silently returning false / true
+-- for the system user). Raises 35005.
+create or replace function unsecure.validate_resource_identifier(
+    _resource_id   jsonb,
+    _resource_path text
+) returns void
+    language plpgsql immutable
+as
+$$
+begin
+    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
+        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
+            using errcode = '35005';
+    end if;
+end;
+$$;
+
 -- ============================================================================
 -- Core check: auth.has_resource_access
 -- ============================================================================
@@ -636,11 +655,7 @@ begin
         perform error.raise_35002();
     end if;
 
-    -- At least one of resource_id or resource_path must be meaningful
-    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
-        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
-            using errcode = '35005';
-    end if;
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
 
     __resource_path_lt := ext.text2ltree(_resource_path);
 

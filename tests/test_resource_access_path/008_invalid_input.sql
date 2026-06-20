@@ -104,4 +104,74 @@ BEGIN
     ELSE
         RAISE EXCEPTION 'FAIL: Check constraint not enforced';
     END IF;
+
+    -- TEST 5: has_resource_access with both null raises 35005 (not silent false)
+    __caught := false;
+    BEGIN
+        PERFORM auth.has_resource_access(__user_2, 'test-corr-008-5', 'fsitem');
+    EXCEPTION WHEN sqlstate '35005' THEN
+        __caught := true;
+    END;
+
+    IF __caught THEN
+        RAISE NOTICE 'PASS: has_resource_access rejects empty id + null path (35005)';
+    ELSE
+        RAISE EXCEPTION 'FAIL: has_resource_access did not raise on both-null';
+    END IF;
+
+    -- TEST 6: has_resource_access also raises for system user (assert runs before shortcut)
+    __caught := false;
+    BEGIN
+        PERFORM auth.has_resource_access(1, 'test-corr-008-6', 'fsitem');
+    EXCEPTION WHEN sqlstate '35005' THEN
+        __caught := true;
+    END;
+
+    IF __caught THEN
+        RAISE NOTICE 'PASS: has_resource_access rejects both-null even for system user';
+    ELSE
+        RAISE EXCEPTION 'FAIL: system-user shortcut masked malformed call';
+    END IF;
+
+    -- TEST 7: get_resource_access_flags raises on both-null
+    __caught := false;
+    BEGIN
+        PERFORM auth.get_resource_access_flags(__user_2, 'test-corr-008-7', 'fsitem');
+    EXCEPTION WHEN sqlstate '35005' THEN
+        __caught := true;
+    END;
+
+    IF __caught THEN
+        RAISE NOTICE 'PASS: get_resource_access_flags rejects both-null (35005)';
+    ELSE
+        RAISE EXCEPTION 'FAIL: get_resource_access_flags did not raise';
+    END IF;
+
+    -- TEST 8: get_resource_access_matrix raises on both-null
+    __caught := false;
+    BEGIN
+        PERFORM auth.get_resource_access_matrix(__user_2, 'test-corr-008-8', 'fsitem');
+    EXCEPTION WHEN sqlstate '35005' THEN
+        __caught := true;
+    END;
+
+    IF __caught THEN
+        RAISE NOTICE 'PASS: get_resource_access_matrix rejects both-null (35005)';
+    ELSE
+        RAISE EXCEPTION 'FAIL: get_resource_access_matrix did not raise';
+    END IF;
+
+    -- TEST 9: get_resource_grants raises on both-null (before permission check)
+    __caught := false;
+    BEGIN
+        PERFORM auth.get_resource_grants(__user_1, 'test-corr-008-9', 'fsitem');
+    EXCEPTION WHEN sqlstate '35005' THEN
+        __caught := true;
+    END;
+
+    IF __caught THEN
+        RAISE NOTICE 'PASS: get_resource_grants rejects both-null (35005)';
+    ELSE
+        RAISE EXCEPTION 'FAIL: get_resource_grants did not raise';
+    END IF;
 END $$;
