@@ -25,12 +25,12 @@ BEGIN
             _target_user_id := __user_2,
             _access_flags   := ARRAY['read']
         );
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
     IF __caught THEN
-        RAISE NOTICE 'PASS: Empty id + null path rejected (35005)';
+        RAISE NOTICE 'PASS: Empty id + null path rejected (35010)';
     ELSE
         RAISE EXCEPTION 'FAIL: Expected rejection';
     END IF;
@@ -105,16 +105,16 @@ BEGIN
         RAISE EXCEPTION 'FAIL: Check constraint not enforced';
     END IF;
 
-    -- TEST 5: has_resource_access with both null raises 35005 (not silent false)
+    -- TEST 5: has_resource_access with both null raises 35010 (not silent false)
     __caught := false;
     BEGIN
         PERFORM auth.has_resource_access(__user_2, 'test-corr-008-5', 'fsitem');
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
     IF __caught THEN
-        RAISE NOTICE 'PASS: has_resource_access rejects empty id + null path (35005)';
+        RAISE NOTICE 'PASS: has_resource_access rejects empty id + null path (35010)';
     ELSE
         RAISE EXCEPTION 'FAIL: has_resource_access did not raise on both-null';
     END IF;
@@ -123,7 +123,7 @@ BEGIN
     __caught := false;
     BEGIN
         PERFORM auth.has_resource_access(1, 'test-corr-008-6', 'fsitem');
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
@@ -137,12 +137,12 @@ BEGIN
     __caught := false;
     BEGIN
         PERFORM auth.get_resource_access_flags(__user_2, 'test-corr-008-7', 'fsitem');
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
     IF __caught THEN
-        RAISE NOTICE 'PASS: get_resource_access_flags rejects both-null (35005)';
+        RAISE NOTICE 'PASS: get_resource_access_flags rejects both-null (35010)';
     ELSE
         RAISE EXCEPTION 'FAIL: get_resource_access_flags did not raise';
     END IF;
@@ -151,12 +151,12 @@ BEGIN
     __caught := false;
     BEGIN
         PERFORM auth.get_resource_access_matrix(__user_2, 'test-corr-008-8', 'fsitem');
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
     IF __caught THEN
-        RAISE NOTICE 'PASS: get_resource_access_matrix rejects both-null (35005)';
+        RAISE NOTICE 'PASS: get_resource_access_matrix rejects both-null (35010)';
     ELSE
         RAISE EXCEPTION 'FAIL: get_resource_access_matrix did not raise';
     END IF;
@@ -165,12 +165,12 @@ BEGIN
     __caught := false;
     BEGIN
         PERFORM auth.get_resource_grants(__user_1, 'test-corr-008-9', 'fsitem');
-    EXCEPTION WHEN sqlstate '35005' THEN
+    EXCEPTION WHEN sqlstate '35010' THEN
         __caught := true;
     END;
 
     IF __caught THEN
-        RAISE NOTICE 'PASS: get_resource_grants rejects both-null (35005)';
+        RAISE NOTICE 'PASS: get_resource_grants rejects both-null (35010)';
     ELSE
         RAISE EXCEPTION 'FAIL: get_resource_grants did not raise';
     END IF;

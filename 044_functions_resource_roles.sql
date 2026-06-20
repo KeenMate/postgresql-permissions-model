@@ -468,11 +468,7 @@ declare
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'resources.revoke_access', _tenant_id);
     perform unsecure.validate_resource_type(_resource_type);
-
-    if (_resource_id is null or _resource_id = '{}'::jsonb) and _resource_path is null then
-        raise exception 'Either _resource_id (non-empty) or _resource_path must be provided'
-            using errcode = '35005';
-    end if;
+    perform unsecure.validate_resource_identifier(_resource_id, _resource_path);
 
     _resource_id      := coalesce(_resource_id, '{}'::jsonb);
     __root_type        := split_part(_resource_type, '.', 1);

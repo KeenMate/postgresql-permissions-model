@@ -248,20 +248,29 @@ INSERT INTO const.event_code (event_id, code, category_code, is_system, source) 
     (33013, 'err_group_not_assignable',      'user_error', true, 'core'),
     (33014, 'err_group_is_system',           'user_error', true, 'core'),
     (33015, 'err_not_owner',                 'user_error', true, 'core'),
+    (33016, 'err_provider_no_group_mapping', 'user_error', true, 'core'),
+    (33017, 'err_provider_no_group_sync',    'user_error', true, 'core'),
     (33018, 'err_user_blacklisted',          'user_error', true, 'core'),
     (33019, 'err_identity_blacklisted',      'user_error', true, 'core'),
+    (33020, 'err_user_not_resolvable',       'user_error', true, 'core'),
+    (33021, 'err_group_not_resolvable',      'user_error', true, 'core'),
 
     -- Tenant errors (34001-34999)
     (34001, 'err_no_tenant_access',          'tenant_error', true, 'core'),
     (34002, 'err_cross_tenant_requires_admin', 'tenant_error', true, 'core'),
+    (34003, 'err_tenant_not_resolvable',     'tenant_error', true, 'core'),
 
     -- Resource access errors (35001-35999)
-    (35001, 'err_no_resource_access',             'resource_error', true, 'core'),
-    (35002, 'err_resource_grant_no_target',       'resource_error', true, 'core'),
-    (35003, 'err_resource_type_not_found',        'resource_error', true, 'core'),
-    (35004, 'err_resource_access_flag_not_found', 'resource_error', true, 'core'),
+    (35001, 'err_no_resource_access',              'resource_error', true, 'core'),
+    (35002, 'err_resource_grant_no_target',        'resource_error', true, 'core'),
+    (35003, 'err_resource_type_not_found',         'resource_error', true, 'core'),
+    (35004, 'err_resource_access_flag_not_found',  'resource_error', true, 'core'),
     (35005, 'err_resource_id_invalid',             'resource_error', true, 'core'),
     (35006, 'err_resource_flag_not_valid',         'resource_error', true, 'core'),
+    (35007, 'err_resource_role_not_found',         'resource_error', true, 'core'),
+    (35008, 'err_resource_role_invalid_flag',      'resource_error', true, 'core'),
+    (35009, 'err_resource_role_type_mismatch',     'resource_error', true, 'core'),
+    (35010, 'err_resource_identifier_required',    'resource_error', true, 'core'),
 
     -- Token config errors (36001-36999)
     (36001, 'err_token_type_not_found',      'token_config_error', true, 'core'),
@@ -383,8 +392,12 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (35002, 'en', 'Either target user_id or user_group_id must be provided'),
     (35003, 'en', 'Resource type "{resource_type}" does not exist or is not active'),
     (35004, 'en', 'Access flag "{access_flag}" does not exist'),
-    (35005, 'en', 'Resource ID is missing required key "{key}" for resource type "{resource_type}"'),
+    (35005, 'en', 'Resource ID key "{key}" is not part of key_schema for resource type "{resource_type}"'),
     (35006, 'en', 'Access flag "{access_flag}" is not valid for resource type "{resource_type}"'),
+    (35007, 'en', 'Resource role "{role_code}" does not exist or is not active'),
+    (35008, 'en', 'Resource role "{role_code}" cannot include flag "{access_flag}" — not valid for resource type "{resource_type}"'),
+    (35009, 'en', 'Resource role "{role_code}" is defined for type "{defined_type}" but was assigned on type "{assigned_type}"'),
+    (35010, 'en', 'Either _resource_id (non-empty) or _resource_path must be provided'),
 
     -- Token config error messages (36xxx)
     (36001, 'en', 'Token type "{token_type_code}" does not exist'),
@@ -396,6 +409,13 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     (31012, 'en', 'Event category "{category_code}" still has event codes and cannot be deleted'),
     (31013, 'en', 'Event ID {event_id} is outside the allowed range ({range_start}-{range_end}) for category "{category_code}"'),
     (31014, 'en', 'Event category "{category_code}" does not exist'),
+
+    -- User/group/tenant resolver errors (33016, 33017, 33020, 33021, 34003)
+    (33016, 'en', 'Provider "{provider_code}" does not allow group mapping'),
+    (33017, 'en', 'Provider "{provider_code}" does not allow group sync'),
+    (33020, 'en', 'User (identifier: {identifier}) could not be resolved'),
+    (33021, 'en', 'User group (identifier: {identifier}) could not be resolved'),
+    (34003, 'en', 'Tenant (identifier: {identifier}) could not be resolved'),
 
     -- Blacklist error messages (33018-33019)
     (33018, 'en', 'User (username: {username}) is blacklisted and cannot be created'),
