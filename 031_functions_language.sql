@@ -41,7 +41,25 @@ create or replace function public.create_language(
     _custom_data jsonb DEFAULT null,
     _tenant_id integer DEFAULT 1
 )
-    returns setof const.language
+    returns table(
+        __created_at                  timestamptz,
+        __created_by                  text,
+        __updated_at                  timestamptz,
+        __updated_by                  text,
+        __code                        text,
+        __value                       text,
+        __tenant_id                   integer,
+        __is_frontend_language        boolean,
+        __is_backend_language         boolean,
+        __is_communication_language   boolean,
+        __frontend_logical_order      integer,
+        __backend_logical_order       integer,
+        __communication_logical_order integer,
+        __is_default_frontend         boolean,
+        __is_default_backend          boolean,
+        __is_default_communication    boolean,
+        __custom_data                 jsonb
+    )
     rows 1
     language plpgsql
 as
@@ -72,7 +90,10 @@ begin
             _is_frontend_language, _is_backend_language, _is_communication_language,
             _frontend_logical_order, _backend_logical_order, _communication_logical_order,
             _is_default_frontend, _is_default_backend, _is_default_communication, _custom_data)
-        returning *;
+        returning created_at, created_by, updated_at, updated_by, code, value, tenant_id,
+                  is_frontend_language, is_backend_language, is_communication_language,
+                  frontend_logical_order, backend_logical_order, communication_logical_order,
+                  is_default_frontend, is_default_backend, is_default_communication, custom_data;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
         , 20001  -- language_created
@@ -107,7 +128,25 @@ create or replace function public.update_language(
     _custom_data jsonb DEFAULT null,
     _tenant_id integer DEFAULT 1
 )
-    returns setof const.language
+    returns table(
+        __created_at                  timestamptz,
+        __created_by                  text,
+        __updated_at                  timestamptz,
+        __updated_by                  text,
+        __code                        text,
+        __value                       text,
+        __tenant_id                   integer,
+        __is_frontend_language        boolean,
+        __is_backend_language         boolean,
+        __is_communication_language   boolean,
+        __frontend_logical_order      integer,
+        __backend_logical_order       integer,
+        __communication_logical_order integer,
+        __is_default_frontend         boolean,
+        __is_default_backend          boolean,
+        __is_default_communication    boolean,
+        __custom_data                 jsonb
+    )
     rows 1
     language plpgsql
 as
@@ -149,7 +188,10 @@ begin
           , is_default_communication    = coalesce(_is_default_communication, is_default_communication)
           , custom_data                 = coalesce(_custom_data, custom_data)
         where code = _code
-        returning *;
+        returning created_at, created_by, updated_at, updated_by, code, value, tenant_id,
+                  is_frontend_language, is_backend_language, is_communication_language,
+                  frontend_logical_order, backend_logical_order, communication_logical_order,
+                  is_default_frontend, is_default_backend, is_default_communication, custom_data;
 
     perform create_journal_message(_created_by, _user_id, _correlation_id
         , 20002  -- language_updated
@@ -195,13 +237,35 @@ $$;
 -- get_language
 -- ============================================================================
 create or replace function public.get_language(_code text)
-    returns setof const.language
+    returns table(
+        __created_at                  timestamptz,
+        __created_by                  text,
+        __updated_at                  timestamptz,
+        __updated_by                  text,
+        __code                        text,
+        __value                       text,
+        __tenant_id                   integer,
+        __is_frontend_language        boolean,
+        __is_backend_language         boolean,
+        __is_communication_language   boolean,
+        __frontend_logical_order      integer,
+        __backend_logical_order       integer,
+        __communication_logical_order integer,
+        __is_default_frontend         boolean,
+        __is_default_backend          boolean,
+        __is_default_communication    boolean,
+        __custom_data                 jsonb
+    )
     stable
     rows 1
     language sql
 as
 $$
-select * from const.language where code = _code;
+select created_at, created_by, updated_at, updated_by, code, value, tenant_id,
+       is_frontend_language, is_backend_language, is_communication_language,
+       frontend_logical_order, backend_logical_order, communication_logical_order,
+       is_default_frontend, is_default_backend, is_default_communication, custom_data
+from const.language where code = _code;
 $$;
 
 -- ============================================================================

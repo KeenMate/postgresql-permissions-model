@@ -613,7 +613,21 @@ end;
 $$;
 
 create or replace function auth.get_user_data(_user_id bigint, _correlation_id text, _target_user_id bigint,
-    _tenant_id integer default 1) returns SETOF auth.user_data
+    _tenant_id integer default 1)
+    returns table(
+        __created_at   timestamptz,
+        __created_by   text,
+        __updated_at   timestamptz,
+        __updated_by   text,
+        __user_data_id bigint,
+        __user_id      bigint,
+        __first_name   text,
+        __middle_name  text,
+        __last_name    text,
+        __settings     jsonb,
+        __preferences  jsonb,
+        __custom_data  jsonb
+    )
     language plpgsql
 as
 $$
@@ -624,7 +638,8 @@ begin
 	end if;
 
 	return query
-	select *
+	select created_at, created_by, updated_at, updated_by, user_data_id, user_id,
+	       first_name, middle_name, last_name, settings, preferences, custom_data
 	from auth.user_data
 	where user_id = _target_user_id;
 
@@ -651,7 +666,20 @@ create or replace function auth.update_user_data(
     _preferences     jsonb   default null,
     _custom_data     jsonb   default null,
     _tenant_id       integer default 1
-) returns setof auth.user_data
+) returns table(
+    __created_at   timestamptz,
+    __created_by   text,
+    __updated_at   timestamptz,
+    __updated_by   text,
+    __user_data_id bigint,
+    __user_id      bigint,
+    __first_name   text,
+    __middle_name  text,
+    __last_name    text,
+    __settings     jsonb,
+    __preferences  jsonb,
+    __custom_data  jsonb
+)
     rows 1
     language plpgsql
 as
@@ -684,7 +712,8 @@ begin
                           then jsonb_strip_nulls(coalesce(custom_data, '{}'::jsonb) || _custom_data)
                           else custom_data end
         where user_id = _target_user_id
-        returning *;
+        returning created_at, created_by, updated_at, updated_by, user_data_id, user_id,
+                  first_name, middle_name, last_name, settings, preferences, custom_data;
 
     perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
         , 10002  -- user_updated

@@ -176,7 +176,17 @@ begin
 end;
 $$;
 
-create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function auth.set_permission_as_assignable(_updated_by text, _user_id bigint, _correlation_id text, _permission_id integer DEFAULT NULL::integer, _permission_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __assignment_id bigint,
+        __tenant_id     integer,
+        __user_group_id integer,
+        __user_id       bigint,
+        __perm_set_id   integer,
+        __permission_id integer
+    )
     language plpgsql
 as
 $$
@@ -185,13 +195,23 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission', _tenant_id);
 
 	return query
-		select *
+		select created_at, created_by, assignment_id, tenant_id, user_group_id, user_id, perm_set_id, permission_id
 		from unsecure.set_permission_as_assignable(_updated_by, _user_id, _correlation_id, _permission_id, _permission_full_code,
 																							 _is_assignable);
 end;
 $$;
 
-create or replace function auth.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function auth.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text, _tenant_id integer DEFAULT 1)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __assignment_id bigint,
+        __tenant_id     integer,
+        __user_group_id integer,
+        __user_id       bigint,
+        __perm_set_id   integer,
+        __permission_id integer
+    )
     language plpgsql
 as
 $$
@@ -200,7 +220,7 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.assign_permission', _tenant_id);
 
 	return query
-		select *
+		select created_at, created_by, assignment_id, tenant_id, user_group_id, user_id, perm_set_id, permission_id
 		from unsecure.assign_permission(_created_by, _user_id, _correlation_id
 			, _user_group_id, _target_user_id
 			, _perm_set_code
@@ -210,7 +230,17 @@ end;
 
 $$;
 
-create or replace function auth.unassign_permission(_deleted_by text, _user_id bigint, _correlation_id text, _assignment_id bigint, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function auth.unassign_permission(_deleted_by text, _user_id bigint, _correlation_id text, _assignment_id bigint, _tenant_id integer DEFAULT 1)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __assignment_id bigint,
+        __tenant_id     integer,
+        __user_group_id integer,
+        __user_id       bigint,
+        __perm_set_id   integer,
+        __permission_id integer
+    )
     language plpgsql
 as
 $$
@@ -219,12 +249,26 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.unassign_permission', _tenant_id);
 
 	return query
-		select *
+		select created_at, created_by, assignment_id, tenant_id, user_group_id, user_id, perm_set_id, permission_id
 		from unsecure.unassign_permission(_deleted_by, _user_id, _correlation_id, _assignment_id, _tenant_id);
 end;
 $$;
 
-create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission
+create or replace function auth.create_permission(_created_by text, _user_id bigint, _correlation_id text, _title text, _parent_full_code text DEFAULT NULL::text, _is_assignable boolean DEFAULT true, _short_code text DEFAULT NULL::text, _source text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __updated_at    timestamptz,
+        __updated_by    text,
+        __permission_id integer,
+        __is_assignable boolean,
+        __code          text,
+        __full_code     text,
+        __node_path     text,
+        __has_children  boolean,
+        __short_code    text,
+        __source        text
+    )
     rows 1
     language plpgsql
 as
@@ -240,7 +284,7 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
 
 	return query
-		select * from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable, _short_code, _source);
+		select created_at, created_by, updated_at, updated_by, permission_id, is_assignable, code, full_code::text, node_path::text, has_children, short_code, source from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable, _short_code, _source);
 end;
 $$;
 
@@ -271,7 +315,19 @@ begin
 end;
 $$;
 
-create or replace function auth.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1, _source text DEFAULT NULL::text) returns SETOF auth.perm_set
+create or replace function auth.create_perm_set(_created_by text, _user_id bigint, _correlation_id text, _title text, _is_system boolean DEFAULT false, _is_assignable boolean DEFAULT true, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1, _source text DEFAULT NULL::text)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __updated_at    timestamptz,
+        __updated_by    text,
+        __perm_set_id   integer,
+        __tenant_id     integer,
+        __code          text,
+        __is_system     boolean,
+        __is_assignable boolean,
+        __source        text
+    )
     rows 1
     language plpgsql
 as
@@ -282,13 +338,25 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.create_permission_set', _tenant_id);
 
 	return query
-		select *
+		select created_at, created_by, updated_at, updated_by, perm_set_id, tenant_id, code, is_system, is_assignable, source
 		from unsecure.create_perm_set(_created_by, _user_id, _correlation_id, _title, _is_system, _is_assignable,
 																	_permissions, _tenant_id, _source);
 end;
 $$;
 
-create or replace function auth.update_perm_set(_updated_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1) returns SETOF auth.perm_set
+create or replace function auth.update_perm_set(_updated_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _title text, _is_assignable boolean DEFAULT true, _tenant_id integer DEFAULT 1)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __updated_at    timestamptz,
+        __updated_by    text,
+        __perm_set_id   integer,
+        __tenant_id     integer,
+        __code          text,
+        __is_system     boolean,
+        __is_assignable boolean,
+        __source        text
+    )
     rows 1
     language plpgsql
 as
@@ -305,7 +373,7 @@ begin
 		auth.has_permission(_user_id, _correlation_id, 'permissions.update_permission_set', _tenant_id);
 
 	return query
-		select *
+		select created_at, created_by, updated_at, updated_by, perm_set_id, tenant_id, code, is_system, is_assignable, source
 		from unsecure.update_perm_set(_updated_by, _user_id, _correlation_id
 			, _perm_set_id, _title, _is_assignable, _tenant_id);
 end;
@@ -932,7 +1000,21 @@ create or replace function auth.ensure_permissions(
     _source          text    default null,
     _is_final_state  boolean default false,
     _tenant_id       integer default 1
-) returns setof auth.permission
+)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __updated_at    timestamptz,
+        __updated_by    text,
+        __permission_id integer,
+        __is_assignable boolean,
+        __code          text,
+        __full_code     text,
+        __node_path     text,
+        __has_children  boolean,
+        __short_code    text,
+        __source        text
+    )
     language plpgsql
 as
 $$
@@ -1052,7 +1134,7 @@ begin
 
     -- Return all processed permissions (existing + newly created)
     return query
-        select p.*
+        select p.created_at, p.created_by, p.updated_at, p.updated_by, p.permission_id, p.is_assignable, p.code, p.full_code::text, p.node_path::text, p.has_children, p.short_code, p.source
         from auth.permission p
         where p.full_code::text = any (__full_codes)
         order by p.full_code;
@@ -1072,7 +1154,19 @@ create or replace function auth.ensure_perm_sets(
     _source          text    default null,
     _tenant_id       integer default 1,
     _is_final_state  boolean default false
-) returns setof auth.perm_set
+)
+    returns table(
+        __created_at    timestamptz,
+        __created_by    text,
+        __updated_at    timestamptz,
+        __updated_by    text,
+        __perm_set_id   integer,
+        __tenant_id     integer,
+        __code          text,
+        __is_system     boolean,
+        __is_assignable boolean,
+        __source        text
+    )
     language plpgsql
 as
 $$
@@ -1205,7 +1299,7 @@ begin
 
     -- Return all processed perm sets (existing + newly created)
     return query
-        select ps.*
+        select ps.created_at, ps.created_by, ps.updated_at, ps.updated_by, ps.perm_set_id, ps.tenant_id, ps.code, ps.is_system, ps.is_assignable, ps.source
         from auth.perm_set ps
         where ps.tenant_id = _tenant_id
           and ps.code in (

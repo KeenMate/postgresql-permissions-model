@@ -7,7 +7,7 @@ DO $$
 DECLARE
     __admin_id bigint;
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 1: First update auto-creates user_data row';
     SELECT val FROM _ud_test_data WHERE key = 'admin_id' INTO __admin_id;
@@ -23,7 +23,7 @@ BEGIN
         _first_name := 'John')
     INTO __result;
 
-    IF __result.user_data_id IS NOT NULL AND __result.first_name = 'John' THEN
+    IF __result.__user_data_id IS NOT NULL AND __result.__first_name = 'John' THEN
         RAISE NOTICE '  PASS: Row auto-created with first_name=John';
     ELSE
         RAISE EXCEPTION '  FAIL: Expected auto-created row, got %', __result;
@@ -37,7 +37,7 @@ DO $$
 DECLARE
     __admin_id bigint;
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 2: Name fields use coalesce — null leaves unchanged';
     SELECT val FROM _ud_test_data WHERE key = 'admin_id' INTO __admin_id;
@@ -48,10 +48,10 @@ BEGIN
         _last_name := 'Doe')
     INTO __result;
 
-    IF __result.first_name = 'John' AND __result.last_name = 'Doe' THEN
+    IF __result.__first_name = 'John' AND __result.__last_name = 'Doe' THEN
         RAISE NOTICE '  PASS: first_name preserved, last_name updated';
     ELSE
-        RAISE EXCEPTION '  FAIL: first=%, last=%', __result.first_name, __result.last_name;
+        RAISE EXCEPTION '  FAIL: first=%, last=%', __result.__first_name, __result.__last_name;
     END IF;
 END $$;
 
@@ -62,7 +62,7 @@ DO $$
 DECLARE
     __admin_id bigint;
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 3: All three name fields in one call';
     SELECT val FROM _ud_test_data WHERE key = 'admin_id' INTO __admin_id;
@@ -72,7 +72,7 @@ BEGIN
         _first_name := 'Jane', _middle_name := 'M', _last_name := 'Smith')
     INTO __result;
 
-    IF __result.first_name = 'Jane' AND __result.middle_name = 'M' AND __result.last_name = 'Smith' THEN
+    IF __result.__first_name = 'Jane' AND __result.__middle_name = 'M' AND __result.__last_name = 'Smith' THEN
         RAISE NOTICE '  PASS: All name fields updated';
     ELSE
         RAISE EXCEPTION '  FAIL: %', __result;

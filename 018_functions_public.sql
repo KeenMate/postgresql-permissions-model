@@ -10,18 +10,34 @@
 
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
-create or replace function public.start_version_update(_version text, _title text, _description text DEFAULT NULL::text, _component text DEFAULT 'main'::text) returns SETOF __version
+create or replace function public.start_version_update(_version text, _title text, _description text DEFAULT NULL::text, _component text DEFAULT 'main'::text) returns table(
+    __version_id         integer,
+    __component          text,
+    __version            text,
+    __title              text,
+    __description        text,
+    __execution_started  timestamptz,
+    __execution_finished timestamptz
+)
     language sql
 as
 $$
 
 insert into __version(component, version, title, description)
 VALUES (_component, _version, _title, _description)
-returning *;
+returning version_id, component, version, title, description, execution_started, execution_finished;
 
 $$;
 
-create or replace function public.stop_version_update(_version text, _component text DEFAULT 'main'::text) returns SETOF __version
+create or replace function public.stop_version_update(_version text, _component text DEFAULT 'main'::text) returns table(
+    __version_id         integer,
+    __component          text,
+    __version            text,
+    __title              text,
+    __description        text,
+    __execution_started  timestamptz,
+    __execution_finished timestamptz
+)
     language sql
 as
 $$
@@ -30,7 +46,7 @@ update __version
 set execution_finished = now()
 where component = _component
 	and version = _version
-returning *;
+returning version_id, component, version, title, description, execution_started, execution_finished;
 
 $$;
 
@@ -192,7 +208,18 @@ create or replace function public.create_journal_message(
     _payload jsonb default null,
     _tenant_id integer default 1,
     _request_context jsonb default null
-) returns setof journal
+) returns table(
+    __created_at      timestamptz,
+    __created_by      text,
+    __correlation_id  text,
+    __journal_id      bigint,
+    __tenant_id       integer,
+    __event_id        integer,
+    __user_id         bigint,
+    __keys            jsonb,
+    __data_payload    jsonb,
+    __request_context jsonb
+)
     rows 1
     language plpgsql
 as
@@ -218,7 +245,7 @@ begin
     return query
         insert into journal (created_by, user_id, correlation_id, event_id, keys, data_payload, tenant_id, request_context)
         values (_created_by, _user_id, _correlation_id, _event_id, _keys, _payload, _tenant_id, _request_context)
-        returning *;
+        returning created_at, created_by, correlation_id, journal_id, tenant_id, event_id, user_id, keys, data_payload, request_context;
 end;
 $$;
 
@@ -232,27 +259,39 @@ create or replace function public.create_journal_message_by_code(
     _payload jsonb default null,
     _tenant_id integer default 1,
     _request_context jsonb default null
-) returns setof journal
+) returns table(
+    __created_at      timestamptz,
+    __created_by      text,
+    __correlation_id  text,
+    __journal_id      bigint,
+    __tenant_id       integer,
+    __event_id        integer,
+    __user_id         bigint,
+    __keys            jsonb,
+    __data_payload    jsonb,
+    __request_context jsonb
+)
     rows 1
     language plpgsql
 as
 $$
 declare
-    __event_id integer;
+    ___event_id integer;
 begin
-    select event_id into __event_id
+    select event_id into ___event_id
     from const.event_code
     where code = _event_code;
 
-    if __event_id is null then
+    if ___event_id is null then
         raise exception 'Event code "%" not found in const.event_code', _event_code
             using errcode = '22000';
     end if;
 
     return query
-        select * from create_journal_message(
-            _created_by, _user_id, _correlation_id, __event_id, _keys, _payload, _tenant_id, _request_context
-        );
+        select j.__created_at, j.__created_by, j.__correlation_id, j.__journal_id, j.__tenant_id, j.__event_id, j.__user_id, j.__keys, j.__data_payload, j.__request_context
+        from create_journal_message(
+            _created_by, _user_id, _correlation_id, ___event_id, _keys, _payload, _tenant_id, _request_context
+        ) j;
 end;
 $$;
 
@@ -267,12 +306,24 @@ create or replace function public.create_journal_message_for_entity(
     _payload jsonb default null,
     _tenant_id integer default 1,
     _request_context jsonb default null
-) returns setof journal
+) returns table(
+    __created_at      timestamptz,
+    __created_by      text,
+    __correlation_id  text,
+    __journal_id      bigint,
+    __tenant_id       integer,
+    __event_id        integer,
+    __user_id         bigint,
+    __keys            jsonb,
+    __data_payload    jsonb,
+    __request_context jsonb
+)
     rows 1
     language sql
 as
 $$
-select * from create_journal_message(
+select __created_at, __created_by, __correlation_id, __journal_id, __tenant_id, __event_id, __user_id, __keys, __data_payload, __request_context
+from create_journal_message(
     _created_by, _user_id, _correlation_id, _event_id,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id, _request_context
@@ -290,12 +341,24 @@ create or replace function public.create_journal_message_for_entity_by_code(
     _payload jsonb default null,
     _tenant_id integer default 1,
     _request_context jsonb default null
-) returns setof journal
+) returns table(
+    __created_at      timestamptz,
+    __created_by      text,
+    __correlation_id  text,
+    __journal_id      bigint,
+    __tenant_id       integer,
+    __event_id        integer,
+    __user_id         bigint,
+    __keys            jsonb,
+    __data_payload    jsonb,
+    __request_context jsonb
+)
     rows 1
     language sql
 as
 $$
-select * from create_journal_message_by_code(
+select __created_at, __created_by, __correlation_id, __journal_id, __tenant_id, __event_id, __user_id, __keys, __data_payload, __request_context
+from create_journal_message_by_code(
     _created_by, _user_id, _correlation_id, _event_code,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id, _request_context
@@ -601,7 +664,13 @@ create or replace function public.create_event_category(
     _range_end integer,
     _is_error boolean default false,
     _source text default null
-) returns setof const.event_category
+) returns table(
+    __category_code text,
+    __range_start   integer,
+    __range_end     integer,
+    __is_error      boolean,
+    __source        text
+)
     rows 1
     language plpgsql
 as
@@ -618,7 +687,7 @@ begin
     end if;
 
     return query
-        select *
+        select category_code, range_start, range_end, is_error, source
         from const.event_category
         where category_code = _category_code;
 end;
@@ -636,7 +705,14 @@ create or replace function public.create_event_code(
     _description text default null,
     _is_read_only boolean default false,
     _source text default null
-) returns setof const.event_code
+) returns table(
+    __event_id      integer,
+    __code          text,
+    __category_code text,
+    __is_read_only  boolean,
+    __is_system     boolean,
+    __source        text
+)
     rows 1
     language plpgsql
 as
@@ -677,7 +753,7 @@ begin
     end if;
 
     return query
-        select *
+        select event_id, code, category_code, is_read_only, is_system, source
         from const.event_code
         where event_id = _event_id;
 end;
@@ -691,7 +767,17 @@ create or replace function public.create_event_message(
     _event_id integer,
     _message_template text,
     _language_code text default 'en'
-) returns setof const.event_message
+) returns table(
+    __created_at       timestamptz,
+    __created_by       text,
+    __updated_at       timestamptz,
+    __updated_by       text,
+    __event_message_id integer,
+    __event_id         integer,
+    __language_code    text,
+    __message_template text,
+    __is_active        boolean
+)
     rows 1
     language plpgsql
 as
@@ -706,7 +792,7 @@ begin
     values (_created_by, _created_by, _event_id, _language_code, _message_template);
 
     return query
-        select *
+        select created_at, created_by, updated_at, updated_by, event_message_id, event_id, language_code, message_template, is_active
         from const.event_message
         where event_id = _event_id
           and language_code = _language_code

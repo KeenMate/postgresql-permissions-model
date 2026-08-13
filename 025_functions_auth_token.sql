@@ -333,12 +333,16 @@ $$;
  */
 
 create or replace function public.get_token_types()
-    returns setof const.token_type
+    returns table(
+        __code                          text,
+        __default_expiration_in_seconds integer,
+        __is_system                     boolean
+    )
     stable
     language sql
 as
 $$
-    select * from const.token_type order by code;
+    select code, default_expiration_in_seconds, is_system from const.token_type order by code;
 $$;
 
 create or replace function public.create_token_type(
@@ -348,7 +352,11 @@ create or replace function public.create_token_type(
     _code text,
     _default_expiration_in_seconds integer default null,
     _tenant_id integer default 1
-) returns setof const.token_type
+) returns table(
+    __code                          text,
+    __default_expiration_in_seconds integer,
+    __is_system                     boolean
+)
     rows 1
     language plpgsql
 as
@@ -366,7 +374,7 @@ begin
         , _tenant_id);
 
     return query
-        select *
+        select code, default_expiration_in_seconds, is_system
         from const.token_type
         where code = _code;
 end;
@@ -379,7 +387,11 @@ create or replace function public.update_token_type(
     _code text,
     _default_expiration_in_seconds integer default null,
     _tenant_id integer default 1
-) returns setof const.token_type
+) returns table(
+    __code                          text,
+    __default_expiration_in_seconds integer,
+    __is_system                     boolean
+)
     rows 1
     language plpgsql
 as
@@ -413,7 +425,7 @@ begin
         , _tenant_id);
 
     return query
-        select *
+        select code, default_expiration_in_seconds, is_system
         from const.token_type
         where code = _code;
 end;

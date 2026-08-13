@@ -44,7 +44,20 @@ create or replace function public.create_translation(
     _context text default 'text',
     _tenant_id integer default 1
 )
-    returns setof public.translation
+    returns table(
+        __created_at       timestamptz,
+        __created_by       text,
+        __updated_at       timestamptz,
+        __updated_by       text,
+        __translation_id   integer,
+        __language_code    text,
+        __tenant_id        integer,
+        __data_group       text,
+        __data_object_code text,
+        __data_object_id   bigint,
+        __context          text,
+        __value            text
+    )
     rows 1
     language plpgsql
 as
@@ -61,7 +74,9 @@ begin
             data_group, data_object_code, data_object_id, context, value)
         values (_created_by, _created_by, _language_code, _tenant_id,
             _data_group, _data_object_code, _data_object_id, _context, _value)
-        returning *;
+        returning created_at, created_by, updated_at, updated_by, translation_id,
+            language_code, tenant_id, data_group, data_object_code, data_object_id,
+            context, value;
 
     -- Refresh materialized view
     perform internal.refresh_translation_cache();

@@ -12,7 +12,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 4: auth.create_perm_set - create perm set with permission';
 
-    SELECT ps.perm_set_id, ps.code
+    SELECT ps.__perm_set_id, ps.__code
     FROM auth.create_perm_set('perm_crud_test', __user_id, 'pc-corr-4', 'PC Test Perm Set',
         false, true, array[__child_perm]) ps
     INTO __perm_set_id, __perm_set_code;
@@ -37,7 +37,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 5: auth.update_perm_set - update perm set title';
 
-    SELECT ps.perm_set_id
+    SELECT ps.__perm_set_id
     FROM auth.update_perm_set('perm_crud_test', __user_id, 'pc-corr-5', __perm_set_id, 'PC Test Perm Set Updated') ps
     INTO __result_id;
 
@@ -85,7 +85,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 7: Recreate perm set for assignment tests';
 
-    SELECT ps.perm_set_id, ps.code
+    SELECT ps.__perm_set_id, ps.__code
     FROM auth.create_perm_set('perm_crud_test', __user_id, 'pc-corr-7', 'PC Test Perm Set 2',
         false, true, array[__child_perm]) ps
     INTO __perm_set_id, __perm_set_code;

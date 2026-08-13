@@ -5,17 +5,23 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
 -- ============================================================================
 DO $$
 DECLARE
-    __trans record;
+    __tid bigint;
+    __nrm text;
+    __ts tsvector;
 BEGIN
     RAISE NOTICE 'TEST 12: Create translation - trigger fills search fields';
 
-    SELECT * INTO __trans
+    SELECT __translation_id INTO __tid
     FROM public.create_translation('test', 1, 'test-corr-4', 'en', 'ui_labels', 'Hello World',
         _data_object_code := 'greeting');
 
-    IF __trans.nrm_search_data IS NOT NULL AND __trans.ts_search_data IS NOT NULL THEN
+    SELECT nrm_search_data, ts_search_data INTO __nrm, __ts
+    FROM public.translation
+    WHERE translation_id = __tid;
+
+    IF __nrm IS NOT NULL AND __ts IS NOT NULL THEN
         RAISE NOTICE '  PASS: Translation created, nrm_search_data="%", ts_search_data set',
-            __trans.nrm_search_data;
+            __nrm;
     ELSE
         RAISE EXCEPTION '  FAIL: Trigger did not populate search fields';
     END IF;
@@ -26,18 +32,23 @@ END $$;
 -- ============================================================================
 DO $$
 DECLARE
-    __trans record;
+    __tid bigint;
+    __nrm text;
 BEGIN
     RAISE NOTICE 'TEST 13: Accent-insensitive search data via normalize_text';
 
-    SELECT * INTO __trans
+    SELECT __translation_id INTO __tid
     FROM public.create_translation('test', 1, 'test-corr-5', 'fr', 'ui_labels', 'Héllo Wörld',
         _data_object_code := 'greeting');
 
-    IF __trans.nrm_search_data = 'hello world' THEN
-        RAISE NOTICE '  PASS: Accents removed in nrm_search_data="%"', __trans.nrm_search_data;
+    SELECT nrm_search_data INTO __nrm
+    FROM public.translation
+    WHERE translation_id = __tid;
+
+    IF __nrm = 'hello world' THEN
+        RAISE NOTICE '  PASS: Accents removed in nrm_search_data="%"', __nrm;
     ELSE
-        RAISE EXCEPTION '  FAIL: Expected "hello world", got "%"', __trans.nrm_search_data;
+        RAISE EXCEPTION '  FAIL: Expected "hello world", got "%"', __nrm;
     END IF;
 END $$;
 
@@ -58,9 +69,9 @@ BEGIN
     SELECT * INTO __trans
     FROM public.update_translation('test', 1, 'test-corr-6', __trans_id, 'Hello Universe');
 
-    IF __trans.value = 'Hello Universe' THEN
-        RAISE NOTICE '  PASS: Translation updated to "%"', __trans.value;
+    IF __trans.__value = 'Hello Universe' THEN
+        RAISE NOTICE '  PASS: Translation updated to "%"', __trans.__value;
     ELSE
-        RAISE EXCEPTION '  FAIL: Expected "Hello Universe", got "%"', __trans.value;
+        RAISE EXCEPTION '  FAIL: Expected "Hello Universe", got "%"', __trans.__value;
     END IF;
 END $$;

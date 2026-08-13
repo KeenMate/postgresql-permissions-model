@@ -13,7 +13,7 @@ BEGIN
     RAISE NOTICE 'TEST 7: auth.get_effective_group_permissions - assign perm then verify';
 
     -- Assign an individual permission to the group
-    SELECT pa.assignment_id
+    SELECT pa.__assignment_id
     FROM auth.assign_permission('grp_crud_test', __user_id, 'gc-corr-7',
         __group_id, null, null, 'grp_crud_test_perm') pa
     INTO __assignment_id;

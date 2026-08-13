@@ -15,18 +15,18 @@ BEGIN
         90001, 'Order "{order_number}" was created by {actor}'
     );
 
-    IF __rec.event_id = 90001
-        AND __rec.language_code = 'en'
-        AND __rec.message_template = 'Order "{order_number}" was created by {actor}' THEN
+    IF __rec.__event_id = 90001
+        AND __rec.__language_code = 'en'
+        AND __rec.__message_template = 'Order "{order_number}" was created by {actor}' THEN
         RAISE NOTICE '  PASS: Created message template for event_id=%, lang="%"',
-            __rec.event_id, __rec.language_code;
+            __rec.__event_id, __rec.__language_code;
     ELSE
         RAISE EXCEPTION '  FAIL: Unexpected message values: event_id=%, lang=%, template=%',
-            __rec.event_id, __rec.language_code, __rec.message_template;
+            __rec.__event_id, __rec.__language_code, __rec.__message_template;
     END IF;
 
     -- Store event_message_id for later tests
-    PERFORM set_config('test.event_message_id', __rec.event_message_id::text, false);
+    PERFORM set_config('test.event_message_id', __rec.__event_message_id::text, false);
 END $$;
 
 -- ============================================================================

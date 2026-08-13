@@ -12,7 +12,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 1: auth.create_permission - create root permission';
 
-    SELECT p.permission_id, p.code, p.full_code::text
+    SELECT p.__permission_id, p.__code, p.__full_code::text
     FROM auth.create_permission('perm_crud_test', __user_id, 'pc-corr-1', 'PC Test Root') p
     INTO __perm_id, __db_code, __db_full_code;
 
@@ -37,7 +37,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 2: auth.create_permission - create child permission with parent';
 
-    SELECT p.permission_id, p.code, p.full_code::text
+    SELECT p.__permission_id, p.__code, p.__full_code::text
     FROM auth.create_permission('perm_crud_test', __user_id, 'pc-corr-2', 'PC Test Child', __root_code) p
     INTO __perm_id, __db_code, __db_full_code;
 

@@ -1540,14 +1540,30 @@ create or replace function auth.ensure_invitation_templates(
     _source          text    default null,
     _is_final_state  boolean default false,
     _request_context jsonb   default null
-) returns setof auth.invitation_template
+) returns table(
+    __created_at      timestamptz,
+    __created_by      text,
+    __updated_at      timestamptz,
+    __updated_by      text,
+    __template_id     integer,
+    __tenant_id       integer,
+    __code            text,
+    __title           text,
+    __description     text,
+    __is_active       boolean,
+    __default_message text,
+    __source          text
+)
     language plpgsql
 as
 $$
 begin
     perform auth.has_permission(_user_id, _correlation_id, 'invitations.manage_templates', _tenant_id);
 
-    return query select * from unsecure.ensure_invitation_templates(
+    return query select
+        created_at, created_by, updated_at, updated_by, template_id, tenant_id,
+        code, title, description, is_active, default_message, source
+    from unsecure.ensure_invitation_templates(
         _created_by, _user_id, _correlation_id, _templates, _tenant_id, _source, _is_final_state
     );
 end;

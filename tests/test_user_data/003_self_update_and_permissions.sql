@@ -6,7 +6,7 @@ set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, 
 DO $$
 DECLARE
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 1: Self-update — no permission required';
     SELECT val FROM _ud_test_data WHERE key = 'user_id_1' INTO __user_id;
@@ -16,10 +16,10 @@ BEGIN
         _preferences := '{"self_updated": true}'::jsonb)
     INTO __result;
 
-    IF (__result.preferences->>'self_updated')::boolean = true THEN
+    IF (__result.__preferences->>'self_updated')::boolean = true THEN
         RAISE NOTICE '  PASS: Self-update succeeded without permissions';
     ELSE
-        RAISE EXCEPTION '  FAIL: %', __result.preferences;
+        RAISE EXCEPTION '  FAIL: %', __result.__preferences;
     END IF;
 END $$;
 
@@ -56,7 +56,7 @@ DO $$
 DECLARE
     __admin_id bigint;
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 3: Admin updating another user — succeeds';
     SELECT val FROM _ud_test_data WHERE key = 'admin_id' INTO __admin_id;
@@ -66,10 +66,10 @@ BEGIN
         _custom_data := '{"admin_set": true}'::jsonb)
     INTO __result;
 
-    IF (__result.custom_data->>'admin_set')::boolean = true THEN
+    IF (__result.__custom_data->>'admin_set')::boolean = true THEN
         RAISE NOTICE '  PASS: Admin update succeeded';
     ELSE
-        RAISE EXCEPTION '  FAIL: %', __result.custom_data;
+        RAISE EXCEPTION '  FAIL: %', __result.__custom_data;
     END IF;
 END $$;
 
@@ -79,7 +79,7 @@ END $$;
 DO $$
 DECLARE
     __user_id bigint;
-    __result auth.user_data;
+    __result record;
 BEGIN
     RAISE NOTICE 'TEST 4: get_user_data — self access is free';
     SELECT val FROM _ud_test_data WHERE key = 'user_id_1' INTO __user_id;
@@ -87,7 +87,7 @@ BEGIN
     SELECT * FROM auth.get_user_data(__user_id, 'test-perm-4', __user_id)
     INTO __result;
 
-    IF __result.user_id = __user_id THEN
+    IF __result.__user_id = __user_id THEN
         RAISE NOTICE '  PASS: Self-read succeeded';
     ELSE
         RAISE EXCEPTION '  FAIL: Expected own data, got %', __result;

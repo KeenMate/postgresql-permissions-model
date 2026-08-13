@@ -203,7 +203,7 @@ BEGIN
     WHERE ug.code = 'test_mapped_group' AND ug.tenant_id = 1
     INTO __group_id;
 
-    SELECT min(user_group_mapping_id), max(user_group_mapping_id)
+    SELECT min(__user_group_mapping_id), max(__user_group_mapping_id)
     FROM auth.ensure_user_group_mappings(
         'test_ef', __user_id, __correlation_id,
         ('[

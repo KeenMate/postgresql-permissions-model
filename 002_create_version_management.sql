@@ -24,19 +24,35 @@ create unique index uq_version on __version (component, version);
 
 create function start_version_update(_version text, _title text, _description text default null,
 																		 _component text default 'main')
-	returns setof __version
+	returns table(
+		__version_id         integer,
+		__component          text,
+		__version            text,
+		__title              text,
+		__description        text,
+		__execution_started  timestamptz,
+		__execution_finished timestamptz
+	)
 	language sql
 as
 $$
 
 insert into __version(component, version, title, description)
 VALUES (_component, _version, _title, _description)
-returning *;
+returning version_id, component, version, title, description, execution_started, execution_finished;
 
 $$;
 
 create function stop_version_update(_version text, _component text default 'main')
-	returns setof __version
+	returns table(
+		__version_id         integer,
+		__component          text,
+		__version            text,
+		__title              text,
+		__description        text,
+		__execution_started  timestamptz,
+		__execution_finished timestamptz
+	)
 	language sql
 as
 $$
@@ -45,7 +61,7 @@ update __version
 set execution_finished = now()
 where component = _component
 	and version = _version
-returning *;
+returning version_id, component, version, title, description, execution_started, execution_finished;
 
 $$;
 

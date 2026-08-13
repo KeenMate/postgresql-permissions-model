@@ -14,8 +14,8 @@ BEGIN
         _is_frontend_language := true, _is_backend_language := true,
         _frontend_logical_order := 2, _backend_logical_order := 2);
 
-    IF __lang.code = 'de' AND __lang.value = 'Deutsch' AND __lang.is_frontend_language = true THEN
-        RAISE NOTICE '  PASS: German language created (code=%, value=%)', __lang.code, __lang.value;
+    IF __lang.__code = 'de' AND __lang.__value = 'Deutsch' AND __lang.__is_frontend_language = true THEN
+        RAISE NOTICE '  PASS: German language created (code=%, value=%)', __lang.__code, __lang.__value;
     ELSE
         RAISE EXCEPTION '  FAIL: Language not created correctly';
     END IF;
@@ -41,10 +41,10 @@ BEGIN
     SELECT is_default_frontend INTO __en_default
     FROM const.language WHERE code = 'en';
 
-    IF __lang.is_default_frontend = true AND __en_default = false THEN
+    IF __lang.__is_default_frontend = true AND __en_default = false THEN
         RAISE NOTICE '  PASS: French is new default, English unset';
     ELSE
-        RAISE EXCEPTION '  FAIL: Default enforcement failed (fr=%, en=%)', __lang.is_default_frontend, __en_default;
+        RAISE EXCEPTION '  FAIL: Default enforcement failed (fr=%, en=%)', __lang.__is_default_frontend, __en_default;
     END IF;
 
     -- Restore English as default frontend
@@ -63,10 +63,10 @@ BEGIN
     SELECT * INTO __lang
     FROM public.update_language('test', 1, 'test-corr-3', 'de', _value := 'German');
 
-    IF __lang.value = 'German' THEN
-        RAISE NOTICE '  PASS: Language value updated to "%"', __lang.value;
+    IF __lang.__value = 'German' THEN
+        RAISE NOTICE '  PASS: Language value updated to "%"', __lang.__value;
     ELSE
-        RAISE EXCEPTION '  FAIL: Expected "German", got "%"', __lang.value;
+        RAISE EXCEPTION '  FAIL: Expected "German", got "%"', __lang.__value;
     END IF;
 END $$;
 
@@ -81,8 +81,8 @@ BEGIN
 
     SELECT * INTO __lang FROM public.get_language('de');
 
-    IF __lang.code = 'de' AND __lang.value = 'German' THEN
-        RAISE NOTICE '  PASS: Got language (code=%, value=%)', __lang.code, __lang.value;
+    IF __lang.__code = 'de' AND __lang.__value = 'German' THEN
+        RAISE NOTICE '  PASS: Got language (code=%, value=%)', __lang.__code, __lang.__value;
     ELSE
         RAISE EXCEPTION '  FAIL: Language not found or wrong values';
     END IF;

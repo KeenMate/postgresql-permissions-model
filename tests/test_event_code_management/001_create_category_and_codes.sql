@@ -15,15 +15,15 @@ BEGIN
         'test_app_event', 'Test Application Events', 90001, 90999, false
     );
 
-    IF __rec.category_code = 'test_app_event'
-        AND __rec.range_start = 90001
-        AND __rec.range_end = 90999
-        AND __rec.is_error = false THEN
+    IF __rec.__category_code = 'test_app_event'
+        AND __rec.__range_start = 90001
+        AND __rec.__range_end = 90999
+        AND __rec.__is_error = false THEN
         RAISE NOTICE '  PASS: Created category "%", range %-%, is_error=%',
-            __rec.category_code, __rec.range_start, __rec.range_end, __rec.is_error;
+            __rec.__category_code, __rec.__range_start, __rec.__range_end, __rec.__is_error;
     ELSE
         RAISE EXCEPTION '  FAIL: Unexpected category values: code=%, range=%-%, is_error=%',
-            __rec.category_code, __rec.range_start, __rec.range_end, __rec.is_error;
+            __rec.__category_code, __rec.__range_start, __rec.__range_end, __rec.__is_error;
     END IF;
 END $$;
 
@@ -43,15 +43,15 @@ BEGIN
         'Order Created', 'A new order was created', false
     );
 
-    IF __rec.event_id = 90001
-        AND __rec.code = 'test_order_created'
-        AND __rec.category_code = 'test_app_event'
-        AND __rec.is_system = false THEN
+    IF __rec.__event_id = 90001
+        AND __rec.__code = 'test_order_created'
+        AND __rec.__category_code = 'test_app_event'
+        AND __rec.__is_system = false THEN
         RAISE NOTICE '  PASS: Created event code id=%, code="%", is_system=%',
-            __rec.event_id, __rec.code, __rec.is_system;
+            __rec.__event_id, __rec.__code, __rec.__is_system;
     ELSE
         RAISE EXCEPTION '  FAIL: Unexpected event code values: id=%, code=%, is_system=%',
-            __rec.event_id, __rec.code, __rec.is_system;
+            __rec.__event_id, __rec.__code, __rec.__is_system;
     END IF;
 END $$;
 
@@ -71,12 +71,12 @@ BEGIN
         'Order Viewed', 'An order was viewed', true
     );
 
-    IF __rec.event_id = 90002 AND __rec.is_read_only = true AND __rec.is_system = false THEN
+    IF __rec.__event_id = 90002 AND __rec.__is_read_only = true AND __rec.__is_system = false THEN
         RAISE NOTICE '  PASS: Created read-only event code id=%, is_read_only=%, is_system=%',
-            __rec.event_id, __rec.is_read_only, __rec.is_system;
+            __rec.__event_id, __rec.__is_read_only, __rec.__is_system;
     ELSE
         RAISE EXCEPTION '  FAIL: Unexpected values: id=%, is_read_only=%, is_system=%',
-            __rec.event_id, __rec.is_read_only, __rec.is_system;
+            __rec.__event_id, __rec.__is_read_only, __rec.__is_system;
     END IF;
 END $$;
 

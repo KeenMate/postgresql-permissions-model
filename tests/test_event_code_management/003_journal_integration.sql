@@ -27,15 +27,15 @@ BEGIN
         1
     );
 
-    IF __rec.event_id = 90001 THEN
+    IF __rec.__event_id = 90001 THEN
         RAISE NOTICE '  PASS: Journal entry created with custom event_id=%, template="%"',
-            __rec.event_id, __template;
+            __rec.__event_id, __template;
     ELSE
-        RAISE EXCEPTION '  FAIL: Journal entry has wrong event_id: %', __rec.event_id;
+        RAISE EXCEPTION '  FAIL: Journal entry has wrong event_id: %', __rec.__event_id;
     END IF;
 
     -- Store journal_id for cleanup
-    PERFORM set_config('test.journal_id', __rec.journal_id::text, false);
+    PERFORM set_config('test.journal_id', __rec.__journal_id::text, false);
 END $$;
 
 -- ============================================================================
@@ -56,12 +56,12 @@ BEGIN
         1
     );
 
-    IF __rec.event_id = 90001 THEN
-        RAISE NOTICE '  PASS: Journal entry created using event code name, event_id=%', __rec.event_id;
+    IF __rec.__event_id = 90001 THEN
+        RAISE NOTICE '  PASS: Journal entry created using event code name, event_id=%', __rec.__event_id;
     ELSE
-        RAISE EXCEPTION '  FAIL: Journal entry has wrong event_id: %', __rec.event_id;
+        RAISE EXCEPTION '  FAIL: Journal entry has wrong event_id: %', __rec.__event_id;
     END IF;
 
     -- Store for cleanup
-    PERFORM set_config('test.journal_id_2', __rec.journal_id::text, false);
+    PERFORM set_config('test.journal_id_2', __rec.__journal_id::text, false);
 END $$;

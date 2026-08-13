@@ -318,7 +318,17 @@ begin
 end;
 $$;
 
-create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer default 1, _target_tenant_id integer default null) returns SETOF auth.user_group_mapping
+create or replace function auth.get_user_group_mappings(_requested_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _tenant_id integer default 1, _target_tenant_id integer default null)
+    returns table(
+        __created_at            timestamptz,
+        __created_by            text,
+        __user_group_mapping_id integer,
+        __user_group_id         integer,
+        __provider_code         text,
+        __mapped_object_id      text,
+        __mapped_object_name    text,
+        __mapped_role           text
+    )
     language plpgsql
 as
 $$
@@ -329,7 +339,7 @@ begin
 	__effective_tenant_id := internal.resolve_cross_tenant_access(
 		_user_id, _correlation_id, 'groups.get_all_mappings', 'groups.get_mapping', _tenant_id, _target_tenant_id);
 
-	return query select ugm.*
+	return query select ugm.created_at, ugm.created_by, ugm.user_group_mapping_id, ugm.user_group_id, ugm.provider_code, ugm.mapped_object_id, ugm.mapped_object_name, ugm.mapped_role
 				 from auth.user_group_mapping ugm
 					 inner join auth.user_group ug on ugm.user_group_id = ug.user_group_id
 				 where ugm.user_group_id = _user_group_id
@@ -1126,7 +1136,27 @@ create or replace function auth.ensure_user_groups(
     _tenant_id       integer default 1,
     _source          text    default null,
     _is_final_state  boolean default false
-) returns setof auth.user_group
+)
+    returns table(
+        __created_at                   timestamptz,
+        __created_by                   text,
+        __updated_at                   timestamptz,
+        __updated_by                   text,
+        __user_group_id                integer,
+        __tenant_id                    integer,
+        __title                        text,
+        __code                         text,
+        __is_system                    boolean,
+        __is_external                  boolean,
+        __is_assignable                boolean,
+        __is_active                    boolean,
+        __is_default                   boolean,
+        __can_members_manage_others    boolean,
+        __can_members_see_others       boolean,
+        __is_synced                    boolean,
+        __create_missing_users_on_sync boolean,
+        __source                       text
+    )
     language plpgsql
 as
 $$
@@ -1215,7 +1245,7 @@ begin
 
     -- Return all processed groups (existing + newly created)
     return query
-        select ug.*
+        select ug.created_at, ug.created_by, ug.updated_at, ug.updated_by, ug.user_group_id, ug.tenant_id, ug.title, ug.code, ug.is_system, ug.is_external, ug.is_assignable, ug.is_active, ug.is_default, ug.can_members_manage_others, ug.can_members_see_others, ug.is_synced, ug.create_missing_users_on_sync, ug.source
         from auth.user_group ug
         where ug.tenant_id = _tenant_id
           and ug.code in (
@@ -1238,7 +1268,17 @@ create or replace function auth.ensure_user_group_mappings(
     _mappings        jsonb,
     _tenant_id       integer default 1,
     _is_final_state  boolean default false
-) returns setof auth.user_group_mapping
+)
+    returns table(
+        __created_at            timestamptz,
+        __created_by            text,
+        __user_group_mapping_id integer,
+        __user_group_id         integer,
+        __provider_code         text,
+        __mapped_object_id      text,
+        __mapped_object_name    text,
+        __mapped_role           text
+    )
     language plpgsql
 as
 $$
@@ -1367,7 +1407,7 @@ begin
 
     -- Return all processed mappings
     return query
-        select ugm.*
+        select ugm.created_at, ugm.created_by, ugm.user_group_mapping_id, ugm.user_group_id, ugm.provider_code, ugm.mapped_object_id, ugm.mapped_object_name, ugm.mapped_role
         from auth.user_group_mapping ugm
         where ugm.user_group_mapping_id = any (__mapping_ids)
         order by ugm.user_group_mapping_id;

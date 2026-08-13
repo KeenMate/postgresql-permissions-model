@@ -12,7 +12,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 8: auth.assign_permission - assign perm set to user';
 
-    SELECT pa.assignment_id
+    SELECT pa.__assignment_id
     FROM auth.assign_permission('perm_crud_test', __user_id, 'pc-corr-8',
         null, __target_id, __perm_set_code, null) pa
     INTO __assignment_id;
@@ -37,7 +37,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 9: auth.assign_permission - assign individual permission to user';
 
-    SELECT pa.assignment_id
+    SELECT pa.__assignment_id
     FROM auth.assign_permission('perm_crud_test', __user_id, 'pc-corr-9',
         null, __target_id, null, __root_perm) pa
     INTO __assignment_id;
@@ -82,7 +82,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 11: auth.unassign_permission - unassign perm set';
 
-    SELECT pa.assignment_id
+    SELECT pa.__assignment_id
     FROM auth.unassign_permission('perm_crud_test', __user_id, 'pc-corr-11', __ps_assignment_id) pa
     INTO __result_id;
 
@@ -104,7 +104,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'TEST 12: auth.unassign_permission - unassign individual permission';
 
-    SELECT pa.assignment_id
+    SELECT pa.__assignment_id
     FROM auth.unassign_permission('perm_crud_test', __user_id, 'pc-corr-12', __ind_assignment_id) pa
     INTO __result_id;
 
