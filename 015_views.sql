@@ -171,7 +171,7 @@ from auth.user_identity ui
 where ui.is_active;
 
 -- tenant_id → affected user_ids
--- Used for: tenant_deleted
+-- Used for: tenant_purged
 create or replace view auth.notify_tenant_users
             (tenant_id, user_id) as
 select tu.tenant_id,

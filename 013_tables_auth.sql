@@ -47,6 +47,12 @@ create table auth.tenant
     is_removable     boolean default true               not null,
     is_assignable    boolean default true               not null,
     is_default       boolean default false              not null,
+    -- Soft delete: deleted_at set = tenant is soft-deleted (reversible via restore).
+    -- purged_at set = tenant was hard-purged (child data destroyed). Both null = live.
+    deleted_at       timestamptz default null,
+    deleted_by       text        default null,
+    purged_at        timestamptz default null,
+    purged_by        text        default null,
     nrm_search_data  text,
     unique (code),
     constraint tenant_created_by_check
@@ -58,6 +64,31 @@ create table auth.tenant
 -- Unique index needed early for user_permission_cache FK reference
 create unique index uq_tenant_uuid
     on auth.tenant (uuid);
+
+/*
+ * auth.tenant_identity — permanent, append-only identity ledger
+ *
+ * Every tenant code ever created is recorded here at creation time and NEVER
+ * deleted — not even on purge. The unique(code) constraint is what makes a
+ * tenant code impossible to reuse: create_tenant inserts here first, so a
+ * second tenant with the same code (or same title → same derived code) fails
+ * the ledger insert, which create_tenant wraps in error 34004.
+ *
+ * uuid / original_tenant_id are backfilled once the auth.tenant row exists.
+ * On purge, purged_at/purged_by are stamped but the row stays forever.
+ */
+create table auth.tenant_identity
+(
+    tenant_identity_id bigint generated always as identity primary key,
+    code               text        not null unique,
+    uuid               uuid,
+    title              text,
+    original_tenant_id integer,
+    created_at         timestamptz default now() not null,
+    created_by         text        default 'unknown'::text not null,
+    purged_at          timestamptz default null,
+    purged_by          text        default null
+);
 
 create table auth.user_info
 (

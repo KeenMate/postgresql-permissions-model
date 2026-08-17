@@ -51,7 +51,7 @@ BEGIN
     -- Get first row to verify column structure
     SELECT r.__assignment_id, r.__perm_set_code, r.__perm_set_title,
            r.__user_group_member_id, r.__user_group_title,
-           r.__permission_inheritance_type, r.__permission_code, r.__permission_title,
+           r.__permission_inheritance_type, r.__permission_full_code, r.__permission_title,
            r.__tenant_id, r.__tenant_code, r.__tenant_title
     FROM auth.get_api_key_permissions(__admin_id, 'ak-test-getperm', __api_key_id, 1) r
     LIMIT 1
@@ -64,7 +64,7 @@ BEGIN
 
     IF __rec.__assignment_id IS NOT NULL AND __row_count > 0 THEN
         RAISE NOTICE '  PASS: get_api_key_permissions returned % rows, 11 columns verified (assignment_id=%, perm_set=%, perm=%)',
-            __row_count, __rec.__assignment_id, __rec.__perm_set_code, __rec.__permission_code;
+            __row_count, __rec.__assignment_id, __rec.__perm_set_code, __rec.__permission_full_code;
     ELSE
         RAISE EXCEPTION '  FAIL: get_api_key_permissions returned no data (row_count=%)', __row_count;
     END IF;

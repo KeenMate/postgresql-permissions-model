@@ -137,7 +137,9 @@ INSERT INTO const.event_code (event_id, code, category_code, is_system, source) 
     -- Tenant events (11001-11999)
     (11001, 'tenant_created',         'tenant_event', true, 'core'),
     (11002, 'tenant_updated',         'tenant_event', true, 'core'),
-    (11003, 'tenant_deleted',         'tenant_event', true, 'core'),
+    (11004, 'tenant_soft_deleted',    'tenant_event', true, 'core'),
+    (11005, 'tenant_restored',        'tenant_event', true, 'core'),
+    (11006, 'tenant_purged',          'tenant_event', true, 'core'),
     (11010, 'tenant_user_added',      'tenant_event', true, 'core'),
     (11011, 'tenant_user_removed',    'tenant_event', true, 'core'),
 
@@ -325,7 +327,9 @@ INSERT INTO const.event_message (event_id, language_code, message_template) VALU
     -- Tenant events (11001-11999)
     (11001, 'en', 'Tenant "{tenant_title}" was created by {actor}'),
     (11002, 'en', 'Tenant "{tenant_title}" was updated by {actor}'),
-    (11003, 'en', 'Tenant "{tenant_title}" was deleted by {actor}'),
+    (11004, 'en', 'Tenant "{tenant_title}" was soft-deleted by {actor}'),
+    (11005, 'en', 'Tenant "{tenant_title}" was restored by {actor}'),
+    (11006, 'en', 'Tenant "{tenant_title}" was permanently purged by {actor}'),
     (11010, 'en', 'User "{username}" was added to tenant "{tenant_title}" by {actor}'),
     (11011, 'en', 'User "{username}" was removed from tenant "{tenant_title}" by {actor}'),
 

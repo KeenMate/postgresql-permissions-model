@@ -1,0 +1,6 @@
+{
+  "name": "Tenant Soft Delete",
+  "description": "Soft delete, restore, purge, guards, block-at-boundary access, and the permanent identity ledger",
+  "isolation": "transaction",
+  "always_cleanup": true
+}

@@ -25,12 +25,12 @@ from start_version_update('1.6', 'Journal level control helper', _component := '
  *
  * Usage:
  *   if helpers.should_log_journal() then
- *       perform create_journal_message(...);
+ *       perform public.create_journal_message(...);
  *   end if;
  *
  *   -- For read-only operations:
  *   if helpers.should_log_journal(true) then
- *       perform create_journal_message(...);
+ *       perform public.create_journal_message(...);
  *   end if;
  */
 create or replace function helpers.should_log_journal(_is_read_only boolean default false)
@@ -51,7 +51,7 @@ $$;
  * Check if event is read-only by event_id
  *
  * Looks up the is_read_only flag from const.event_code.
- * Used by create_journal_message to automatically determine if logging should happen.
+ * Used by public.create_journal_message to automatically determine if logging should happen.
  */
 create or replace function helpers.is_event_read_only(_event_id integer)
     returns boolean
@@ -70,7 +70,7 @@ $$;
  * ====================
  *
  * Check storage mode for journal and user_event from const.sys_param.
- * Used by create_journal_message() and create_user_event() to control
+ * Used by public.create_journal_message() and create_user_event() to control
  * whether data is stored locally in PostgreSQL, sent via pg_notify, or both.
  *
  * Modes:

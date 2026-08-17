@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
+## 2026-08-17
+
+### Added
+
+- **Tenant soft delete, restore, and purge** — `auth.delete_tenant` is now a reversible **soft delete** (stamps `deleted_at`/`deleted_by` and clears the tenant's permission + group caches). `auth.restore_tenant` reverses it, and new `auth.purge_tenant` performs the permanent hard delete (the previous cascade) behind a **separate** `tenants.purge_tenant` permission. Purge requires the tenant to be soft-deleted first (two-step safety); the system tenant (id 1) and `is_removable = false` tenants are rejected from both delete and purge.
+  - `auth.tenant` gains `deleted_at`, `deleted_by`, `purged_at`, `purged_by`.
+  - Workers: new `unsecure.soft_delete_tenant` and `unsecure.restore_tenant`; the existing `unsecure.delete_tenant` is repurposed as the purge worker (stamps the identity ledger and emits `tenant_purged`).
+  - **Block-at-boundary enforcement**: `auth.get_user_available_tenants` and `auth.update_user_last_selected_tenant` exclude/reject soft-deleted tenants. `auth.get_tenants` keeps them visible for management and exposes new `__deleted_at` / `__purged_at` columns.
+  - `auth.delete_tenant_by_uuid` de-duplicated into a thin wrapper over `auth.delete_tenant`.
+- **Permanent tenant identity ledger** — new append-only `auth.tenant_identity` table records every tenant `code` at creation time with a `unique(code)` constraint, making a code (or a title that derives the same code via `helpers.get_code`) **impossible to reuse even after a tenant is purged**. `auth.create_tenant` burns the code here first (raising the new `34004` on collision) and backfills uuid/tenant_id; purge stamps `purged_at` but never deletes the ledger row.
+- New error codes: `34004` (code previously used), `34005` (already deleted), `34006` (not deleted — restore/purge require a soft-deleted tenant), `34007` (protected / non-removable). New events `11004 tenant_soft_deleted`, `11005 tenant_restored`, `11006 tenant_purged` (+ messages and en translations). New permission node `tenants.purge_tenant` (auto-covered by the `tenants` parent for admin roles).
+- New test suite `tests/test_tenant_soft_delete` (16 assertions: soft-delete + access block, guards, restore, purge, identity ledger). `tests/test_tenant_crud` TEST 9 updated for the soft semantics.
+
+### Changed
+
+- **Removed the orphaned `11003 tenant_deleted` journal event** — superseded by `tenant_soft_deleted` / `tenant_purged`, and no longer emitted by any function. The `notify_tenant` trigger (and the `notify_tenant_users` view comment) that fire on physical row-delete were repointed `tenant_deleted` → `tenant_purged`, since a tenant row is now only physically removed via purge.
+- **Consolidated 11 duplicate function definitions** left over from the in-flight resource-access/roles and translation-context reworks, restoring one-definition-per-function:
+  - The role-aware resource-access functions (`has_resource_access`, `filter_accessible_resources`, `get_resource_access_flags`, `get_resource_access_matrix`, `get_resource_grants`, `get_user_accessible_resources`) now live solely in `035_functions_resource_access.sql`; the role tables and the shared `unsecure.ensure_resource_access_partition` helper moved into `034_tables_resource_access.sql` (before `035`, so the functions have in-order dependencies). `044_functions_resource_roles.sql` keeps only role management; `043_tables_resource_roles.sql` keeps role error functions + event/translation seeds.
+  - The translation functions (`create_translation`, `copy_translations`, `get_group_translations`, `search_translations`) were folded back into `032_functions_translation.sql`; `045_translation_context.sql` is deleted (its `context` column already lived in `030`).
+- **Permission-identifier naming unified to `_permission_full_code` / `__permission_full_code`** — the value passed to `auth.has_permission` is matched against `auth.permission.full_code` (the dotted ltree path), so the three prior spellings — `_perm_code`, `_permission_code`, and `can_manage_user_group`'s `_permission` — were unified to `_permission_full_code` for parameters and `__permission_full_code` for return columns, across all migration files. `_perm_set_code` (a distinct concept — permission *set* code) is deliberately untouched. `tests/test_api_keys/003_permissions.sql` updated for the renamed return column.
+- **`_provider` → `_provider_code`** on `auth.create_external_user_group` and `auth.update_user_data` — the value is a provider code; `auth.create_user_group_mapping` already used `_provider_code`.
+- **`create_journal_message*` calls schema-qualified** — all 127 unqualified `create_journal_message` / `create_journal_message_by_code` / `create_journal_message_for_entity` / `create_journal_message_for_entity_by_code` call sites across 16 files now carry an explicit `public.` schema to avoid `search_path` collisions.
+- Verified end-to-end after every change: clean `fullService` rebuild + 812 tests across 37 suites passing.
+
 ## 2026-06-20
 
 ### Changed

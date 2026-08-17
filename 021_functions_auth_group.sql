@@ -19,7 +19,7 @@ begin
 end;
 $$;
 
-create or replace function auth.can_manage_user_group(_user_id bigint, _correlation_id text, _user_group_id integer, _permission text, _tenant_id integer DEFAULT 1) returns boolean
+create or replace function auth.can_manage_user_group(_user_id bigint, _correlation_id text, _user_group_id integer, _permission_full_code text, _tenant_id integer DEFAULT 1) returns boolean
     language plpgsql
 as
 $$
@@ -46,7 +46,7 @@ begin
 				end if;
 			else
 				-- when there is no owner anybody with the right permission can add new members
-				perform auth.has_permission(_user_id, _correlation_id, _permission, _tenant_id);
+				perform auth.has_permission(_user_id, _correlation_id, _permission_full_code, _tenant_id);
 			end if;
 		end if;
 	end if;
@@ -97,7 +97,7 @@ begin
 				and user_group_id = _user_group_id
 			returning user_group_id;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _title, 'is_default', _is_default
@@ -129,7 +129,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (enabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'enabled')
@@ -160,7 +160,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (disabled)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'disabled')
@@ -191,7 +191,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (locked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'locked')
@@ -222,7 +222,7 @@ begin
 				, updated_at
 				, updated_by;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (unlocked)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'unlocked')
@@ -265,7 +265,7 @@ begin
 					and user_group_id = _user_group_id
 				returning user_group_id;
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13003  -- group_deleted
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text)
@@ -309,7 +309,7 @@ begin
 		and user_id = _target_user_id
 		and member_type_code = 'manual';
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13011  -- group_member_removed
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -511,7 +511,7 @@ begin
 										from affected_users);
 
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13020  -- group_mapping_created
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text
@@ -554,7 +554,7 @@ begin
 		into __user_group_id, __provider_code, __mapped_object_id, __mapped_object_name, __mapped_role;
 
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 13021  -- group_mapping_deleted
 			, 'group', __user_group_id
 			, jsonb_build_object('group_title', __user_group_id::text
@@ -565,7 +565,7 @@ begin
 end;
 $$;
 
-create or replace function auth.create_external_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _provider text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_external_user_group(_created_by text, _user_id bigint, _correlation_id text, _title text, _provider_code text, _is_assignable boolean DEFAULT true, _is_active boolean DEFAULT true, _mapped_object_id text DEFAULT NULL::text, _mapped_object_name text DEFAULT NULL::text, _mapped_role text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
     returns TABLE(__user_group_id integer)
     rows 1
     language plpgsql
@@ -586,7 +586,7 @@ begin
 	into __last_id;
 
 	perform
-		auth.create_user_group_mapping(_created_by, _user_id, _correlation_id, __last_id, _provider, _mapped_object_id,
+		auth.create_user_group_mapping(_created_by, _user_id, _correlation_id, __last_id, _provider_code, _mapped_object_id,
 																	 _mapped_object_name, _mapped_role, _tenant_id := _tenant_id);
 
 	return query
@@ -608,7 +608,7 @@ begin
 		, is_external = false
 	where user_group_id = _user_group_id;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as hybrid)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', _user_group_id::text, 'action', 'set_hybrid')
@@ -689,7 +689,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as external)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_external')
@@ -729,7 +729,7 @@ begin
 		into __user_group_code;
 
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 13002  -- group_updated (set as internal)
 			, 'group', _user_group_id
 			, jsonb_build_object('group_title', __user_group_code, 'action', 'set_internal')
@@ -895,7 +895,7 @@ begin
 		from combined_results cr
 					 inner join auth.user_info ui on cr.user_id = ui.user_id;
 
-	perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_run_by, _user_id, _correlation_id
 		, 13030  -- group_members_synced
 		, 'group', __user_group_id
 		, jsonb_build_object('user_group_mapping_id', _user_group_mapping_id,
@@ -976,7 +976,7 @@ begin
 					get diagnostics __deleted_count = row_count;
 
 					if __deleted_count > 0 then
-						perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+						perform public.create_journal_message_for_entity(_run_by, _user_id, _correlation_id
 							, 13011  -- group_member_removed
 							, 'group', __group_row.user_group_id
 							, jsonb_build_object('user_group_mapping_id', __mapping_id,
@@ -1018,7 +1018,7 @@ begin
 			get diagnostics __deleted_count = row_count;
 
 			if __deleted_count > 0 then
-				perform create_journal_message_for_entity(_run_by, _user_id, _correlation_id
+				perform public.create_journal_message_for_entity(_run_by, _user_id, _correlation_id
 					, 13011  -- group_member_removed
 					, 'group', __group_row.user_group_id
 					, jsonb_build_object('action', 'sync_cleanup_missing_mappings',
@@ -1232,7 +1232,7 @@ begin
             where user_group_id = __group_to_delete.user_group_id;
 
             -- Journal the removal
-            perform create_journal_message_for_entity(
+            perform public.create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 13003,  -- group_deleted
                 'group', __group_to_delete.user_group_id,
@@ -1389,7 +1389,7 @@ begin
                 end if;
 
                 -- Journal the removal
-                perform create_journal_message_for_entity(
+                perform public.create_journal_message_for_entity(
                     _created_by, _user_id, _correlation_id,
                     13021,  -- group_mapping_deleted
                     'user_group_mapping', __del_mapping.user_group_mapping_id,

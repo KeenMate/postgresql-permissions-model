@@ -11,7 +11,7 @@
 set search_path = public, const, ext, stage, helpers, internal, unsecure, auth, triggers;
 
 create or replace function auth.get_tenants(_user_id bigint, _correlation_id text, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
-    returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean)
+    returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean, __deleted_at timestamp with time zone, __purged_at timestamp with time zone)
     language plpgsql
 as
 $$
@@ -21,6 +21,9 @@ begin
 	__effective_tenant_id := internal.resolve_cross_tenant_access(
 		_user_id, _correlation_id, 'tenants.get_all_tenants', 'tenants.get_tenants', _tenant_id, _target_tenant_id);
 
+	-- Management view: soft-deleted tenants remain listed (with deleted_at/purged_at
+	-- exposed) so admins can find them to restore or purge. Access is blocked
+	-- separately at the switch boundary (get_user_available_tenants / update_user_last_selected_tenant).
 	return query
 		select created_at
 				 , created_by
@@ -32,6 +35,8 @@ begin
 				 , code
 				 , is_removable
 				 , is_assignable
+				 , deleted_at
+				 , purged_at
 		from auth.tenant t
 		where (__effective_tenant_id is null or t.tenant_id = __effective_tenant_id)
 		order by t.title;
@@ -146,24 +151,41 @@ begin
 end;
 $$;
 
+-- Soft delete (reversible). Marks the tenant deleted and blocks access; child
+-- data is retained. Permanent removal is auth.purge_tenant. Guards: system
+-- tenant (id 1) and is_removable = false are rejected; already-deleted errors.
 create or replace function auth.delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
     language plpgsql
 as
 $$
+declare
+    __t auth.tenant;
 begin
     perform
         auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant', _tenant_id);
 
+    select * into __t from auth.tenant t where t.uuid = _tenant_uuid;
+    if not found then
+        perform error.raise_34003(_tenant_uuid::text);
+    end if;
+
+    if __t.tenant_id = 1 or not __t.is_removable then
+        perform error.raise_34007(__t.tenant_id);
+    end if;
+
+    if __t.deleted_at is not null then
+        perform error.raise_34005(_tenant_uuid);
+    end if;
+
     return query
         select dt.__tenant_id, dt.__uuid, dt.__code
-        from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id) dt
-        where t.uuid = _tenant_uuid;
+        from unsecure.soft_delete_tenant(_deleted_by, _user_id, _correlation_id, __t.tenant_id) dt;
 end;
 $$;
 
+-- Explicit by-uuid alias, kept for callers; delegates to auth.delete_tenant.
 create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
     returns TABLE(__tenant_id integer, __uuid uuid, __code text)
     rows 1
@@ -171,14 +193,73 @@ create or replace function auth.delete_tenant_by_uuid(_deleted_by text, _user_id
 as
 $$
 begin
+    return query
+        select dt.__tenant_id, dt.__uuid, dt.__code
+        from auth.delete_tenant(_deleted_by, _user_id, _correlation_id, _tenant_uuid, _tenant_id) dt;
+end;
+$$;
+
+-- Reverse a soft delete. Requires the tenant to currently be soft-deleted
+-- (and not purged). Reuses the tenants.delete_tenant permission.
+create or replace function auth.restore_tenant(_restored_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
+    returns TABLE(__tenant_id integer, __uuid uuid, __code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __t auth.tenant;
+begin
     perform
         auth.has_permission(_user_id, _correlation_id, 'tenants.delete_tenant', _tenant_id);
 
+    select * into __t from auth.tenant t where t.uuid = _tenant_uuid;
+    if not found then
+        perform error.raise_34003(_tenant_uuid::text);
+    end if;
+
+    if __t.deleted_at is null then
+        perform error.raise_34006(_tenant_uuid);
+    end if;
+
     return query
         select dt.__tenant_id, dt.__uuid, dt.__code
-        from auth.tenant t
-           , lateral unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, t.tenant_id) dt
-        where t.uuid = _tenant_uuid;
+        from unsecure.restore_tenant(_restored_by, _user_id, _correlation_id, __t.tenant_id) dt;
+end;
+$$;
+
+-- Permanent hard delete (destroys all child data, stamps the identity ledger
+-- as purged). Requires tenants.purge_tenant AND that the tenant is already
+-- soft-deleted (two-step safety). System / non-removable tenants are rejected.
+create or replace function auth.purge_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_uuid uuid, _tenant_id integer DEFAULT 1)
+    returns TABLE(__tenant_id integer, __uuid uuid, __code text)
+    rows 1
+    language plpgsql
+as
+$$
+declare
+    __t auth.tenant;
+begin
+    perform
+        auth.has_permission(_user_id, _correlation_id, 'tenants.purge_tenant', _tenant_id);
+
+    select * into __t from auth.tenant t where t.uuid = _tenant_uuid;
+    if not found then
+        perform error.raise_34003(_tenant_uuid::text);
+    end if;
+
+    if __t.tenant_id = 1 or not __t.is_removable then
+        perform error.raise_34007(__t.tenant_id);
+    end if;
+
+    -- Two-step safety: a tenant must be soft-deleted before it can be purged
+    if __t.deleted_at is null then
+        perform error.raise_34006(_tenant_uuid);
+    end if;
+
+    return query
+        select dt.__tenant_id, dt.__uuid, dt.__code
+        from unsecure.delete_tenant(_deleted_by, _user_id, _correlation_id, __t.tenant_id) dt;
 end;
 $$;
 
@@ -210,6 +291,7 @@ begin
              , t.is_default
         from member_of_tenants mt
                  inner join auth.tenant t on mt.tenant_id = t.tenant_id
+        where t.deleted_at is null
         order by t.title;
 end;
 $$;
@@ -305,6 +387,7 @@ begin
              inner join auth.user_group_members ugms on t.tenant_id = ugms.tenant_id
     where t.uuid = _tenant_uuid::uuid
       and ugms.user_id = _user_id
+      and t.deleted_at is null
     into __tenant_id;
 
     if __tenant_id is null
@@ -323,7 +406,7 @@ begin
 
     if _user_id <> _target_user_id and _user_id <> 1
     then
-        perform create_journal_message_for_entity('system', _user_id, _correlation_id
+        perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
                 , 10002  -- user_updated
                 , 'user', _target_user_id
                 , jsonb_build_object('username', _target_user_id::text, 'tenant_id', __tenant_id
@@ -359,16 +442,34 @@ declare
 							int;
 	__tenant_member_group_id
 							int;
+	__code text;
 begin
 	perform
 		auth.has_permission(_user_id, _correlation_id, 'tenants.create_tenant', _tenant_id);
 
+	__code := coalesce(_code, helpers.get_code(_title));
+
+	-- Burn the code in the permanent identity ledger before creating the tenant.
+	-- unique(code) makes any previously-used code (live, soft-deleted or purged)
+	-- impossible to reuse; wrap the violation in a friendly error.
+	begin
+		insert into auth.tenant_identity (code, title, created_by)
+		values (__code, _title, _created_by);
+	exception when unique_violation then
+		perform error.raise_34004(__code);
+	end;
+
 	insert into auth.tenant (created_by, updated_by, title, code, is_removable, is_assignable)
-	values (_created_by, _created_by, _title, coalesce(_code, helpers.get_code(_title)), _is_removable, _is_assignable)
+	values (_created_by, _created_by, _title, __code, _is_removable, _is_assignable)
 	returning *
 		into __last_item;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	-- Backfill the ledger with the real uuid + tenant_id now the row exists
+	update auth.tenant_identity
+	   set uuid = __last_item.uuid, original_tenant_id = __last_item.tenant_id
+	 where code = __code;
+
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 11001  -- tenant_created
 			, 'tenant', __last_item.tenant_id
 			, jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code
@@ -440,7 +541,7 @@ begin
 		, updated_at    = now()
 	where tenant_id = _tenant_id;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 11002  -- tenant_updated
 			, 'tenant', _tenant_id
 			, jsonb_build_object('tenant_title', _title, 'tenant_code', _code

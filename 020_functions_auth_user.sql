@@ -32,7 +32,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10004  -- user_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -69,7 +69,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10005  -- user_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -103,7 +103,7 @@ begin
 				, is_active
 				, is_locked;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10007  -- user_unlocked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -140,7 +140,7 @@ begin
 	-- Clear permission cache for all tenants to ensure immediate effect
 	perform unsecure.clear_permission_cache(_updated_by, _target_user_id, null);
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10006  -- user_locked
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -206,7 +206,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10033  -- identity_enabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -253,7 +253,7 @@ begin
 			returning user_identity_id
 				, is_active;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10034  -- identity_disabled
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text, 'provider_code', _provider_code)
@@ -596,7 +596,7 @@ begin
 end;
 $$;
 
-create or replace function auth.update_user_data(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider text, _user_data jsonb)
+create or replace function auth.update_user_data(_updated_by text, _user_id bigint, _correlation_id text, _target_user_id bigint, _provider_code text, _user_data jsonb)
     returns TABLE(__user_id bigint, __user_data_id bigint)
     language plpgsql
 as
@@ -715,7 +715,7 @@ begin
         returning created_at, created_by, updated_at, updated_by, user_data_id, user_id,
                   first_name, middle_name, last_name, settings, preferences, custom_data;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
         , 10002  -- user_updated
         , 'user', _target_user_id
         , jsonb_strip_nulls(jsonb_build_object(
@@ -756,7 +756,7 @@ begin
         select *
         from unsecure.delete_user_by_id(_deleted_by, _user_id, _correlation_id, _target_user_id, _blacklist);
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 10003  -- user_deleted
         , 'user', _target_user_id
         , jsonb_build_object('user_id', _target_user_id::text, 'blacklisted', _blacklist::text)
@@ -1097,7 +1097,7 @@ begin
             _reason, _notes)
     returning blacklist_id into __last_id;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 10080  -- user_blacklisted
         , 'user', 0
         , jsonb_build_object('username', _username, 'provider_code', _provider_code,
@@ -1134,7 +1134,7 @@ begin
             using errcode = '33018';
     end if;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 10081  -- user_unblacklisted
         , 'user', coalesce(__item.original_user_id, 0)
         , jsonb_build_object('username', __item.username, 'provider_code', __item.provider_code,

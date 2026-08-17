@@ -20,47 +20,47 @@ begin
 end;
 $$;
 
-create or replace function internal.throw_no_permission(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _permission_full_codes text[], _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		error.raise_52109(_user_id, _perm_codes, _tenant_id);
+		error.raise_52109(_user_id, _permission_full_codes, _tenant_id);
 end;
 $$;
 
-create or replace function internal.throw_no_permission(_user_id bigint, _perm_codes text[]) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _permission_full_codes text[]) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		error.raise_52109(_user_id, _perm_codes);
+		error.raise_52109(_user_id, _permission_full_codes);
 end;
 $$;
 
-create or replace function internal.throw_no_permission(_user_id bigint, _perm_code text, _tenant_id integer DEFAULT 1) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _permission_full_code text, _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		internal.throw_no_permission(_user_id, array [_perm_code], _tenant_id);
+		internal.throw_no_permission(_user_id, array [_permission_full_code], _tenant_id);
 end;
 $$;
 
-create or replace function internal.throw_no_permission(_user_id bigint, _perm_code text) returns void
+create or replace function internal.throw_no_permission(_user_id bigint, _permission_full_code text) returns void
     language plpgsql
 as
 $$
 begin
 	perform
-		internal.throw_no_permission(_user_id, array [_perm_code], 1);
+		internal.throw_no_permission(_user_id, array [_permission_full_code], 1);
 end;
 $$;
 
-create or replace function auth.has_permissions(_target_user_id bigint, _correlation_id text, _perm_codes text[], _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
+create or replace function auth.has_permissions(_target_user_id bigint, _correlation_id text, _permission_full_codes text[], _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
     stable
     language plpgsql
 as
@@ -119,35 +119,35 @@ begin
     if exists(
             select
             from unnest(__perms) p
-                     inner join unnest(_perm_codes) rp on p = rp)
+                     inner join unnest(_permission_full_codes) rp on p = rp)
     then
         return true;
     end if;
 
     if (_throw_err)
     then
-        perform create_journal_message_for_entity('system', _target_user_id, _correlation_id
+        perform public.create_journal_message_for_entity('system', _target_user_id, _correlation_id
             , 32001  -- err_no_permission
             , 'perm', _target_user_id
             , jsonb_build_object('username', _target_user_id::text
-                , 'permission_codes', array_to_string(_perm_codes, '; '))
+                , 'permission_codes', array_to_string(_permission_full_codes, '; '))
             , _tenant_id);
 
         perform
-            internal.throw_no_permission(_target_user_id, _perm_codes, _tenant_id);
+            internal.throw_no_permission(_target_user_id, _permission_full_codes, _tenant_id);
     end if;
 
     return false;
 end ;
 $$;
 
-create or replace function auth.has_permission(_target_user_id bigint, _correlation_id text, _perm_code text, _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
+create or replace function auth.has_permission(_target_user_id bigint, _correlation_id text, _permission_full_code text, _tenant_id integer DEFAULT 1, _throw_err boolean DEFAULT true) returns boolean
     stable
     language plpgsql
 as
 $$
 begin
-	return auth.has_permissions(_target_user_id, _correlation_id, array [_perm_code], _tenant_id, _throw_err);
+	return auth.has_permissions(_target_user_id, _correlation_id, array [_permission_full_code], _tenant_id, _throw_err);
 end ;
 $$;
 
@@ -201,7 +201,7 @@ begin
 end;
 $$;
 
-create or replace function auth.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text, _tenant_id integer DEFAULT 1)
+create or replace function auth.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer, _target_user_id bigint, _perm_set_code text, _permission_full_code text, _tenant_id integer DEFAULT 1)
     returns table(
         __created_at    timestamptz,
         __created_by    text,
@@ -224,7 +224,7 @@ begin
 		from unsecure.assign_permission(_created_by, _user_id, _correlation_id
 			, _user_group_id, _target_user_id
 			, _perm_set_code
-			, _perm_code
+			, _permission_full_code
 			, _tenant_id);
 end;
 
@@ -380,7 +380,7 @@ end;
 $$;
 
 create or replace function auth.create_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
-    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
+    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_full_code text)
     rows 1
     language plpgsql
 as
@@ -398,7 +398,7 @@ end;
 $$;
 
 create or replace function auth.delete_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
-    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
+    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_full_code text)
     rows 1
     language plpgsql
 as
@@ -416,7 +416,7 @@ end;
 $$;
 
 create or replace function auth.get_user_permissions(_user_id bigint, _correlation_id text, _target_user_id bigint, _tenant_id integer DEFAULT 1, _target_tenant_id integer default null)
-    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
+    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_full_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
     language plpgsql
 as
@@ -569,6 +569,7 @@ begin
 	perform unsecure.create_permission_as_system('Read tenants', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Read all tenants', 'tenants', _source := 'core');
 	perform unsecure.create_permission_as_system('Delete tenant', 'tenants', _source := 'core');
+	perform unsecure.create_permission_as_system('Purge tenant', 'tenants', _source := 'core');
 
 	-- Permissions: Providers
 	perform unsecure.create_permission_as_system('Providers', _source := 'core');
@@ -1112,7 +1113,7 @@ begin
             delete from auth.permission where permission_id = __perm_to_delete.permission_id;
 
             -- Journal the removal
-            perform create_journal_message_for_entity(
+            perform public.create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 12003,  -- permission_deleted
                 'permission', __perm_to_delete.permission_id,
@@ -1286,7 +1287,7 @@ begin
             where perm_set_id = __set_to_delete.perm_set_id;
 
             -- Journal the removal
-            perform create_journal_message_for_entity(
+            perform public.create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 12022,  -- perm_set_deleted
                 'perm_set', __set_to_delete.perm_set_id,

@@ -108,7 +108,7 @@ begin
 	return query
 		select __last_id;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 16001  -- provider_created
 			, 'provider', __last_id
 			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
@@ -149,7 +149,7 @@ begin
 		perform internal.refresh_translation_cache();
 	end if;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 16002  -- provider_updated
 			, 'provider', _provider_id
 			, jsonb_build_object('provider_code', _provider_code, 'provider_name', _provider_name
@@ -181,7 +181,7 @@ begin
 	return query
 		select ___provider_id;
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 16003  -- provider_deleted
 			, 'provider', ___provider_id
 			, jsonb_build_object('provider_code', _provider_code)
@@ -211,7 +211,7 @@ begin
 	return query
 		select ___provider_id;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 16004  -- provider_enabled
 			, 'provider', ___provider_id
 			, jsonb_build_object('provider_code', _provider_code)
@@ -241,7 +241,7 @@ begin
 	return query
 		select ___provider_id;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 16005  -- provider_disabled
 			, 'provider', ___provider_id
 			, jsonb_build_object('provider_code', _provider_code)

@@ -228,18 +228,16 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- TEST 9: delete_tenant removes the tenant
+-- TEST 9: delete_tenant now SOFT-deletes (row remains, deleted_at set)
 -- ============================================================================
 DO $$
 DECLARE
-    __admin_id bigint := current_setting('test_tenant.admin_id')::bigint;
-    __tenant_uuid uuid := current_setting('test_tenant.tenant_uuid')::uuid;
     __deleted_id int;
     __db_count int;
 BEGIN
-    RAISE NOTICE 'TEST 9: delete_tenant removes a fresh tenant';
+    RAISE NOTICE 'TEST 9: delete_tenant soft-deletes a fresh tenant';
 
-    -- Create a fresh tenant and delete it (delete_tenant handles cleanup)
+    -- Create a fresh tenant and soft-delete it
     DECLARE __fresh_uuid uuid;
     BEGIN
         SELECT ct.__uuid FROM auth.create_tenant('tenant_test', 1, 'tenant-test-del-setup', 'Deletable Tenant', 'del_tenant') ct INTO __fresh_uuid;
@@ -253,22 +251,19 @@ BEGIN
         RAISE EXCEPTION '  FAIL: delete_tenant returned NULL';
     END IF;
 
-    SELECT count(*) FROM auth.tenant WHERE tenant_id = __deleted_id INTO __db_count;
+    -- Soft delete: row still present, but deleted_at stamped
+    SELECT count(*) FROM auth.tenant WHERE tenant_id = __deleted_id AND deleted_at IS NOT NULL INTO __db_count;
 
-    IF __db_count = 0 THEN
-        RAISE NOTICE '  PASS: tenant deleted (id=%)', __deleted_id;
+    IF __db_count = 1 THEN
+        RAISE NOTICE '  PASS: tenant soft-deleted (id=%, deleted_at set)', __deleted_id;
     ELSE
-        RAISE EXCEPTION '  FAIL: tenant still exists after delete (id=%, count=%)', __deleted_id, __db_count;
+        RAISE EXCEPTION '  FAIL: tenant not soft-deleted as expected (id=%, count=%)', __deleted_id, __db_count;
     END IF;
 END $$;
 
--- TEST 10: Removed — cascade is PostgreSQL FK behavior, tested implicitly by test 9
-
--- ============================================================================
--- (placeholder to keep file structure)
--- ============================================================================
+-- TEST 10: full soft-delete/restore/purge lifecycle lives in test_tenant_soft_delete
 DO $$
 BEGIN
-    RAISE NOTICE 'TEST 10: (cascade test removed — FK cascade is implicit)';
+    RAISE NOTICE 'TEST 10: (lifecycle covered by test_tenant_soft_delete suite)';
     RAISE NOTICE '  PASS: skipped';
 END $$;

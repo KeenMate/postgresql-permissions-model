@@ -44,14 +44,14 @@ $$
 select sha256(convert_to(_secret, 'UTF8')::bytea);
 $$;
 
-create or replace function auth.create_api_key(_created_by text, _user_id bigint, _correlation_id text, _title text, _description text, _perm_set_code text, _permission_codes text[], _api_key text DEFAULT NULL::text, _api_secret text DEFAULT NULL::text, _expire_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _notification_email text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
+create or replace function auth.create_api_key(_created_by text, _user_id bigint, _correlation_id text, _title text, _description text, _perm_set_code text, _permission_full_codes text[], _api_key text DEFAULT NULL::text, _api_secret text DEFAULT NULL::text, _expire_at timestamp with time zone DEFAULT NULL::timestamp with time zone, _notification_email text DEFAULT NULL::text, _tenant_id integer DEFAULT 1)
     returns TABLE(__api_key_id integer, __api_key text, __api_secret text)
     rows 1
     language plpgsql
 as
 $$
 declare
-	__permission_code text;
+	__permission_full_code text;
 	__api_secret      text;
 	__api_secret_hash bytea;
 	__api_key         text;
@@ -84,24 +84,24 @@ begin
 																			 _perm_set_code := _perm_set_code, _tenant_id := __tenant_id);
 	end if;
 
-	if _permission_codes is not null and _permission_codes <> (array [])::text[] then
-		foreach __permission_code in array _permission_codes
+	if _permission_full_codes is not null and _permission_full_codes <> (array [])::text[] then
+		foreach __permission_full_code in array _permission_full_codes
 			loop
 				perform unsecure.assign_permission(_created_by, _user_id, _correlation_id, _target_user_id := __api_user_id,
-																					 _perm_code := __permission_code, _tenant_id := __tenant_id);
+																					 _permission_full_code := __permission_full_code, _tenant_id := __tenant_id);
 			end loop;
 	end if;
 
 	return query
 		select __last_id, __api_key, __api_secret;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 14001  -- apikey_created
 			, 'api_key', __last_id
 			, jsonb_strip_nulls(jsonb_build_object('api_key_title', coalesce(_title, __api_key)
 				, 'api_key', __api_key, 'description', _description
 				, 'expire_at', _expire_at, 'notification_email', _notification_email
-				, 'perm_set_code', _perm_set_code, 'permission_codes', _permission_codes))
+				, 'perm_set_code', _perm_set_code, 'permission_codes', _permission_full_codes))
 			, __tenant_id);
 
 end;
@@ -162,7 +162,7 @@ end;
 $$;
 
 create or replace function auth.get_api_key_permissions(_user_id bigint, _correlation_id text, _api_key_id integer, _tenant_id integer)
-    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
+    returns TABLE(__assignment_id bigint, __perm_set_code text, __perm_set_title text, __user_group_member_id bigint, __user_group_title text, __permission_inheritance_type text, __permission_full_code text, __permission_title text, __tenant_id integer, __tenant_code text, __tenant_title text)
     stable
     language plpgsql
 as
@@ -204,7 +204,7 @@ begin
 		where api_key_id = _api_key_id
 			and tenant_id = _tenant_id;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 14002  -- apikey_updated
 			, 'api_key', _api_key_id
 			, jsonb_build_object('api_key_title', _title, 'description', _description
@@ -213,14 +213,14 @@ begin
 end;
 $$;
 
-create or replace function auth.assign_api_key_permissions(_created_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_codes text[], _tenant_id integer DEFAULT 1)
+create or replace function auth.assign_api_key_permissions(_created_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_full_codes text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__assignment_id bigint, __tenant_id integer, __perm_set_id integer, __perm_set_code text, __perm_set_title text, __permission_full_code text, __permission_full_title text, __permission_title text)
     rows 1
     language plpgsql
 as
 $$
 declare
-	__permission_code text;
+	__permission_full_code text;
 	__api_user_id     bigint;
 begin
 
@@ -238,11 +238,11 @@ begin
 																			 _tenant_id := _tenant_id);
 	end if;
 
-	if _permission_codes is not null then
-		foreach __permission_code in array _permission_codes
+	if _permission_full_codes is not null then
+		foreach __permission_full_code in array _permission_full_codes
 			loop
 				perform unsecure.assign_permission(_created_by, _user_id, _correlation_id, _target_user_id := __api_user_id,
-																					 _perm_code := __permission_code,
+																					 _permission_full_code := __permission_full_code,
 																					 _tenant_id := _tenant_id);
 			end loop;
 	end if;
@@ -262,24 +262,24 @@ begin
 		where pa.user_id = __api_user_id
 		order by ps.code nulls last, p.full_code;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 14002  -- apikey_updated (permissions assigned)
 			, 'api_key', _api_key_id
 			, jsonb_build_object('api_key_title', _api_key_id::text
 				, 'action', 'permissions_assigned', 'perm_set_code', _perm_set_code
-				, 'permission_codes', array_to_string(_permission_codes, ';'))
+				, 'permission_codes', array_to_string(_permission_full_codes, ';'))
 			, _tenant_id);
 end;
 $$;
 
-create or replace function auth.unassign_api_key_permissions(_deleted_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_codes text[], _tenant_id integer DEFAULT 1)
+create or replace function auth.unassign_api_key_permissions(_deleted_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_full_codes text[], _tenant_id integer DEFAULT 1)
     returns TABLE(__assignment_id bigint, __perm_set_id integer, __perm_set_code text, __perm_set_title text, __permission_full_code text, __permission_full_title text, __permission_title text)
     rows 1
     language plpgsql
 as
 $$
 declare
-	__permission_code text;
+	__permission_full_code text;
 	__assignment_id   bigint;
 	__null_bigint     bigint;
 	__api_user_id     bigint;
@@ -304,8 +304,8 @@ begin
 		into __null_bigint;
 	end if;
 
-	if _permission_codes is not null then
-		foreach __permission_code in array _permission_codes
+	if _permission_full_codes is not null then
+		foreach __permission_full_code in array _permission_full_codes
 			loop
 				for __assignment_id in
 					select pa.assignment_id
@@ -313,7 +313,7 @@ begin
 								 inner join auth.permission_assignment pa
 														on pa.user_id = __api_user_id and p.permission_id = pa.permission_id and
 															 pa.tenant_id = _tenant_id
-					where p.full_code = __permission_code::ext.ltree
+					where p.full_code = __permission_full_code::ext.ltree
 					loop
 						perform unsecure.unassign_permission(_deleted_by, _user_id, _correlation_id, __assignment_id, _tenant_id);
 					end loop;
@@ -334,12 +334,12 @@ begin
 		where pa.user_id = __api_user_id
 		order by ps.code nulls last, p.full_code;
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 14002  -- apikey_updated (permissions unassigned)
 			, 'api_key', _api_key_id
 			, jsonb_build_object('api_key_title', _api_key_id::text
 				, 'action', 'permissions_unassigned', 'perm_set_code', _perm_set_code
-				, 'permission_codes', array_to_string(_permission_codes, ';'))
+				, 'permission_codes', array_to_string(_permission_full_codes, ';'))
 			, _tenant_id);
 
 end;
@@ -371,7 +371,7 @@ begin
 		delete from auth.api_key where api_key_id = _api_key_id
 			returning api_key_id;
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 14003  -- apikey_deleted
 			, 'api_key', _api_key_id
 			, jsonb_build_object('api_key_title', _api_key_id::text)
@@ -406,7 +406,7 @@ begin
 	return query
 		select _api_key_id, __api_secret;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 14002  -- apikey_updated (secret rotated)
 			, 'api_key', _api_key_id
 			, jsonb_build_object('api_key_title', _api_key_id::text, 'action', 'secret_rotated')
@@ -532,7 +532,7 @@ begin
     return query
         select __last_id, __api_key, lower(_service_code);
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 14001  -- apikey_created
         , 'api_key', __last_id
         , jsonb_strip_nulls(jsonb_build_object(
@@ -761,7 +761,7 @@ begin
         where ak.api_key_id = _api_key_id
           and ak.tenant_id = _tenant_id;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
         , 14002  -- apikey_updated
         , 'api_key', _api_key_id
         , jsonb_build_object('api_key_title', _title, 'key_type', 'outbound',
@@ -813,7 +813,7 @@ begin
     return query
         select _api_key_id, __service_code;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
         , 14002  -- apikey_updated (secret rotated)
         , 'api_key', _api_key_id
         , jsonb_build_object('api_key_id', _api_key_id, 'key_type', 'outbound',
@@ -917,7 +917,7 @@ begin
     return query
         select _api_key_id, __service_code;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 14003  -- apikey_deleted
         , 'api_key', _api_key_id
         , jsonb_build_object('api_key_id', _api_key_id, 'key_type', 'outbound',

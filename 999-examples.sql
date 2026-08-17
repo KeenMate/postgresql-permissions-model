@@ -193,7 +193,7 @@ from auth.create_api_key('system', 1, :correlation_id, 'Another service'
   , null, null
   , _api_key:= 'another_service', _api_secret := 'another_service_secret');
 
--- _created_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_codes text[], _tenant_id integer DEFAULT 1
+-- _created_by text, _user_id bigint, _correlation_id text, _api_key_id integer, _perm_set_code text, _permission_full_codes text[], _tenant_id integer DEFAULT 1
 select *
 from auth.assign_api_key_permissions('system', 1, :correlation_id, 1, 'export_service', null);
 

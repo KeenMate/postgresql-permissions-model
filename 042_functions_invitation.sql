@@ -64,7 +64,7 @@ begin
     returning invitation.invitation_id, invitation.uuid
         into ___invitation_id, ___uuid;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
         22001, 'invitation', ___invitation_id,
         jsonb_build_object('target_email', _target_email, 'tenant_id', _tenant_id),
         _tenant_id);
@@ -124,7 +124,7 @@ begin
       and status_code = 'pending'
       and phase_code not in ('on_accept', 'on_create');
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22002, 'invitation', _invitation_id,
         jsonb_build_object('target_email', ___inv.target_email, 'tenant_id', ___inv.tenant_id),
         ___inv.tenant_id);
@@ -173,7 +173,7 @@ begin
       and status_code = 'pending'
       and phase_code <> 'on_reject';
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22003, 'invitation', _invitation_id,
         jsonb_build_object('target_email', ___inv.target_email, 'tenant_id', ___inv.tenant_id),
         ___inv.tenant_id);
@@ -220,7 +220,7 @@ begin
     set status_code = 'skipped', updated_by = _updated_by, updated_at = now()
     where invitation_id = _invitation_id and status_code = 'pending';
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22004, 'invitation', _invitation_id,
         jsonb_build_object('target_email', ___inv.target_email, 'tenant_id', ___inv.tenant_id),
         ___inv.tenant_id);
@@ -266,7 +266,7 @@ begin
         updated_at = now()
     where invitation_action_id = _invitation_action_id;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22006, 'invitation', ___action.invitation_id,
         jsonb_build_object('action_type', ___action.action_type_code, 'target_email', ___action.target_email),
         ___action.tenant_id);
@@ -316,7 +316,7 @@ begin
         updated_at = now()
     where invitation_action_id = _invitation_action_id;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22007, 'invitation', ___action.invitation_id,
         jsonb_build_object('action_type', ___action.action_type_code, 'target_email', ___action.target_email,
                            'error_message', coalesce(_error_message, 'unknown')),
@@ -335,7 +335,7 @@ begin
         set status_code = 'failed', updated_by = _updated_by, updated_at = now()
         where invitation_id = ___action.invitation_id;
 
-        perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+        perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
             22009, 'invitation', ___action.invitation_id,
             jsonb_build_object('action_type', ___action.action_type_code, 'target_email', ___action.target_email),
             ___action.tenant_id);
@@ -376,7 +376,7 @@ begin
         where invitation_id = _invitation_id
           and status_code in ('processing', 'accepted');
 
-        perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+        perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
             22008, 'invitation', _invitation_id,
             jsonb_build_object('target_email', ___inv.target_email),
             ___inv.tenant_id);
@@ -713,7 +713,7 @@ $$
 declare
     ___group_id integer;
     ___perm_set_code text;
-    ___perm_code text;
+    ___permission_full_code text;
     ___resource_type text;
     ___resource_id jsonb;
     ___access_flags text[];
@@ -739,10 +739,10 @@ begin
             );
 
         when 'assign_permission' then
-            ___perm_code := _payload->>'permission_code';
+            ___permission_full_code := _payload->>'permission_code';
             perform unsecure.assign_permission(
                 _updated_by, _user_id, _correlation_id,
-                null, _target_user_id, null, ___perm_code, _tenant_id
+                null, _target_user_id, null, ___permission_full_code, _tenant_id
             );
 
         when 'assign_resource_access' then
@@ -1267,7 +1267,7 @@ begin
         );
     end loop;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
         22010, 'invitation_template', ___template_id,
         jsonb_build_object('template_code', _code),
         _tenant_id);
@@ -1310,7 +1310,7 @@ begin
         updated_at = now()
     where template_id = _template_id;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id,
         22011, 'invitation_template', _template_id,
         jsonb_build_object('template_code', ___tmpl.code),
         ___tmpl.tenant_id);
@@ -1340,7 +1340,7 @@ begin
 
     delete from auth.invitation_template where template_id = _template_id;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id,
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id,
         22012, 'invitation_template', _template_id,
         jsonb_build_object('template_code', ___tmpl.code),
         ___tmpl.tenant_id);
@@ -1489,7 +1489,7 @@ begin
             );
         end loop;
 
-        perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
+        perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id,
             22010, 'invitation_template', ___template_id,
             jsonb_build_object('template_code', __code),
             _tenant_id);
@@ -1508,7 +1508,7 @@ begin
             delete from auth.invitation_template
             where template_id = __tmpl_to_delete.template_id;
 
-            perform create_journal_message_for_entity(
+            perform public.create_journal_message_for_entity(
                 _created_by, _user_id, _correlation_id,
                 22012, 'invitation_template', __tmpl_to_delete.template_id,
                 jsonb_build_object('template_code', __tmpl_to_delete.code,

@@ -77,7 +77,7 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 15001  -- token_created
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -132,7 +132,7 @@ begin
 				, user_oid
 				, token_data;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -211,7 +211,7 @@ begin
 				, user_oid
 				, token_data;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15004  -- token_failed
 			, 'token', __token_id
 			, jsonb_build_object('username', _user_id::text, 'token_uid', _token_uid
@@ -291,7 +291,7 @@ begin
 	where ui.user_id = __last_item.user_id
 	into __target_username;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used (validated)
 			, 'token', __last_item.token_id
 			, jsonb_build_object('username', __target_username, 'token_type', __last_item.token_type_code
@@ -367,7 +367,7 @@ begin
     insert into const.token_type (code, default_expiration_in_seconds, is_system)
     values (_code, _default_expiration_in_seconds, false);
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 19001  -- token_type_created
         , 'token_type', 0
         , jsonb_build_object('token_type_code', _code, 'actor', _created_by)
@@ -418,7 +418,7 @@ begin
     set default_expiration_in_seconds = _default_expiration_in_seconds
     where code = _code;
 
-    perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
         , 19002  -- token_type_updated
         , 'token_type', 0
         , jsonb_build_object('token_type_code', _code, 'actor', _updated_by)
@@ -461,7 +461,7 @@ begin
 
     delete from const.token_type where code = _code;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 19003  -- token_type_deleted
         , 'token_type', 0
         , jsonb_build_object('token_type_code', _code, 'actor', _deleted_by)

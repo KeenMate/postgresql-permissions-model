@@ -412,14 +412,15 @@ begin
 end;
 $$;
 
--- Notify BEFORE tenant DELETE
+-- Notify BEFORE tenant DELETE. A tenant row is only physically removed via
+-- auth.purge_tenant now (soft delete keeps the row), so this signals a purge.
 create or replace function triggers.notify_tenant() returns trigger
     language plpgsql
 as
 $$
 begin
     perform unsecure.notify_permission_change(
-        'tenant_deleted', OLD.tenant_id, 'tenant', OLD.tenant_id, null);
+        'tenant_purged', OLD.tenant_id, 'tenant', OLD.tenant_id, null);
     return OLD;
 end;
 $$;

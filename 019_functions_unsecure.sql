@@ -587,7 +587,7 @@ begin
     get diagnostics __expired_count = row_count;
 
     if __expired_count > 0 then
-        perform create_journal_message_for_entity(_created_by, 1, null
+        perform public.create_journal_message_for_entity(_created_by, 1, null
             , 15003  -- token_expired
             , 'token', 0
             , jsonb_build_object('expired_count', __expired_count, 'action', 'batch_expiration')
@@ -616,7 +616,7 @@ begin
 	return query
 		select __last_id;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13001  -- group_created
 			, 'group', __last_id
 			, jsonb_build_object('group_title', _title, 'tenant_title', _tenant_id::text
@@ -756,7 +756,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _target_user_id bigint DEFAULT NULL::bigint, _perm_set_code text DEFAULT NULL::text, _perm_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function unsecure.assign_permission(_created_by text, _user_id bigint, _correlation_id text, _user_group_id integer DEFAULT NULL::integer, _target_user_id bigint DEFAULT NULL::bigint, _perm_set_code text DEFAULT NULL::text, _permission_full_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
@@ -779,7 +779,7 @@ begin
 	end if;
 
 	if
-		_perm_set_code is null and _perm_code is null then
+		_perm_set_code is null and _permission_full_code is null then
 		perform error.raise_52273();
 	end if;
 
@@ -806,22 +806,22 @@ begin
 			perform error.raise_52282(_perm_set_code);
 		else
 			if not __perm_set_assignable then
-				perform error.raise_52283(_perm_code);
+				perform error.raise_52283(_permission_full_code);
 			end if;
 		end if;
 	end if;
 
-	if _perm_code is not null then
+	if _permission_full_code is not null then
 		select p.permission_id, p.is_assignable
 		from auth.permission p
-		where p.full_code = _perm_code::ext.ltree
+		where p.full_code = _permission_full_code::ext.ltree
 		into __permission_id, __permission_assignable;
 
 		if __permission_id is null then
-			perform error.raise_52180(_perm_code);
+			perform error.raise_52180(_permission_full_code);
 		else
 			if not __permission_assignable then
-				perform error.raise_52181(_perm_code);
+				perform error.raise_52181(_permission_full_code);
 			end if;
 		end if;
 	end if;
@@ -837,10 +837,10 @@ begin
 		where assignment_id = __last_id;
 
 	if _user_group_id is not null then
-		perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+		perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'group', _user_group_id
-			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
+			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _permission_full_code)
 				, 'target_type', 'group', 'target_name', _user_group_id::text
 				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
 			, _tenant_id);
@@ -848,10 +848,10 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_created_by, _user_group_id, _tenant_id);
 	else
-		perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+		perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12010  -- permission_assigned
 			, 'user', _target_user_id
-			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _perm_code)
+			, jsonb_build_object('permission_code', coalesce(_perm_set_code, _permission_full_code)
 				, 'target_type', 'user', 'target_name', _target_user_id::text
 				, 'assignment_id', __last_id, 'perm_set_code', _perm_set_code)
 			, _tenant_id);
@@ -883,7 +883,7 @@ begin
 				returning *;
 
 	if __user_group_id is not null then
-		perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+		perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'group', __user_group_id
 			, jsonb_build_object('target_type', 'group', 'target_name', __user_group_id::text
@@ -893,7 +893,7 @@ begin
 		-- Invalidate permission cache for all members of the group
 		perform unsecure.invalidate_group_members_permission_cache(_deleted_by, __user_group_id, _tenant_id);
 	else
-		perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+		perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12011  -- permission_revoked
 			, 'user', __target_user_id
 			, jsonb_build_object('target_type', 'user', 'target_name', __target_user_id::text
@@ -947,7 +947,7 @@ begin
 	-- Invalidate cache for all users who have this permission (directly or via perm_sets/groups)
 	perform unsecure.invalidate_permission_users_cache(_updated_by, __permission_id);
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12002  -- permission_updated
 			, 'permission', __permission_id
 			, jsonb_build_object('permission_code', __permission_full_code, 'is_assignable', _is_assignable)
@@ -955,7 +955,7 @@ begin
 end;
 $$;
 
-create or replace function unsecure.assign_permission_as_system(_user_group_id integer, _target_user_id bigint, _perm_set_code text, _perm_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
+create or replace function unsecure.assign_permission_as_system(_user_group_id integer, _target_user_id bigint, _perm_set_code text, _permission_full_code text DEFAULT NULL::text, _tenant_id integer DEFAULT 1) returns SETOF auth.permission_assignment
     language plpgsql
 as
 $$
@@ -963,7 +963,7 @@ begin
 	return query
 		select *
 		from unsecure.assign_permission('system', 1, null, _user_group_id, _target_user_id, _perm_set_code,
-																		_perm_code, _tenant_id);
+																		_permission_full_code, _tenant_id);
 end;
 
 $$;
@@ -1182,7 +1182,7 @@ begin
 		from auth.permission
 		where permission_id = __last_id;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12001  -- permission_created
 			, 'permission', __last_id
 			, jsonb_build_object('permission_code', __full_code::text, 'title', _title)
@@ -1279,7 +1279,7 @@ begin
 				 inner join auth.permission p
 										on p.full_code = perm_code::ext.ltree;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
@@ -1327,7 +1327,7 @@ begin
 				 inner join auth.permission p
 										on p.full_code = perm_code::ext.ltree;
 
-	perform create_journal_message_for_entity('system', 1, null
+	perform public.create_journal_message_for_entity('system', 1, null
 			, 12020  -- perm_set_created
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'tenant_title', _tenant_id::text
@@ -1384,7 +1384,7 @@ begin
 		perform unsecure.invalidate_perm_set_users_permission_cache(_updated_by, _perm_set_id, _tenant_id);
 	end if;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', __last_id
 			, jsonb_build_object('perm_set_code', _title, 'is_assignable', _is_assignable)
@@ -1398,7 +1398,7 @@ end;
 $$;
 
 create or replace function unsecure.create_perm_set_permissions(_created_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
-    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
+    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_full_code text)
     rows 1
     language plpgsql
 as
@@ -1420,7 +1420,7 @@ begin
 	where p.code is not null
 		and psp.perm_set_id is null;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -1442,7 +1442,7 @@ end;
 $$;
 
 create or replace function unsecure.delete_perm_set_permissions(_deleted_by text, _user_id bigint, _correlation_id text, _perm_set_id integer, _permissions text[] DEFAULT NULL::text[], _tenant_id integer DEFAULT 1)
-    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_code text)
+    returns TABLE(__perm_set_id integer, __perm_set_code text, __permission_id integer, __permission_full_code text)
     rows 1
     language plpgsql
 as
@@ -1465,7 +1465,7 @@ begin
 																 inner join auth.perm_set ps
 																						on psp.perm_set_id = ps.perm_set_id and ps.tenant_id = _tenant_id);
 
-	perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
 			, 12021  -- perm_set_updated
 			, 'perm_set', _perm_set_id
 			, jsonb_build_object('perm_set_code', _perm_set_id::text
@@ -1532,7 +1532,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -1592,7 +1592,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'email', __normalized_email
@@ -1619,7 +1619,7 @@ begin
 				, provider_code
 				, uid;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10020  -- password_changed
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -1697,7 +1697,7 @@ begin
 		from auth.user_info
 		where user_id = __last_id;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10001  -- user_created
 			, 'user', __last_id
 			, jsonb_build_object('username', __normalized_username, 'user_type', 'api')
@@ -1722,7 +1722,7 @@ begin
 
 	perform auth.create_user_event(_updated_by, _user_id, _correlation_id, 'update_user_info', _target_user_id);
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 10002  -- user_updated
 			, 'user', _target_user_id
 			, jsonb_build_object('username', _username, 'display_name', _display_name, 'email', _email)
@@ -1778,7 +1778,7 @@ begin
 	-- Invalidate permission cache so user picks up group permissions immediately
 	perform unsecure.clear_permission_cache(_created_by, _target_user_id, _tenant_id);
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 13010  -- group_member_added
 			, 'group', _user_group_id
 			, jsonb_build_object('username', __user_upn, 'group_title', __user_group_code
@@ -1855,7 +1855,7 @@ begin
 					 , _password_salt, _is_active, _is_verified)
 		returning user_id, provider_code, uid;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 			, 10030  -- identity_created
 			, 'user', _target_user_id
 			, jsonb_build_object('username', __user_info.username, 'provider_code', _provider_code
@@ -1921,13 +1921,86 @@ begin
     -- Detach journal references (preserve audit history)
     update public.journal set tenant_id = null where tenant_id = _tenant_id;
 
-    -- Delete the tenant
+    -- Stamp the permanent identity ledger as purged. The ledger row stays
+    -- forever so the code can never be reused, even after the tenant row is gone.
+    update auth.tenant_identity
+       set purged_at = now(), purged_by = _deleted_by
+     where original_tenant_id = _tenant_id;
+
+    -- Delete the tenant row (all child data was removed above)
     delete from auth.tenant
     where tenant_id = _tenant_id
     returning * into __last_item;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
-            , 11003  -- tenant_deleted
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+            , 11006  -- tenant_purged
+            , 'tenant', __last_item.tenant_id
+            , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
+            , 1);
+
+    return query
+        select __last_item.tenant_id
+             , __last_item.uuid
+             , __last_item.code;
+end;
+$$;
+
+/*
+ * unsecure.soft_delete_tenant — reversible soft delete
+ *
+ * Marks the tenant deleted_at/by and clears its permission + group caches so
+ * users lose access immediately. Child data is left intact (block-at-boundary).
+ */
+create or replace function unsecure.soft_delete_tenant(_deleted_by text, _user_id bigint, _correlation_id text, _tenant_id integer)
+    returns table(__tenant_id integer, __uuid uuid, __code text)
+    language plpgsql
+as
+$$
+declare
+    __last_item auth.tenant;
+begin
+    update auth.tenant
+       set deleted_at = now(), deleted_by = _deleted_by
+         , updated_at = now(), updated_by = _deleted_by
+     where tenant_id = _tenant_id
+    returning * into __last_item;
+
+    -- Block access: drop cached permissions/groups for this tenant
+    delete from auth.user_permission_cache where tenant_id = _tenant_id;
+    delete from auth.user_group_id_cache where tenant_id = _tenant_id;
+
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+            , 11004  -- tenant_soft_deleted
+            , 'tenant', __last_item.tenant_id
+            , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
+            , 1);
+
+    return query
+        select __last_item.tenant_id
+             , __last_item.uuid
+             , __last_item.code;
+end;
+$$;
+
+/*
+ * unsecure.restore_tenant — reverse a soft delete
+ */
+create or replace function unsecure.restore_tenant(_restored_by text, _user_id bigint, _correlation_id text, _tenant_id integer)
+    returns table(__tenant_id integer, __uuid uuid, __code text)
+    language plpgsql
+as
+$$
+declare
+    __last_item auth.tenant;
+begin
+    update auth.tenant
+       set deleted_at = null, deleted_by = null
+         , updated_at = now(), updated_by = _restored_by
+     where tenant_id = _tenant_id
+    returning * into __last_item;
+
+    perform public.create_journal_message_for_entity(_restored_by, _user_id, _correlation_id
+            , 11005  -- tenant_restored
             , 'tenant', __last_item.tenant_id
             , jsonb_build_object('tenant_title', __last_item.title, 'tenant_code', __last_item.code)
             , 1);
@@ -2290,7 +2363,7 @@ begin
 		set uid = _provider_uid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message_for_entity('system', _user_id, _correlation_id
+		perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -2304,7 +2377,7 @@ begin
 		set provider_oid = _provider_oid
 		where user_identity_id = __user_identity_id;
 
-		perform create_journal_message_for_entity('system', _user_id, _correlation_id
+		perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 				, 10031  -- identity_updated
 				, 'user', _target_user_id
 				, jsonb_build_object('username', __upn, 'provider_code', _provider_code
@@ -2338,7 +2411,7 @@ begin
 		and provider_code = _provider_code
 		and not is_verified;
 
-	perform create_journal_message_for_entity('system', _user_id, _correlation_id
+	perform public.create_journal_message_for_entity('system', _user_id, _correlation_id
 		, 10035  -- identity_verified
 		, 'user', _target_user_id
 		, jsonb_build_object('username', __username, 'provider_code', _provider_code)
@@ -2408,7 +2481,7 @@ begin
 	from auth.perm_set_perm
 	where perm_set_id = __source_perm_set.perm_set_id;
 
-	perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
 			, 12020  -- perm_set_created
 			, 'perm_set', __created_perm_set.perm_set_id
 			, jsonb_build_object('perm_set_code', __created_perm_set.code
@@ -2821,7 +2894,7 @@ begin
             _original_user_id, _reason)
     returning blacklist_id into __last_id;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 10080  -- user_blacklisted
         , 'user', coalesce(_original_user_id, 0)
         , jsonb_build_object('username', _username, 'provider_code', _provider_code,

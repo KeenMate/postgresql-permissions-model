@@ -289,7 +289,7 @@ begin
 
     return query
         select j.__created_at, j.__created_by, j.__correlation_id, j.__journal_id, j.__tenant_id, j.__event_id, j.__user_id, j.__keys, j.__data_payload, j.__request_context
-        from create_journal_message(
+        from public.create_journal_message(
             _created_by, _user_id, _correlation_id, ___event_id, _keys, _payload, _tenant_id, _request_context
         ) j;
 end;
@@ -323,7 +323,7 @@ create or replace function public.create_journal_message_for_entity(
 as
 $$
 select __created_at, __created_by, __correlation_id, __journal_id, __tenant_id, __event_id, __user_id, __keys, __data_payload, __request_context
-from create_journal_message(
+from public.create_journal_message(
     _created_by, _user_id, _correlation_id, _event_id,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id, _request_context
@@ -358,7 +358,7 @@ create or replace function public.create_journal_message_for_entity_by_code(
 as
 $$
 select __created_at, __created_by, __correlation_id, __journal_id, __tenant_id, __event_id, __user_id, __keys, __data_payload, __request_context
-from create_journal_message_by_code(
+from public.create_journal_message_by_code(
     _created_by, _user_id, _correlation_id, _event_code,
     jsonb_build_object(_entity_type, _entity_id),
     _payload, _tenant_id, _request_context
@@ -470,7 +470,7 @@ begin
 		perform error.raise_52279(__token_uid);
 	end if;
 
-	perform create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
+	perform public.create_journal_message_for_entity(_updated_by, _user_id, _correlation_id
 			, 15002  -- token_used
 			, 'token', __token_id
 			, jsonb_build_object('username', _target_user_id::text)
@@ -1002,7 +1002,7 @@ begin
     select __deleted_count from unsecure.purge_user_events(_deleted_by, _user_id, _correlation_id, _older_than_days)
     into __ue_deleted;
 
-    perform create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_deleted_by, _user_id, _correlation_id
         , 17001  -- audit_data_purged
         , 'system', 0
         , jsonb_build_object('journal_deleted', __j_deleted, 'user_events_deleted', __ue_deleted,

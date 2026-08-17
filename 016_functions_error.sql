@@ -185,12 +185,12 @@ $$;
  */
 
 -- 32001: No permission
-create or replace function error.raise_32001(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1) returns void
+create or replace function error.raise_32001(_user_id bigint, _permission_full_codes text[], _tenant_id integer DEFAULT 1) returns void
     language plpgsql
 as
 $$
 begin
-    raise exception 'User(id: %) has no permission (codes: %) in tenant(id: %)', _user_id, array_to_string(_perm_codes, '; '), _tenant_id
+    raise exception 'User(id: %) has no permission (codes: %) in tenant(id: %)', _user_id, array_to_string(_permission_full_codes, '; '), _tenant_id
         using errcode = '32001';
 end;
 $$;
@@ -207,12 +207,12 @@ end;
 $$;
 
 -- 32003: Permission not assignable
-create or replace function error.raise_32003(_permission_code text) returns void
+create or replace function error.raise_32003(_permission_full_code text) returns void
     language plpgsql
 as
 $$
 begin
-    raise exception 'Permission (code: %) is not assignable', _permission_code
+    raise exception 'Permission (code: %) is not assignable', _permission_full_code
         using errcode = '32003';
 end;
 $$;
@@ -607,6 +607,50 @@ begin
 end;
 $$;
 
+-- 34004: Tenant code was previously used and can never be reused (identity ledger)
+create or replace function error.raise_34004(_code text) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Tenant code "%" has been used before and cannot be reused', _code
+        using errcode = '34004';
+end;
+$$;
+
+-- 34005: Tenant is already soft-deleted
+create or replace function error.raise_34005(_tenant_uuid uuid) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Tenant (uuid: %) is already deleted', _tenant_uuid
+        using errcode = '34005';
+end;
+$$;
+
+-- 34006: Tenant is not soft-deleted (restore/purge require a soft-deleted tenant)
+create or replace function error.raise_34006(_tenant_uuid uuid) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Tenant (uuid: %) is not deleted', _tenant_uuid
+        using errcode = '34006';
+end;
+$$;
+
+-- 34007: Tenant cannot be deleted (system tenant or is_removable = false)
+create or replace function error.raise_34007(_tenant_id integer) returns void
+    language plpgsql
+as
+$$
+begin
+    raise exception 'Tenant (id: %) is protected and cannot be deleted', _tenant_id
+        using errcode = '34007';
+end;
+$$;
+
 /*
  * Blacklist Errors (33018-33019)
  */
@@ -649,7 +693,7 @@ create or replace function error.raise_52105(_user_id bigint) returns void langu
 create or replace function error.raise_52106(_email text) returns void language sql as $$ select error.raise_33004(_email); $$;
 create or replace function error.raise_52107(_provider_code text) returns void language sql as $$ select error.raise_33010(_provider_code); $$;
 create or replace function error.raise_52108(_tenant_id text, _username text) returns void language sql as $$ select error.raise_34001(_tenant_id, _username); $$;
-create or replace function error.raise_52109(_user_id bigint, _perm_codes text[], _tenant_id integer DEFAULT 1) returns void language sql as $$ select error.raise_32001(_user_id, _perm_codes, _tenant_id); $$;
+create or replace function error.raise_52109(_user_id bigint, _permission_full_codes text[], _tenant_id integer DEFAULT 1) returns void language sql as $$ select error.raise_32001(_user_id, _permission_full_codes, _tenant_id); $$;
 create or replace function error.raise_52110(_user_id bigint, _provider_code text) returns void language sql as $$ select error.raise_33008(_user_id, _provider_code); $$;
 create or replace function error.raise_52111(_user_id bigint, _provider_code text) returns void language sql as $$ select error.raise_33009(_user_id, _provider_code); $$;
 create or replace function error.raise_52112(_user_id bigint) returns void language sql as $$ select error.raise_33005(_user_id); $$;
@@ -679,8 +723,8 @@ create or replace function error.raise_52278(_token_uid text) returns void langu
 create or replace function error.raise_52279(_token_uid text) returns void language sql as $$ select error.raise_30003(_token_uid); $$;
 
 -- Permission errors
-create or replace function error.raise_52180(_permission_code text) returns void language sql as $$ select error.raise_32002(_permission_code); $$;
-create or replace function error.raise_52181(_permission_code text) returns void language sql as $$ select error.raise_32003(_permission_code); $$;
+create or replace function error.raise_52180(_permission_full_code text) returns void language sql as $$ select error.raise_32002(_permission_full_code); $$;
+create or replace function error.raise_52181(_permission_full_code text) returns void language sql as $$ select error.raise_32003(_permission_full_code); $$;
 create or replace function error.raise_52282(_perm_set_code text) returns void language sql as $$ select error.raise_32004(_perm_set_code); $$;
 create or replace function error.raise_52283(_perm_set_code text) returns void language sql as $$ select error.raise_32005(_perm_set_code); $$;
 

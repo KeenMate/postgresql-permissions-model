@@ -27,9 +27,10 @@ create or replace function public.create_translation(
     _language_code text,
     _data_group text,
     _value text,
-    _data_object_code text DEFAULT null,
-    _data_object_id bigint DEFAULT null,
-    _tenant_id integer DEFAULT 1
+    _data_object_code text default null,
+    _data_object_id bigint default null,
+    _context text default 'text',
+    _tenant_id integer default 1
 )
     returns table(
         __created_at       timestamptz,
@@ -58,19 +59,23 @@ begin
 
     return query
         insert into public.translation (created_by, updated_by, language_code, tenant_id,
-            data_group, data_object_code, data_object_id, value)
+            data_group, data_object_code, data_object_id, context, value)
         values (_created_by, _created_by, _language_code, _tenant_id,
-            _data_group, _data_object_code, _data_object_id, _value)
+            _data_group, _data_object_code, _data_object_id, _context, _value)
         returning created_at, created_by, updated_at, updated_by, translation_id,
             language_code, tenant_id, data_group, data_object_code, data_object_id,
             context, value;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    -- Refresh materialized view
+    perform internal.refresh_translation_cache();
+
+    perform public.create_journal_message(_created_by, _user_id, _correlation_id
         , 21001  -- translation_created
-        , null::jsonb  -- keys
+        , null::jsonb
         , jsonb_strip_nulls(jsonb_build_object(
             'language_code', _language_code, 'data_group', _data_group,
-            'data_object_code', _data_object_code, 'data_object_id', _data_object_id))
+            'data_object_code', _data_object_code, 'data_object_id', _data_object_id,
+            'context', _context))
         , _tenant_id);
 end;
 $$;
@@ -121,7 +126,7 @@ begin
             language_code, tenant_id, data_group, data_object_code, data_object_id,
             context, value;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 21002  -- translation_updated
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id, 'value', _value)
@@ -152,7 +157,7 @@ begin
 
     delete from public.translation where translation_id = _translation_id;
 
-    perform create_journal_message_for_entity(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message_for_entity(_created_by, _user_id, _correlation_id
         , 21003  -- translation_deleted
         , 'translation', _translation_id::bigint
         , jsonb_build_object('translation_id', _translation_id)
@@ -169,13 +174,13 @@ create or replace function public.copy_translations(
     _correlation_id text,
     _from_language_code text,
     _to_language_code text,
-    _overwrite boolean DEFAULT false,
-    _data_group text DEFAULT null,
-    _from_tenant_id integer DEFAULT 1,
-    _to_tenant_id integer DEFAULT 1,
-    _tenant_id integer DEFAULT 1
+    _overwrite boolean default false,
+    _data_group text default null,
+    _from_tenant_id integer default 1,
+    _to_tenant_id integer default 1,
+    _tenant_id integer default 1
 )
-    returns TABLE(__operation text, __count bigint)
+    returns table(__operation text, __count bigint)
     language plpgsql
 as
 $$
@@ -195,7 +200,7 @@ begin
     -- Phase 1: Update existing translations if overwrite is enabled
     if _overwrite then
         with source as (
-            select data_group, data_object_code, data_object_id, value
+            select data_group, data_object_code, data_object_id, context, value
             from public.translation
             where language_code = _from_language_code
                 and tenant_id = _from_tenant_id
@@ -209,6 +214,7 @@ begin
         where t.language_code = _to_language_code
             and t.tenant_id = _to_tenant_id
             and t.data_group = s.data_group
+            and t.context = s.context
             and (
                 (t.data_object_code is not null and t.data_object_code = s.data_object_code)
                 or (t.data_object_id is not null and t.data_object_id = s.data_object_id)
@@ -219,9 +225,9 @@ begin
 
     -- Phase 2: Insert missing translations
     insert into public.translation (created_by, updated_by, language_code, tenant_id,
-        data_group, data_object_code, data_object_id, value)
+        data_group, data_object_code, data_object_id, context, value)
     select _created_by, _created_by, _to_language_code, _to_tenant_id,
-        s.data_group, s.data_object_code, s.data_object_id, s.value
+        s.data_group, s.data_object_code, s.data_object_id, s.context, s.value
     from public.translation s
     where s.language_code = _from_language_code
         and s.tenant_id = _from_tenant_id
@@ -231,6 +237,7 @@ begin
             where e.language_code = _to_language_code
                 and e.tenant_id = _to_tenant_id
                 and e.data_group = s.data_group
+                and e.context = s.context
                 and (
                     (s.data_object_code is not null and e.data_object_code = s.data_object_code)
                     or (s.data_object_id is not null and e.data_object_id = s.data_object_id)
@@ -239,9 +246,12 @@ begin
 
     get diagnostics __inserted_count = row_count;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    -- Refresh materialized view
+    perform internal.refresh_translation_cache();
+
+    perform public.create_journal_message(_created_by, _user_id, _correlation_id
         , 21004  -- translations_copied
-        , null::jsonb  -- keys
+        , null::jsonb
         , jsonb_build_object(
             'from_language', _from_language_code, 'to_language', _to_language_code,
             'overwrite', _overwrite, 'data_group', _data_group,
@@ -261,22 +271,44 @@ $$;
 create or replace function public.get_group_translations(
     _language_code text,
     _data_group text,
-    _tenant_id integer DEFAULT 1
+    _context text default 'text',
+    _tenant_id integer default 1
 )
     returns jsonb
     stable
-    language sql
+    language plpgsql
 as
 $$
-select coalesce(
-    jsonb_object_agg(t.data_object_code, t.value),
-    '{}'::jsonb
-)
-from public.translation t
-where t.language_code = _language_code
-    and t.data_group = _data_group
-    and t.data_object_code is not null
-    and t.tenant_id = _tenant_id;
+begin
+    -- Specific context → flat map: {"code1": "value1", "code2": "value2"}
+    if _context is not null then
+        return (
+            select coalesce(
+                jsonb_object_agg(mv.data_object_code, mv.values->>_context),
+                '{}'::jsonb
+            )
+            from public.mv_translation mv
+            where mv.language_code = _language_code
+                and mv.data_group = _data_group
+                and mv.data_object_code is not null
+                and mv.tenant_id = _tenant_id
+                and mv.values ? _context
+        );
+    end if;
+
+    -- All contexts → nested: {"code": {"title": "...", "description": "..."}}
+    return (
+        select coalesce(
+            jsonb_object_agg(mv.data_object_code, mv.values),
+            '{}'::jsonb
+        )
+        from public.mv_translation mv
+        where mv.language_code = _language_code
+            and mv.data_group = _data_group
+            and mv.data_object_code is not null
+            and mv.tenant_id = _tenant_id
+    );
+end;
 $$;
 
 -- ============================================================================
@@ -285,23 +317,25 @@ $$;
 create or replace function public.search_translations(
     _user_id bigint,
     _correlation_id text,
-    _display_language_code text DEFAULT 'en',
-    _search_text text DEFAULT null,
-    _language_code text DEFAULT null,
-    _data_group text DEFAULT null,
-    _data_object_code text DEFAULT null,
-    _data_object_id bigint DEFAULT null,
-    _page integer DEFAULT 1,
-    _page_size integer DEFAULT 10,
-    _tenant_id integer DEFAULT 1
+    _display_language_code text default 'en',
+    _search_text text default null,
+    _language_code text default null,
+    _data_group text default null,
+    _data_object_code text default null,
+    _data_object_id bigint default null,
+    _context text default 'text',
+    _page integer default 1,
+    _page_size integer default 10,
+    _tenant_id integer default 1
 )
-    returns TABLE(
+    returns table(
         __translation_id integer,
         __language_code text,
         __language_value text,
         __data_group text,
         __data_object_code text,
         __data_object_id bigint,
+        __context text,
         __value text,
         __created_at timestamptz,
         __created_by text,
@@ -334,9 +368,10 @@ begin
                 and (_data_group is null or t.data_group = _data_group)
                 and (_data_object_code is null or t.data_object_code = _data_object_code)
                 and (_data_object_id is null or t.data_object_id = _data_object_id)
+                and (_context is null or t.context = _context)
                 and (helpers.is_empty_string(__search_text)
                     or t.nrm_search_data like '%' || __search_text || '%')
-            order by t.data_group, t.data_object_code, t.language_code
+            order by t.data_group, t.data_object_code, t.context, t.language_code
             offset ((_page - 1) * _page_size) limit _page_size
         )
         select t.translation_id
@@ -345,6 +380,7 @@ begin
              , t.data_group
              , t.data_object_code
              , t.data_object_id
+             , t.context
              , t.value
              , t.created_at
              , t.created_by

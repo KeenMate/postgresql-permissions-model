@@ -95,7 +95,7 @@ begin
                   frontend_logical_order, backend_logical_order, communication_logical_order,
                   is_default_frontend, is_default_backend, is_default_communication, custom_data;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message(_created_by, _user_id, _correlation_id
         , 20001  -- language_created
         , null::jsonb  -- keys
         , jsonb_strip_nulls(jsonb_build_object(
@@ -193,7 +193,7 @@ begin
                   frontend_logical_order, backend_logical_order, communication_logical_order,
                   is_default_frontend, is_default_backend, is_default_communication, custom_data;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message(_created_by, _user_id, _correlation_id
         , 20002  -- language_updated
         , null::jsonb  -- keys
         , jsonb_strip_nulls(jsonb_build_object('language_code', _code, 'language_value', _value))
@@ -225,7 +225,7 @@ begin
     -- CASCADE on translation FK handles cleanup
     delete from const.language where code = _code;
 
-    perform create_journal_message(_created_by, _user_id, _correlation_id
+    perform public.create_journal_message(_created_by, _user_id, _correlation_id
         , 20003  -- language_deleted
         , null::jsonb  -- keys
         , jsonb_build_object('language_code', _code)

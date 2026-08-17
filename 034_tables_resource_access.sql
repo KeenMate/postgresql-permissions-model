@@ -184,28 +184,184 @@ create index ix_ra_group_resources
 create index ix_ra_resource_grants
     on auth.resource_access (root_type, resource_type, tenant_id);
 
+-- ============================================================================
+-- const.resource_role — Named bundles of flags scoped to a resource_type
+-- ============================================================================
+-- A "resource role" is a named bundle of access flags scoped to a single
+-- resource_type. Roles replace the N-row flag grant with a single assignment
+-- row that expands to flags at check time.
+--   Analogy:  perm_set : permission  ::  resource_role : access_flag
+-- A role is defined for ONE resource_type. Cascade to descendants happens via
+-- the ltree walk-up in has_resource_access, not via lax FKs.
+create table if not exists const.resource_role
+(
+    code          text    not null primary key,
+    resource_type text    not null references const.resource_type(code) on delete cascade,
+    is_active     boolean not null default true,
+    source        text,
+    -- Unique target for the composite FK from resource_role_assignment.
+    -- code is already PK; this exposes (code, resource_type) as a matchable pair.
+    constraint uq_resource_role_code_type unique (code, resource_type)
+);
+
+create index if not exists ix_resource_role_resource_type
+    on const.resource_role (resource_type);
+
+create index if not exists ix_resource_role_source
+    on const.resource_role (source)
+    where source is not null;
+
+-- ============================================================================
+-- const.resource_role_flag — Flags belonging to a role
+-- ============================================================================
+-- Redefining a role = delete + insert here. No cascade to assignments needed:
+-- has_resource_access expands roles at check time, so every assigned user/group
+-- picks up the new flag set on the very next call.
+create table if not exists const.resource_role_flag
+(
+    resource_role_code text not null references const.resource_role(code) on delete cascade,
+    access_flag_code   text not null references const.resource_access_flag(code) on delete cascade,
+    primary key (resource_role_code, access_flag_code)
+);
+
+create index if not exists ix_resource_role_flag_flag
+    on const.resource_role_flag (access_flag_code);
+
+-- ============================================================================
+-- auth.resource_role_assignment — Tenant-scoped, partitioned by root_type
+-- ============================================================================
+-- One row per (tenant, resource, user|group, role_code).
+-- Role grants (grant-only; no is_deny column). Denies stay in resource_access.
+create table if not exists auth.resource_role_assignment
+(
+    created_at                  timestamptz default now()           not null,
+    created_by                  text        default 'unknown'::text not null,
+    updated_at                  timestamptz default now()           not null,
+    updated_by                  text        default 'unknown'::text not null,
+    resource_role_assignment_id bigint generated always as identity,
+    tenant_id                   integer     not null references auth.tenant on delete cascade,
+    resource_type               text        not null references const.resource_type,
+    root_type                   text        not null,
+    resource_id                 jsonb       not null default '{}'::jsonb,
+    resource_path               ext.ltree,
+    user_id                     bigint      references auth.user_info on delete cascade,
+    user_group_id               integer     references auth.user_group on delete cascade,
+    role_code                   text        not null,
+    granted_by                  bigint      references auth.user_info on delete set null,
+    constraint rra_created_by_check check (length(created_by) <= 250),
+    constraint rra_updated_by_check check (length(updated_by) <= 250),
+    constraint rra_either_user_or_group
+        check ((user_id is not null) or (user_group_id is not null)),
+    constraint rra_not_both_user_and_group
+        check (not (user_id is not null and user_group_id is not null)),
+    constraint rra_resource_id_is_object
+        check (jsonb_typeof(resource_id) = 'object'),
+    constraint rra_path_or_id
+        check (resource_path is not null or resource_id <> '{}'::jsonb),
+    -- Composite FK: role must be defined for exactly this resource_type.
+    -- Hierarchical cascade happens via check-time walk-up, not via FK laxity.
+    constraint rra_role_type_match
+        foreign key (role_code, resource_type)
+            references const.resource_role (code, resource_type)
+            on delete cascade,
+    primary key (resource_role_assignment_id, root_type)
+) partition by list (root_type);
+
+-- Default partition (catches unregistered root types)
+create table if not exists auth.resource_role_assignment_default
+    partition of auth.resource_role_assignment default;
+
+-- ----------------------------------------------------------------------------
+-- Indexes (mirror auth.resource_access)
+-- ----------------------------------------------------------------------------
+
+-- GIN for containment queries: "all role assignments where resource_id @> {...}"
+create index if not exists ix_rra_resource_id
+    on auth.resource_role_assignment using gin (resource_id);
+
+-- GiST for path-based ancestor walks
+create index if not exists ix_rra_resource_path
+    on auth.resource_role_assignment using gist (resource_path)
+    where resource_path is not null;
+
+-- Primary lookup for id-only rows: "does user X have role Y on resource Z?"
+create unique index if not exists uq_rra_user_role
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, md5(resource_id::text), user_id, role_code)
+    where user_id is not null and resource_path is null;
+
+create unique index if not exists uq_rra_group_role
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, md5(resource_id::text), user_group_id, role_code)
+    where user_group_id is not null and resource_path is null;
+
+-- Uniqueness for path-bearing rows
+create unique index if not exists uq_rra_user_role_path
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_id, role_code)
+    where user_id is not null and resource_path is not null;
+
+create unique index if not exists uq_rra_group_role_path
+    on auth.resource_role_assignment
+        (root_type, resource_type, tenant_id, resource_path, md5(resource_id::text), user_group_id, role_code)
+    where user_group_id is not null and resource_path is not null;
+
+-- Reverse: "what resources can user X access via roles?"
+create index if not exists ix_rra_user_resources
+    on auth.resource_role_assignment (root_type, resource_type, tenant_id, user_id)
+    where user_id is not null;
+
+-- Reverse: "what resources can group X access via roles?"
+create index if not exists ix_rra_group_resources
+    on auth.resource_role_assignment (root_type, resource_type, tenant_id, user_group_id)
+    where user_group_id is not null;
+
+-- "Who has a role on resource Y?" — combined with GIN on resource_id
+create index if not exists ix_rra_resource_assignments
+    on auth.resource_role_assignment (root_type, resource_type, tenant_id);
+
 /*
- * Partition helper — creates a partition for a root resource type
+ * Partition helper — creates partitions for a root resource type
  *
  * Root-type logic: only root types get their own partition.
  * Child types (e.g. 'project.documents') share the root partition ('project').
+ *
+ * auth.resource_access and auth.resource_role_assignment live in lockstep:
+ * registering a new root type via create_resource_type() / ensure_resource_types()
+ * auto-creates BOTH partitions because they both call this single helper.
  */
 create or replace function unsecure.ensure_resource_access_partition(_resource_type text)
 returns void language plpgsql as $$
 declare
-    __root_type text;
-    __partition_name text;
+    __root_type      text;
+    __ra_partition   text;
+    __rra_partition  text;
 begin
     __root_type := split_part(_resource_type, '.', 1);
-    __partition_name := 'resource_access_' || __root_type;
+
+    -- auth.resource_access_<root>
+    __ra_partition := 'resource_access_' || __root_type;
     if not exists (
         select 1 from pg_class c
         join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'auth' and c.relname = __partition_name
+        where n.nspname = 'auth' and c.relname = __ra_partition
     ) then
         execute format(
             'create table auth.%I partition of auth.resource_access for values in (%L)',
-            __partition_name, __root_type
+            __ra_partition, __root_type
+        );
+    end if;
+
+    -- auth.resource_role_assignment_<root>
+    __rra_partition := 'resource_role_assignment_' || __root_type;
+    if not exists (
+        select 1 from pg_class c
+        join pg_namespace n on n.oid = c.relnamespace
+        where n.nspname = 'auth' and c.relname = __rra_partition
+    ) then
+        execute format(
+            'create table auth.%I partition of auth.resource_role_assignment for values in (%L)',
+            __rra_partition, __root_type
         );
     end if;
 end;
