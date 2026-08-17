@@ -281,7 +281,7 @@ declare
 begin
 
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'permissions.create_permission', _tenant_id);
 
 	return query
 		select created_at, created_by, updated_at, updated_by, permission_id, is_assignable, code, full_code::text, node_path::text, has_children, short_code, source from unsecure.create_permission(_created_by, _user_id, _correlation_id, _title, _parent_full_code, _is_assignable, _short_code, _source);
@@ -1032,7 +1032,7 @@ declare
     __perm_to_delete record;
 begin
     -- Single permission check for the batch
-    perform auth.has_permission(_user_id, _correlation_id, 'permissions.add_permission', _tenant_id);
+    perform auth.has_permission(_user_id, _correlation_id, 'permissions.create_permission', _tenant_id);
 
     if _is_final_state then
         perform auth.has_permission(_user_id, _correlation_id, 'permissions.delete_permission', _tenant_id);

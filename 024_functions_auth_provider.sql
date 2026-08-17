@@ -258,7 +258,7 @@ declare
 	__provider_id int;
 begin
 	perform
-		auth.has_permission(_user_id, _correlation_id, 'manage_provider.get_users', _tenant_id);
+		auth.has_permission(_user_id, _correlation_id, 'providers.get_users', _tenant_id);
 
 	select provider_id
 	from auth.provider

@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
+## 2026-08-18
+
+### Fixed
+
+Three latent bugs surfaced by a full documentation-vs-source audit. All three shared the same reason they escaped the test suite: every affected test runs as the system user (`user_id = 1`), and `auth.has_permissions` short-circuits `return true` for user 1 (and for owners) **before** the permission code is ever looked up — so permission-string typos sit in a branch no test reaches with a scoped user, and same-user data paths mask the ID mix-up.
+
+- **`auth.create_permission` / `auth.ensure_permissions` checked a non-existent permission** — both required `permissions.add_permission`, which is never seeded (the seeded node is `permissions.create_permission`). A user granted exactly `permissions.create_permission` would have been wrongly **denied**. Both checks now use `permissions.create_permission`.
+- **`auth.get_provider_users` checked a non-existent permission** — required `manage_provider.get_users`; the seeded node is `providers.get_users` (title *"Get users"* under the `providers` parent). Corrected to `providers.get_users`.
+- **`auth.create_user_tenant_preferences` wrote preferences under the wrong user** — the `insert` used `_user_id` (the acting caller) instead of `_target_user_id`, so an admin creating preferences for another user stored them under their own id. Now inserts `_target_user_id` (matching `auth.update_user_tenant_preferences`).
+
 ## 2026-08-17
 
 ### Added

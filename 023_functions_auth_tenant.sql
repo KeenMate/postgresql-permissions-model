@@ -310,7 +310,7 @@ begin
 
     return query
         insert into auth.user_tenant_preference (created_by, updated_by, user_id, tenant_id, user_preferences)
-            values (_created_by, _created_by, _user_id, _tenant_id, _update_data::jsonb)
+            values (_created_by, _created_by, _target_user_id, _tenant_id, _update_data::jsonb)
             returning updated_at
                 , updated_by;
 end;
