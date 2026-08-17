@@ -4,6 +4,8 @@ Debee - PostgreSQL Migration Orchestrator (Python Version)
 Pure orchestration script - all database logic lives in external SQL files
 """
 
+__version__ = "1.1.0"
+
 import os
 import sys
 import argparse
@@ -68,8 +70,11 @@ class TestResult:
 class DebeeOrchestrator:
     """PostgreSQL migration orchestrator"""
 
-    def __init__(self, environment: Optional[str] = None):
+    def __init__(self, environment: Optional[str] = None, silent: bool = False,
+                 assume_yes: bool = False):
         self.environment = environment
+        self.silent = silent
+        self.assume_yes = assume_yes
         self.env_vars: Dict[str, str] = {}
         self.update_start_number = -1
         self.update_end_number = -1
@@ -84,10 +89,14 @@ class DebeeOrchestrator:
 
     def print_success(self, message: str) -> None:
         """Print success message in green"""
+        if self.silent:
+            return
         print(f"{Colors.GREEN}{message}{Colors.NC}")
 
     def print_info(self, message: str) -> None:
         """Print info message"""
+        if self.silent:
+            return
         print(message)
 
     def set_env_var(self, key: str, value: str) -> None:
@@ -143,20 +152,15 @@ class DebeeOrchestrator:
 
     def get_files_by_numeric_prefix(self, start_number: int, end_number: int) -> List[Path]:
         """Get migration files within numeric range"""
-        # Use environment variables if parameters are -1
-        if start_number == -1 and self.env_vars.get("DBUPDATESTARTNUMBER"):
-            try:
-                start_number = int(self.env_vars["DBUPDATESTARTNUMBER"])
-            except ValueError:
-                pass
-
-        if end_number == -1 and self.env_vars.get("DBUPDATEENDNUMBER"):
-            try:
-                end_number = int(self.env_vars["DBUPDATEENDNUMBER"])
-            except ValueError:
-                pass
-
-        self.print_warning(f"Scripts from: {start_number} to: {end_number} will be run.")
+        if start_number == -1 and end_number == -1:
+            range_text = "all"
+        elif end_number == -1:
+            range_text = f"{start_number} onwards"
+        elif start_number == -1:
+            range_text = f"up to {end_number}"
+        else:
+            range_text = f"{start_number} -> {end_number}"
+        self.print_warning(f"Scripts to run: {range_text}")
 
         # Validate range
         if start_number > end_number and end_number != -1:
@@ -270,7 +274,7 @@ class DebeeOrchestrator:
                 return self.run_psql(backup_filepath)
 
             elif backup_type in ["dir", "custom"]:
-                format_flag = "-F d" if backup_type == "dir" else "-F c"
+                format_flag = "-Fd" if backup_type == "dir" else "-Fc"
                 self.print_info(f"Restoring from {backup_type}: {backup_filepath}")
                 self.set_current_database(dest_db)
 
@@ -857,7 +861,7 @@ class DebeeOrchestrator:
 
             suite_result.passed = not main_failed and suite_result.fail_count == 0
         else:
-            # "none" — current behavior with shared setup
+            # "none" - current behavior with shared setup
             tests_dir = Path("tests")
             for setup_path in manifest.setup:
                 resolved = tests_dir / setup_path
@@ -1010,6 +1014,61 @@ class DebeeOrchestrator:
 
         return all(r.passed for r in results)
 
+    def confirm_production(self, operations: List[Operation]) -> bool:
+        """If DBPRODENVIRONMENT is true, require typed 'yes' confirmation.
+        Returns True if execution should proceed, False if user aborted.
+        Bypassed by self.assume_yes. Output always visible regardless of silent."""
+        prod_flag = self.env_vars.get("DBPRODENVIRONMENT", "").strip().lower()
+        if prod_flag not in ("true", "1"):
+            return True
+        if self.assume_yes:
+            return True
+
+        ops_csv = ",".join(op.value for op in operations)
+        op_values = {op.value for op in operations}
+
+        sys.stdout.flush()
+        sep = "=" * 50
+        print(f"\n{Colors.RED}{sep}{Colors.NC}", file=sys.stderr)
+        print(f"{Colors.RED}  PRODUCTION ENVIRONMENT - CONFIRMATION REQUIRED{Colors.NC}", file=sys.stderr)
+        print(f"{Colors.RED}{sep}{Colors.NC}\n", file=sys.stderr)
+        if self.environment:
+            print(f"  Environment:  {self.environment}", file=sys.stderr)
+        print(f"  Host:         {self.env_vars.get('PGHOST', 'localhost')}:{self.env_vars.get('PGPORT', '5432')}", file=sys.stderr)
+        print(f"  User:         {self.env_vars.get('PGUSER', '<unset>')}", file=sys.stderr)
+        print(f"  Target DB:    {self.env_vars.get('DBDESTDB', '<unset>')}", file=sys.stderr)
+        print(f"  Operations:   {ops_csv}", file=sys.stderr)
+        if "execSql" in op_values:
+            if self.sql_file:
+                print(f"  SQL file:     {self.sql_file}", file=sys.stderr)
+            elif self.sql_command:
+                print(f"  SQL command:  {self.sql_command}", file=sys.stderr)
+            else:
+                print(f"  SQL:          (interactive psql session)", file=sys.stderr)
+        if "updateDatabase" in op_values:
+            start, end = self.update_start_number, self.update_end_number
+            if start == -1 and end == -1:
+                range_text = "all"
+            elif end == -1:
+                range_text = f"{start} onwards"
+            elif start == -1:
+                range_text = f"up to {end}"
+            else:
+                range_text = f"{start} -> {end}"
+            print(f"  Migration range: {range_text}", file=sys.stderr)
+        print("", file=sys.stderr)
+
+        try:
+            response = input('  Type "yes" to proceed (anything else aborts): ')
+        except EOFError:
+            response = ""
+        print("", file=sys.stderr)
+
+        if response.strip().lower() != "yes":
+            self.print_error("Production run aborted by user.")
+            return False
+        return True
+
     def execute_operation(self, operation: Operation) -> bool:
         """Execute a single operation"""
         self.print_info(f"Processing: {operation.value}")
@@ -1097,11 +1156,27 @@ class DebeeOrchestrator:
         if Path(local_env_file).exists():
             self.prepare_environment(local_env_file)
 
+        # Resolve migration range: CLI args win; otherwise fall back to env vars loaded above.
+        if self.update_start_number == -1 and self.env_vars.get("DBUPDATESTARTNUMBER"):
+            try:
+                self.update_start_number = int(self.env_vars["DBUPDATESTARTNUMBER"])
+            except ValueError:
+                pass
+        if self.update_end_number == -1 and self.env_vars.get("DBUPDATEENDNUMBER"):
+            try:
+                self.update_end_number = int(self.env_vars["DBUPDATEENDNUMBER"])
+            except ValueError:
+                pass
+
         # Set default tool paths if not defined
         if "DBPSQLFILE" not in self.env_vars:
             self.set_env_var("DBPSQLFILE", "psql")
         if "DBPGRESTOREFILE" not in self.env_vars:
             self.set_env_var("DBPGRESTOREFILE", "pg_restore")
+
+        # Production confirmation
+        if not self.confirm_production(operations):
+            return False
 
         # Execute operations
         for operation in operations:
@@ -1126,6 +1201,128 @@ def parse_operations(operations_str: str) -> List[Operation]:
             raise ValueError(f"Invalid operation: {op_str}")
 
     return operations
+
+
+LLM_REFERENCE_BODY = r"""
+Cross-platform database migration runner for PostgreSQL. Three interchangeable implementations:
+  debee.ps1 (PowerShell, Windows-primary) | debee.sh (Bash, Linux/macOS) | debee.py (Python, cross-platform)
+
+CONCEPT
+
+debee is a pure orchestration layer: all database logic lives in external .sql files. It reads
+connection + behavior settings from .env files, then runs a sequence of operations (recreate /
+restore / migrate / test / document) against a target PostgreSQL database using the system `psql`
+and `pg_restore` binaries. It performs no DB logic of its own beyond invoking those SQL files.
+
+INVOCATION
+
+  PowerShell:  .\debee.ps1 -Operations <op>[,<op>...] [options]
+  Bash:        ./debee.sh   -o <op>[,<op>...] [options]
+  Python:      python debee.py -o <op>[,<op>...] [options]
+
+Run from the directory that holds your .env file, migration files (NNN_*.sql), and (as needed) the
+recreate script, backup file, tests/ folder, and extract-db-objects.py. Migration files and tests
+are discovered relative to the current working directory.
+
+OPERATIONS  (comma-separated; default: fullService)
+
+  recreateDatabase     Drop and recreate the target DB by running the SQL script in DBRECREATESCRIPT,
+                       connected to DBCONNECTDB. Destructive.
+  restoreDatabase      Restore the target DB from DBBACKUPFILE using pg_restore (or psql for plain
+                       SQL). Format set by DBBACKUPTYPE (custom/plain/dir/tar). Parallel jobs via
+                       DBRESTOREJOBCOUNT. Optionally creates the DB first when DBCREATEONRESTORE=true.
+  updateDatabase       Apply numbered migration files matching ^NNN_*.sql in the current directory,
+                       ascending, within the [start..end] range. Empty files are skipped.
+  preUpdateScripts     Run the semicolon-separated SQL files in DBPREUPDATESCRIPTS (before update).
+  postUpdateScripts    Run the semicolon-separated SQL files in DBPOSTUPDATESCRIPTS (after update).
+  prepareVersionTable  Extract DB objects via extract-db-objects.py and emit documentation in the
+                       formats from DBVERSIONTABLEFORMATS (json;md;csv;html) to DBVERSIONTABLEOUTPUTFOLDER.
+  execSql              Run ad-hoc SQL: inline via --sql / -Sql, or a file via --sql-file / -SqlFile.
+                       With neither, opens an interactive psql session against the target DB.
+  runTests             Run SQL test files / suites from the tests/ folder. Global ordering from
+                       tests/tests.json. Filter with --test-filter; show PASS lines with --test-verbose.
+  fullService          recreateDatabase + restoreDatabase + preUpdateScripts + updateDatabase +
+                       postUpdateScripts, in sequence. Destructive - recreates and restores the DB.
+
+MIGRATION FILE NAMING
+
+  Pattern: NNN_description.sql
+    NNN          exactly 3 digits (001, 060, 999) - the ordering/selection key
+    _            underscore separator
+    description  any text
+    .sql         required extension
+  Files not matching ^\d{3}_.*\.sql$ are ignored. The range is inclusive; -1 means unbounded on that
+  end (start=-1, end=-1 -> all files). Start must not exceed a non-(-1) end.
+
+OPTIONS  (PowerShell / Bash + Python)
+
+  -Operations        / -o, --operations      Comma-separated operations (default fullService)
+  -Environment       / -e, --environment      Load debee.<name>.env instead of debee.env
+  -UpdateStartNumber / -s, --start-number     First migration number (default: env DBUPDATESTARTNUMBER, else all)
+  -UpdateEndNumber   / -n, --end-number       Last migration number  (default: env DBUPDATEENDNUMBER, else all)
+  -SqlFile           / --sql-file             SQL file to run (execSql)
+  -Sql               / --sql                  Inline SQL to run (execSql)
+  -TestFilter        / --test-filter          Filter test files by pattern (runTests; default all)
+  -TestVerbose       / --test-verbose         Show all test output including PASS lines
+  -Silent, -q        / -q, --silent           Suppress orchestration messages; errors + psql output remain
+  -Yes, -y           / -y, --yes              Skip production confirmation (needed for automation when DBPRODENVIRONMENT=true)
+  -Version, -V       / -V, --version          Print version and exit
+  -Help, -h          / -h, --help             Show short help
+  -Llm               / --llm                  Print this reference document
+
+ENVIRONMENT FILES  (loaded from the current directory)
+
+  With -Environment/-e NAME:  debee.<NAME>.env   then  .debee.<NAME>.env   (local overrides, gitignored)
+  Without an environment:     debee.env          then  .debee.env
+  The base file must exist; the .local file is optional and layered on top (later wins).
+
+ENVIRONMENT VARIABLES
+
+  Connection (standard libpq):
+    PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+  Core:
+    DBDESTDB              Target database name (required by most operations)
+    DBCONNECTDB           Maintenance/connect DB used while dropping/creating (e.g. postgres)
+    DBRECREATESCRIPT      SQL file run by recreateDatabase
+  Restore:
+    DBBACKUPFILE          Path to the backup to restore
+    DBBACKUPTYPE          Backup format: custom (default) / plain / dir / tar
+    DBRESTOREJOBCOUNT     Parallel pg_restore jobs (-j)
+    DBCREATEONRESTORE     true -> create the DB before restoring
+  Migrations:
+    DBUPDATESTARTNUMBER   Default start number when -s/-UpdateStartNumber not given
+    DBUPDATEENDNUMBER     Default end number when -n/-UpdateEndNumber not given
+    DBPREUPDATESCRIPTS    Semicolon-separated SQL files for preUpdateScripts
+    DBPOSTUPDATESCRIPTS   Semicolon-separated SQL files for postUpdateScripts
+  Version table:
+    DBVERSIONTABLEFORMATS       Semicolon list: json;md;csv;html (default json;md)
+    DBVERSIONTABLEOUTPUTFOLDER  Output directory (default .)
+    DBVERSIONTABLEFILENAME      Base output filename (default db-objects)
+  Tooling / safety:
+    DBPSQLFILE            psql binary/path (default psql)
+    DBPGRESTOREFILE       pg_restore binary/path (default pg_restore)
+    DBPRODENVIRONMENT     true -> require typed 'yes' confirmation before running (bypass with -Yes/-y)
+
+PRODUCTION CONFIRMATION
+
+  When DBPRODENVIRONMENT=true, debee prints the host/user/target-DB and operation list and requires
+  the user to type 'yes' before proceeding. Pass -Yes/-y to skip it in automated/CI runs.
+
+EXAMPLES
+
+  .\debee.ps1 -Operations fullService -Environment prod
+  ./debee.sh      -e dev -o restoreDatabase,updateDatabase
+  python debee.py -o updateDatabase -s 10 -n 20
+  .\debee.ps1 -Operations execSql -Sql "SELECT version();" -Silent
+  ./debee.sh      -o execSql --sql-file script.sql
+  python debee.py -o runTests --test-filter connection
+"""
+
+
+def format_llm_output() -> str:
+    """Return a single self-contained reference document for LLM/AI assistants."""
+    header = f"debee v{__version__} - PostgreSQL Migration Orchestrator"
+    return header + "\n" + LLM_REFERENCE_BODY
 
 
 def main():
@@ -1180,8 +1377,27 @@ Environment files:
     parser.add_argument('--no-color',
                         action='store_true',
                         help='Disable colored output')
+    parser.add_argument('-q', '--silent',
+                        action='store_true',
+                        help='Suppress orchestration messages (env loading, operation banners, '
+                             'final success). Warnings, errors, and psql output remain visible.')
+    parser.add_argument('-y', '--yes',
+                        action='store_true',
+                        help='Skip production confirmation prompt (required for automation when '
+                             'DBPRODENVIRONMENT=true is set in the env file).')
+    parser.add_argument('-V', '--version',
+                        action='version',
+                        version=f'debee.py {__version__}')
+    parser.add_argument('--llm',
+                        action='store_true',
+                        help='Print a full CLI reference document for LLM/AI assistants and exit')
 
     args = parser.parse_args()
+
+    # Print LLM reference and exit
+    if args.llm:
+        print(format_llm_output())
+        return 0
 
     # Disable colors if requested
     if args.no_color:
@@ -1197,7 +1413,8 @@ Environment files:
         return 1
 
     # Create orchestrator and run
-    orchestrator = DebeeOrchestrator(environment=args.environment)
+    orchestrator = DebeeOrchestrator(environment=args.environment, silent=args.silent,
+                                     assume_yes=args.yes)
 
     if orchestrator.run(operations, args.start_number, args.end_number,
                         sql_file=args.sql_file, sql_command=args.sql,
