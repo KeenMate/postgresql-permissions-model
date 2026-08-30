@@ -476,9 +476,9 @@ create or replace function unsecure.create_user_system() returns SETOF auth.user
     language sql
 as
 $$
-insert into auth.user_info( created_by, updated_by, user_type_code, can_login, email, display_name, username
+insert into auth.user_info( created_by, updated_by, user_type_code, can_login, email, original_email, display_name, username
 													, original_username)
-values ('initial_script', 'initial_script', 'system', false, 'system', 'System', 'system', 'system')
+values ('initial_script', 'initial_script', 'system', false, 'system', 'system', 'System', 'system', 'system')
 returning *;
 
 $$;
@@ -1520,9 +1520,9 @@ begin
 
 	if
 		__last_id is null then
-		insert into auth.user_info ( created_by, updated_by, user_type_code, username, original_username, email
+		insert into auth.user_info ( created_by, updated_by, user_type_code, username, original_username, email, original_email
 															 , display_name, last_used_provider_code)
-		values ( _created_by, _created_by, 'normal', __normalized_username, trim(_username), __normalized_email
+		values ( _created_by, _created_by, 'normal', __normalized_username, trim(_username), __normalized_email, trim(_email)
 					 , _display_name, _last_provider_code)
 		returning user_id into __last_id;
 	end if;
@@ -1570,19 +1570,19 @@ begin
 	end if;
 
 	if (__last_service_user_id is null) then
-		insert into auth.user_info ( created_by, updated_by, user_type_code, username, original_username, email
+		insert into auth.user_info ( created_by, updated_by, user_type_code, username, original_username, email, original_email
 															 , display_name)
-		values ( _created_by, _created_by, 'service', __normalized_username, trim(_username), __normalized_email
+		values ( _created_by, _created_by, 'service', __normalized_username, trim(_username), __normalized_email, trim(_email)
 					 , _display_name)
 		returning user_id
 			into __last_id;
 	else
-		insert into auth.user_info ( created_by, updated_by, user_id, user_type_code, username, original_username, email
+		insert into auth.user_info ( created_by, updated_by, user_id, user_type_code, username, original_username, email, original_email
 															 , display_name)
 		values ( _created_by, _created_by, __last_service_user_id + 1
 					 , 'service'
 					 , __normalized_username, trim(_username)
-					 , __normalized_email, _display_name)
+					 , __normalized_email, trim(_email), _display_name)
 		returning user_id
 			into __last_id;
 	end if;
@@ -1717,7 +1717,8 @@ begin
 			username          = trim(lower(_username)),
 			original_username = _username,
 			display_name      = _display_name,
-			email             = _email
+			email             = lower(trim(_email)),
+			original_email    = _email
 	where user_id = _target_user_id;
 
 	perform auth.create_user_event(_updated_by, _user_id, _correlation_id, 'update_user_info', _target_user_id);

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
+## 2026-08-29
+
+### Changed
+
+- **Vendored common-helpers v1-7** from `../postgresql-common-helpers` as `045_update_common-helpers_v1-7.sql` (this repo was synced through v1-6). Four helper fixes: `helpers.normalize_text` gains a `_trim` mode parameter (`'both'` default / `'left'` / `'right'` / `'none'`) so it now trims by default in addition to unaccent+lower; `helpers.delete_jsonb_fields` drops `STRICT` (a single-arg call was silently returning `null` instead of the data unchanged); `helpers.get_code` fixes an unintended regex range in `[^a-z0-9\-_]` that let `\`, `]`, `^` pass through; `helpers.random_string` supports lengths beyond md5's 32 chars. The `nrm_search_data` triggers (`017_functions_triggers.sql`) that call `normalize_text` now get whitespace trimming for free. **Email storage is deliberately left on `lower(trim(...))`, not `normalize_text`** — `normalize_text` unaccents, which is wrong for email canonicalization (you don't want `café@x.com` folded to `cafe@x.com` for login lookups), and it matches how `username` is handled.
+
+- **`auth.user_info` now keeps a normalized + original email pair**, mirroring the existing `username` / `original_username` split. New nullable `original_email` column stores the email exactly as supplied (trimmed only); the `email` column is now **consistently normalized** to `lower(trim(...))` on every write path. Previously `unsecure.update_user_info_basic_data` (the SSO re-login update path used by `auth.ensure_user_from_provider`) stored the raw email, so an existing user's `email` could drift to mixed-case/whitespaced values even though the login lookup key (`user_identity.uid`) stayed normalized. Both inserts (`unsecure.create_user_info`, `unsecure.create_service_user_info`) and the update now populate `email` (normalized) + `original_email` (original). `auth.ensure_user_from_provider`'s change-detection comparison was made case-insensitive and null-safe (`lower(trim(_email)) is distinct from` stored email) so a case-only difference no longer triggers a spurious update on every login. Added `tests/test_registration_login_events/008_email_normalization.sql` (3 assertions: register_user normalization + original_email preservation, and the SSO update path re-normalizing a changed email / never leaking a raw mixed-case email into the `email` column).
+
 ## 2026-08-18
 
 ### Fixed

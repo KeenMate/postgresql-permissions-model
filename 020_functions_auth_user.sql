@@ -829,7 +829,7 @@ begin
 		if
 			(trim(lower(_username)) <> __username
 				or _display_name <> __display_name
-				or _email <> __email) then
+				or lower(trim(_email)) is distinct from __email) then
 			perform unsecure.update_user_info_basic_data(_created_by, _user_id, _correlation_id, __target_user_id, _username, _display_name,
 																									 _email);
 		end if;

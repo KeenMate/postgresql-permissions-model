@@ -124,6 +124,9 @@ create table auth.user_info
     is_active               boolean default true                              not null,
     is_locked               boolean default false                             not null,
     original_username       text                                              not null,
+    original_email          text
+        constraint user_info_original_email_check
+            check (length(original_email) <= 255),
     user_preferences        jsonb   default '{}'::jsonb                       not null,
     nrm_username            text generated always as (lower(username)) stored not null,
     nrm_search_data         text,
