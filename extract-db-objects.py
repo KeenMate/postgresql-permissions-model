@@ -22,7 +22,7 @@ def get_sql_files() -> List[Path]:
     # Get migration files from current directory
     for file_path in Path('.').glob('*.sql'):
         name = file_path.name
-        if re.match(r'^\d{3}_', name) or re.match(r'^9\d_', name) or name == '999-examples.sql':
+        if re.match(r'^\d{3}_', name) or re.match(r'^9\d_', name):
             sql_files.append(file_path)
 
     # Get ad-hoc files from environment-specified directory
@@ -41,8 +41,6 @@ def get_sql_files() -> List[Path]:
             return (0, int(match.group(1)))
         elif match := re.match(r'^9(\d)_', name):
             return (0, 90 + int(match.group(1)))
-        elif name == '999-examples.sql':
-            return (0, 999)
         # Ad-hoc files come after migration files, sorted alphabetically
         else:
             return (1, str(path))

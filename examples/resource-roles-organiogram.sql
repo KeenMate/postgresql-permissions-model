@@ -15,8 +15,8 @@
  *   Diana  (Product)    — org_writer on product.design, org_reader on product
  *   Eve    (HR Admin)   — org_writer on hr, deny assign_manager on hr.benefits
  *
- * Run:  ./debee.ps1 -Operations execSql -SqlFile 999-examples-organiogram.sql
- *       ./debee.sh -o execSql --sql-file 999-examples-organiogram.sql
+ * Run:  ./debee.ps1 -Operations execSql -SqlFile examples/resource-roles-organiogram.sql
+ *       ./debee.sh -o execSql --sql-file examples/resource-roles-organiogram.sql
  *
  * Everything runs in a transaction and rolls back at the end so nothing persists.
  */

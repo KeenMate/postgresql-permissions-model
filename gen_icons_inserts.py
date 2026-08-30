@@ -3,7 +3,7 @@ import os
 import re
 
 BASE = 'C:/Git/KM/pure-admin-icons/.cache/icons/material/material-design-icons-master'
-OUT  = '999-examples-icons-data.sql'
+OUT  = 'examples/resource-acl-icons-data.sql'
 
 
 def path_to_ltree(p: str) -> str:

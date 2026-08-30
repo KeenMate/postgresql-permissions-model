@@ -11,7 +11,7 @@
  *   1. Regenerate the insert data (if not already present):
  *      python gen_icons_inserts.py
  *   2. Execute this file:
- *      ./debee.ps1 -Operations execSql -SqlFile 999-examples-icons.sql
+ *      ./debee.ps1 -Operations execSql -SqlFile examples/resource-acl-icons.sql
  *
  * Everything lives under the `demo` schema so you can drop it wholesale
  * when you're done. Nothing in this file mutates production tables except
@@ -60,7 +60,7 @@ create index        ix_fs_item_has_perms on demo.fs_item (has_permissions) where
 -- 2. Load the generated data
 -- ============================================================================
 
-\i 999-examples-icons-data.sql
+\i examples/resource-acl-icons-data.sql
 
 do $$
 declare

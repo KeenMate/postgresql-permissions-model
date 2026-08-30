@@ -136,7 +136,7 @@ Use the `execSql` operation built into debee for quick SQL execution:
 
 ```powershell
 # Run SQL file
-./debee.ps1 -Operations execSql -SqlFile 999-examples.sql
+./debee.ps1 -Operations execSql -SqlFile examples/01-user-provisioning.sql
 
 # Run inline SQL
 ./debee.ps1 -Operations execSql -Sql "SELECT * FROM auth.user_info LIMIT 5;"
@@ -147,14 +147,14 @@ Use the `execSql` operation built into debee for quick SQL execution:
 
 ```bash
 # Bash equivalent
-./debee.sh -o execSql --sql-file 999-examples.sql
+./debee.sh -o execSql --sql-file examples/01-user-provisioning.sql
 ./debee.sh -o execSql --sql "SELECT * FROM auth.user_info LIMIT 5;"
 ./debee.sh -o execSql
 ```
 
 ```bash
 # Python equivalent
-python debee.py -o execSql --sql-file 999-examples.sql
+python debee.py -o execSql --sql-file examples/01-user-provisioning.sql
 python debee.py -o execSql --sql "SELECT * FROM auth.user_info LIMIT 5;"
 python debee.py -o execSql
 ```
@@ -473,7 +473,7 @@ All tests are organized as suite directories with `test.json` manifests:
 4. Place cleanup in the 900-999 range so it runs even on failure
 
 ### Manual Testing
-- Use `999-examples.sql` for interactive testing scenarios
+- Use the topic-grouped scripts under `examples/` (see `examples/README.md`) for interactive, self-contained usage scenarios — each runs in a transaction that rolls back
 - Always test permission inheritance and tenant isolation
 - Verify audit events are properly logged
 
