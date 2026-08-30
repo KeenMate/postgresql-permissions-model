@@ -9,6 +9,7 @@ The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/
 ### Fixed
 
 - **`auth.get_tenant_by_id` now exposes `__deleted_at` / `__purged_at`** — the single-fetch path was missing the two soft-delete columns that `auth.get_tenants` (the list path) gained in the 2026-08-17 tenant soft-delete work, so `get_by_id` could not signal that a tenant is soft-deleted or purged. Added both columns to its `returns table(...)` and select list in `023_functions_auth_tenant.sql`, matching `auth.get_tenants`. `tests/test_tenant_soft_delete/001_soft_delete_and_access.sql` gains an assertion that the by-id path reports `deleted_at` set / `purged_at` null after a soft delete.
+- **`auth.create_service_user_info` stored `email` and `display_name` in each other's columns** — the wrapper passed `_email, _display_name` **positionally** into `unsecure.create_service_user_info`, whose parameter order is `(_username, _display_name, _email)`, so a service user created via the public API ended up with its email under `display_name` and vice-versa (e.g. `email = 'gordon cole'`). The underlying `unsecure` function and the seed-data callers were already correct and are unchanged; only the `auth` wrapper is fixed, now passing `_display_name := …, _email := …` by name (`020_functions_auth_user.sql`). New regression test `tests/test_service_user_info.sql` asserts each value lands in its own column. This escaped notice because callers rarely re-read the stored columns, and API keys (the main service-user path) don't set a display name.
 
 ## 2026-08-29
 

@@ -277,8 +277,8 @@ begin
 	return query
 		select user_id, username, email, display_name
 		from unsecure.create_service_user_info(_created_by, _user_id, _correlation_id, _username,
-																					 _email, _display_name,
-																					 _custom_service_user_id);
+																					 _display_name := _display_name, _email := _email,
+																					 _custom_service_user_id := _custom_service_user_id);
 end;
 $$;
 
