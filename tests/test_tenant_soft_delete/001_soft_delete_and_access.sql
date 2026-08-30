@@ -13,6 +13,8 @@ declare
     __purged_at  timestamptz;
     __row_count  int;
     __mgmt_deleted_at timestamptz;
+    __byid_deleted_at timestamptz;
+    __byid_purged_at  timestamptz;
 begin
     raise notice 'TEST 1: soft delete sets deleted_at, keeps row, blocks access';
 
@@ -63,5 +65,15 @@ begin
         raise notice '  PASS: get_tenants exposes deleted_at for management';
     else
         raise exception '  FAIL: get_tenants did not expose deleted_at';
+    end if;
+
+    -- Single-fetch path exposes the same soft-delete state
+    select gt.__deleted_at, gt.__purged_at
+    from auth.get_tenant_by_id(__tid) gt
+    into __byid_deleted_at, __byid_purged_at;
+    if __byid_deleted_at is not null and __byid_purged_at is null then
+        raise notice '  PASS: get_tenant_by_id exposes deleted_at / purged_at';
+    else
+        raise exception '  FAIL: get_tenant_by_id soft-delete state wrong deleted_at=% purged_at=%', __byid_deleted_at, __byid_purged_at;
     end if;
 end $$;

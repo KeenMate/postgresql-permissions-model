@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Entries are date-tagged rather than semver-tagged: the project is pre-release and tracks DB-component versions (e.g. `postgresql_permissionmodel` v2) in `public.__version` instead of bumping a semver tag per change. See the **Component Versions** section at the bottom.
 
+## 2026-08-30
+
+### Fixed
+
+- **`auth.get_tenant_by_id` now exposes `__deleted_at` / `__purged_at`** — the single-fetch path was missing the two soft-delete columns that `auth.get_tenants` (the list path) gained in the 2026-08-17 tenant soft-delete work, so `get_by_id` could not signal that a tenant is soft-deleted or purged. Added both columns to its `returns table(...)` and select list in `023_functions_auth_tenant.sql`, matching `auth.get_tenants`. `tests/test_tenant_soft_delete/001_soft_delete_and_access.sql` gains an assertion that the by-id path reports `deleted_at` set / `purged_at` null after a soft delete.
+
 ## 2026-08-29
 
 ### Changed

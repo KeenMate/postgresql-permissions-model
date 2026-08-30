@@ -44,7 +44,7 @@ end;
 $$;
 
 create or replace function auth.get_tenant_by_id(_tenant_id integer DEFAULT 1)
-    returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean)
+    returns TABLE(__created_at timestamp with time zone, __created_by text, __updated_at timestamp with time zone, __updated_by text, __tenant_id integer, __uuid text, __title text, __code text, __is_removable boolean, __is_assignable boolean, __deleted_at timestamp with time zone, __purged_at timestamp with time zone)
     language sql
 as
 $$
@@ -58,6 +58,8 @@ select created_at
 		 , code
 		 , is_removable
 		 , is_assignable
+		 , deleted_at
+		 , purged_at
 from auth.tenant t
 where tenant_id = _tenant_id;
 $$;
